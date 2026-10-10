@@ -15,13 +15,13 @@ const setup = (code) => page.evaluate(async (c) => {
   const g = window.__arena; const m = await import('/src/simulation/lion.ts'); const pl = await import('/src/simulation/player.ts');
   await (new Function('g', 'm', 'pl', 'return (async()=>{' + c + '})()'))(g, m, pl);
 }, code);
-const base = (px, pz, lz, extra = '') => `g.timeScale = 1; g.sim.ctx.hitstop = 0; g.sim.ctx.graceUntil = 1e9; g.sim.player.lockOn = true; g.sim.player.hp = g.sim.player.hpMax = 1000; g.sim.player.pos={x:${px},z:${pz}}; g.sim.player.yaw=0; g.sim.physics.teleport('player', g.sim.player.pos, 0);
+const base = (px, pz, lz, extra = '') => `g.timeScale = 1; g.inputOverride = null; g.sim.ctx.phase = 'fight'; g.sim.victoryT = 0; pl.setMode(g.sim.player, 'free'); g.sim.player.hp = g.sim.player.hpMax; g.sim.ctx.hitstop = 0; g.sim.ctx.graceUntil = 1e9; g.sim.player.lockOn = true; g.sim.player.hp = g.sim.player.hpMax = 1000; g.sim.player.pos={x:${px},z:${pz}}; g.sim.player.yaw=0; g.sim.physics.teleport('player', g.sim.player.pos, 0);
   g.sim.lion.attack=null; g.sim.lion.pos={x:0,z:${lz}}; g.sim.lion.yaw=Math.PI; g.sim.physics.teleport('lion', g.sim.lion.pos, Math.PI); g.sim.lion.mode='idle'; g.sim.lion.modeT=0; g.sim.lion.modeDur=1e9; g.sim.lion.y=0; g.sim.lion.invuln=false; g.scene.cam.reset(g.sim); ${extra}`;
 
 /** 슬로 모션으로 진행시키다가 cond(JS 식)가 참이 되면 완전히 멈추고 캡처한다 */
-async function capture(name, setupCode, cond, { slow = 0.06, preAdvance = 0, wait = 3500, side = { d: 6.5, h: 2.4 } } = {}) {
-  if (only && !name.includes(only)) return;
-  await setup(setupCode + (preAdvance ? `g.simAdvance(${preAdvance});` : ''));
+async function capture(name, setupCode, cond, { slow = 0.06, preAdvance = 0, wait = 3500, side = { d: 6.5, h: 2.4 }, hold = '' } = {}) {
+  if (only && !only.split(',').some((o) => name.includes(o))) return;
+  await setup(setupCode + (preAdvance ? `g.simAdvance(${preAdvance});` : '') + (hold === 'guard' ? "g.inputOverride = () => ({moveX:0,moveY:0,run:false,guard:true,cameraYaw:0,pressed:{light:false,heavy:false,dodge:false,heal:false,lock:false}});" : ''));
   await page.evaluate((s) => { window.__arena.timeScale = s; }, slow);
   const t0 = Date.now();
   for (;;) {
@@ -37,9 +37,9 @@ async function capture(name, setupCode, cond, { slow = 0.06, preAdvance = 0, wai
     // 옆에서 본 시점: 이펙트가 가려지지 않은 상태를 확인한다
     await page.evaluate((c) => {
       const g = window.__arena; const V = g.scene.cam.camera.position.constructor;
-      const mx = (g.sim.player.pos.x + g.sim.lion.pos.x) / 2, mz = (g.sim.player.pos.z + g.sim.lion.pos.z) / 2;
+      const mx = c.focus ? g.sim.player.pos.x : (g.sim.player.pos.x + g.sim.lion.pos.x) / 2, mz = c.focus ? g.sim.player.pos.z : (g.sim.player.pos.z + g.sim.lion.pos.z) / 2;
       g.scene.cam.debugShot = { pos: new V(mx + c.d, c.h, mz - 1.5), look: new V(mx, 0.9, mz), fov: 55 };
-    }, { d: side.d ?? 6.5, h: side.h ?? 2.4 });
+    }, { d: side.d ?? 6.5, h: side.h ?? 2.4, focus: !!side.focus });
     await sleep(2500);
     await page.screenshot({ path: `captures/${name}_side.png` });
     await page.evaluate(() => { window.__arena.scene.cam.debugShot = null; });
@@ -56,6 +56,16 @@ await capture('fx_backhop', base(0, -3.5, 0, "m.startLionAttack(g.sim.ctx,'backH
 await capture('fx_player_hit', base(0, -2.1, 0, "g.sim.player.lockOn=true; m.startLionAttack(g.sim.ctx,'swipe'); g.sim.lion.attack.hold=0; g.sim.lion.attack.t = 0.6;"), 'g.sim.stats.damageTaken > 0', { slow: 0.08 });
 await capture('fx_lion_hit', `${base(0, -2.0, 0)} g.sim.step({moveX:0,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:true,heavy:false,dodge:false,heal:false,lock:false}});`, 'g.sim.stats.hitsLanded > 0', { slow: 0.08 });
 await capture('fx_player_attack', `${base(0, -3.0, 2.5)} g.sim.ctx.graceUntil = 1e9; g.sim.step({moveX:0,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:true,heavy:false,dodge:false,heal:false,lock:false}});`, 'g.sim.player.mode === "attack" && g.sim.player.modeT >= 0.14', { slow: 0.04, side: { d: 3.4, h: 1.2 } });
+// ── 모션 캡처 적용 확인 ──
+const light = "{moveX:0,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:false,heavy:true,dodge:false,heal:false,lock:false}}";
+await capture('mc_heavy_windup', `${base(0, -4.5, 0.2)} g.sim.step(${light});`, 'g.sim.player.mode === "attack" && g.sim.player.modeT >= 0.30', { slow: 0.04, side: { d: 4.5, h: 1.6 } });
+await capture('mc_heavy_apex', `${base(0, -4.5, 0.2)} g.sim.step(${light});`, 'g.sim.player.mode === "attack" && g.sim.player.modeT >= 0.62', { slow: 0.04, side: { d: 4.5, h: 1.6 } });
+await capture('mc_heavy_slam', `${base(0, -4.5, 0.2)} g.sim.step(${light});`, 'g.sim.player.mode === "attack" && g.sim.player.modeT >= 0.9', { slow: 0.04, side: { d: 4.5, h: 1.4 } });
+await capture('mc_block', `${base(0, -3.5, 2.5)} g.sim.lion.mode='dormant'; g.sim.player.guardHeld = true;`, 'true', { slow: 1, wait: 2500, side: { d: 3.2, h: 1.3, focus: true }, hold: 'guard' });
+await capture('mc_death', `${base(0, -3.5, 2.5)} g.sim.lion.mode='dormant'; pl.setMode(g.sim.player, 'dead'); g.sim.player.hp = 0;`, 'g.sim.player.modeT >= 1.2', { slow: 0.2, side: { d: 4.5, h: 1.2, focus: true } });
+await capture('mc_victory_sheath', `${base(0, -3.5, 2.5)} g.sim.lion.mode='dormant'; g.sim.ctx.phase='victory'; g.sim.victoryT = 0; pl.setMode(g.sim.player, 'victory');`, 'g.sim.victoryT >= 2.3', { slow: 0.2, side: { d: 3.6, h: 1.4, focus: true } });
+await capture('mc_turn180', `${base(0, -3.5, 2.5)} g.sim.lion.mode='dormant'; g.sim.player.lockOn = false; g.sim.player.yaw = 0; g.inputOverride = () => ({moveX:0,moveY:-1,run:false,guard:false,cameraYaw:0,pressed:{light:false,heavy:false,dodge:false,heal:false,lock:false}});`, 'g.scene.gladiator.anim.turnT !== null && g.scene.gladiator.anim.turnT > 0.07', { slow: 0.05, side: { d: 3.6, h: 1.4, focus: true } });
+await setup('g.inputOverride = null;');
 await capture('fx_phase2_embers', base(0, -4.5, 0.4, "g.sim.lion.hp = g.sim.lion.hpMax*0.5; g.sim.lion.pendingPhase2 = true; g.sim.lion.modeDur = 0.05; g.sim.ctx.graceUntil = 0;"), 'g.sim.lion.phase === 2 && g.sim.lion.mode === "roar" && g.sim.lion.modeT > 1.2', { slow: 0.25, preAdvance: 0.2 });
 
 if (!only || 'claw_trail'.includes(only) || only.includes('claw')) {

@@ -3,6 +3,7 @@
  * 좌표: 캐릭터 로컬 (x=왼쪽 +, y=위, z=앞), 단위 미터. 시간: 해당 동작 시작부터 초.
  */
 import type { V3 } from '../simulation/math';
+import { MOCAP } from '../animation/mocapData';
 
 export type PlayerAttackId = 'light1' | 'light2' | 'light3' | 'heavy';
 
@@ -36,6 +37,8 @@ export interface PlayerAttackDef {
   keys: SwordKey[];
   next?: PlayerAttackId;
   swingSound: number;
+  /** 모션 캡처 클립으로 구동되는 공격: 클립 이름, 재생 배속, 땅을 찍는 시점(초), 클립이 이동하는 최대 거리(m) */
+  clip?: { name: 'attack'; speed: number; slamAt: number; travelMax: number };
 }
 
 export const SWORD = { bladeStart: 0.075, bladeLen: 0.56, hitRadius: 0.07 };
@@ -120,7 +123,41 @@ function retime(def: PlayerAttackDef, f: number, lungeMul: number) {
 retime(PLAYER_ATTACKS.light1, 0.78, 1.45);
 retime(PLAYER_ATTACKS.light2, 0.78, 1.45);
 retime(PLAYER_ATTACKS.light3, 0.84, 1.3);
-retime(PLAYER_ATTACKS.heavy, 0.88, 1.3);
+
+/**
+ * 강공격 = 모션 캡처 "도약 내려찍기"(sword_and_shield_attack). 판정용 검 키는 리타게팅한 클립에서 그대로 읽는다.
+ * 클립 시간 → 게임 시간은 /speed. 수평 이동은 시뮬레이션이 clipTravel 곡선으로 직접 수행한다(애니메이션에는 루트 모션이 없다).
+ */
+const HEAVY_SPEED = 1.35;
+function buildClipHeavy(): PlayerAttackDef {
+  const c = MOCAP.attack;
+  const keys: SwordKey[] = [];
+  for (let i = 0; i < c.frames; i++) {
+    const o = i * 6;
+    keys.push({ t: i / c.fps / HEAVY_SPEED, hand: [c.sword[o], c.sword[o + 1], c.sword[o + 2]], dir: [c.sword[o + 3], c.sword[o + 4], c.sword[o + 5]], twist: 0, lean: 0 });
+  }
+  const S = HEAVY_SPEED;
+  let travelMax = 0;
+  for (let i = 0; i < c.frames; i++) travelMax = Math.max(travelMax, c.travel[i * 2 + 1]);
+  return {
+    id: 'heavy', duration: (c.frames - 1) / c.fps / S, cost: 32, damage: 78, poise: 48,
+    // 칼끝이 15m/s 이상으로 내려꽂히는 구간(클립 1.09~1.28초)
+    activeStart: 1.09 / S, activeEnd: 1.28 / S, comboAt: 9, cancelAt: 1.4 / S,
+    lunge: { start: 0, end: 0, distance: 0 }, trackUntil: 0.5 / S, hitstop: 0.14, swingSound: 1.02 / S,
+    keys, clip: { name: 'attack', speed: S, slamAt: 1.22 / S, travelMax },
+  };
+}
+PLAYER_ATTACKS.heavy = buildClipHeavy();
+
+/** 클립의 수평 이동 진행도(0..1): 게임 시간 t(초)까지 전체 이동 거리의 몇 퍼센트를 갔는가 */
+export function clipTravel(name: 'attack', t: number): number {
+  const c = MOCAP[name];
+  const f = Math.min(Math.max(t * (PLAYER_ATTACKS.heavy.clip?.speed ?? 1) * c.fps, 0), c.frames - 1);
+  const i0 = Math.floor(f), i1 = Math.min(c.frames - 1, i0 + 1), u = f - i0;
+  const z0 = c.travel[i0 * 2 + 1], z1 = c.travel[i1 * 2 + 1];
+  const max = PLAYER_ATTACKS.heavy.clip?.travelMax || 1;
+  return Math.min(1, Math.max(0, (z0 + (z1 - z0) * u) / max));
+}
 
 export const LIGHT_CHAIN: PlayerAttackId[] = ['light1', 'light2', 'light3'];
 

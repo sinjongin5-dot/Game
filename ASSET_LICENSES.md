@@ -2,6 +2,7 @@
 
 ## 요약
 - 이 프로젝트의 **3D 모델(사자, 검투사, 방패, 검, 투구 등), 텍스처, 효과음, 음악은 모두 이 저장소의 생성 스크립트가 만들어 낸 원본**입니다. 외부 사이트에서 내려받은 모델·사운드·이미지는 **사용하지 않았습니다**.
+- 예외 하나: **검투사의 모션 캡처 애니메이션 5개**(강공격 도약 베기, 방패 막기, 사망, 납검, 180도 회전)는 사용자가 직접 내려받아 제공한 Mixamo(Adobe) 클립을 이 게임의 리그로 리타게팅한 것입니다. 아래 *Mixamo 애니메이션* 항목을 읽어 주세요.
 - 제작 환경의 네트워크 정책이 외부 에셋 사이트(Sketchfab, Poly Haven, Quaternius, Freesound 등)에 대한 접근을 차단하고 있어 실제 다운로드와 라이선스 확인이 불가능했습니다. 확인하지 못한 에셋은 배포용으로 쓰지 않는다는 원칙에 따라, 전부 자체 생성 파이프라인으로 대체했습니다.
 - 생성 결과물은 이 프로젝트의 일부로서 프로젝트 라이선스(저장소 소유자 지정)에 따릅니다. 외부 저작물이 섞여 있지 않으므로 별도의 표시 의무가 없습니다.
 
@@ -12,7 +13,16 @@
 | `public/assets/models/gladiator.glb` | 이 프로젝트 | `tools/gen-gladiator.ts` — 인체/청동 투구/정강이받이/마니카/가죽/천/글라디우스/스쿠툼, 16개 본 | |
 | `public/assets/textures/shield_face.png` | 이 프로젝트 | `tools/gen-textures.ts` 절차적 페인팅(번개·날개 문양, 마모) | 도형은 직접 작도, 기존 로고/문장 복제 아님 |
 | 모래·석재·깃발·털·피부·금속 재질 | 이 프로젝트 | 셰이더 내 절차적 생성 (`src/render/*Material*.ts`) | 이미지 파일 없음 |
-| `public/assets/audio/*.ogg` (40개) | 이 프로젝트 | `tools/gen-audio.py` — numpy/scipy 로 합성 (성대 펄스+포먼트, 필터링 노이즈, 비조화 부분음 등) | 녹음/샘플 사용 없음. 음악 3곡(calm/battle/phase2)과 스팅 포함 |
+| `public/assets/audio/*.ogg` (48개) | 이 프로젝트 | `tools/gen-audio.py`(효과음, 대기 음악, 스팅), `tools/gen-music.py`(보스전 음악 2곡) — numpy/scipy 로 합성 (성대 펄스+포먼트, 필터링 노이즈, 비조화 부분음, 톱니파 현/금관 등) | 녹음/샘플 사용 없음 |
+
+## Mixamo 애니메이션 (사용자 제공, Adobe)
+| 항목 | 내용 |
+|---|---|
+| 원본 | `sword_and_shield_attack`, `sword_and_shield_block`, `sword_and_shield_death`, `sheath_sword_1`, `sword_and_shield_180_turn` (Mixamo, FBX, 사용자가 직접 내려받아 대화에 첨부) |
+| 이 저장소에 있는 것 | 리타게팅·베이크한 **회전/위치 곡선 데이터** `src/animation/mocapData.ts` 와 변환 도구 `tools/bake-anims.ts`. **원본 FBX 파일은 저장소에 넣지 않았습니다**(`assets-src/` 는 `.gitignore`). |
+| 변환 | Mixamo 뼈 22개의 회전을 이 프로젝트 검투사 리그(T 자세 → 팔을 내린 자세)에 뼈 방향 기반으로 옮기고(`tools/bake-anims.ts` 주석 참고), 검/방패를 쥔 손의 쥐는 각도를 보정했습니다. 캐릭터 메시·텍스처는 Mixamo 것을 쓰지 않고 이 프로젝트 모델을 그대로 씁니다. |
+| 라이선스 | Mixamo 애니메이션은 Adobe 계정으로 무료로 받아 상업 프로젝트를 포함한 자신의 게임/영상에 사용할 수 있고, **애니메이션 파일 자체를 단독으로 재배포·판매하는 것은 금지**되는 것으로 알고 있습니다(제 이해이며 법률 자문이 아닙니다 — 현재 약관은 Adobe 의 Mixamo FAQ/약관에서 직접 확인하세요). 그래서 원본 FBX 는 공개하지 않고, 게임에 내장된 변환 데이터만 포함했습니다. 저장소를 **공개**하거나 이 데이터를 단독으로 배포하려면 약관 해당 여부를 먼저 확인하세요. 문제가 되면 `src/animation/mocapData.ts` 를 지우고 `PlayerAttackDef.clip` 을 쓰지 않도록 하면(절차적 애니메이션으로 되돌림) 나머지 에셋은 영향이 없습니다. |
+| 다시 만들기 | FBX 5개를 `assets-src/mocap/` 에 `attack.fbx, block.fbx, death.fbx, sheath.fbx, turn180.fbx` 이름으로 두고 `npx tsx tools/bake-anims.ts` |
 
 ## 제3자 소프트웨어 (런타임 번들)
 | 구성요소 | 버전 | 라이선스 |

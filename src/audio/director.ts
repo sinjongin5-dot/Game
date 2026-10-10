@@ -102,6 +102,10 @@ export class AudioDirector {
           else if (e.attack === 'whirl') a.play('lion_whirl', { volume: 0.95, pos: p });
           break;
         }
+        case 'playerSlam':
+          a.play('impact_boom', { volume: 0.75, rate: 1.1, pos: { x: e.pos.x, y: 0.2, z: e.pos.z } });
+          a.play('step_sand_0', { volume: 0.9, rate: 0.7, pos: { x: e.pos.x, y: 0.1, z: e.pos.z } });
+          break;
         case 'lionSlam': {
           const p = { x: e.pos.x, y: 0.3, z: e.pos.z };
           a.play('lion_quake', { volume: 1, pos: p, reverb: 0.35 });

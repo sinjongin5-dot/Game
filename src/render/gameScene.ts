@@ -286,6 +286,15 @@ export class GameScene {
           this.crowd.cheerBurst(0.9);
           break;
         }
+        case 'playerSlam': {
+          const c = new V3(e.pos.x, 0, e.pos.z);
+          this.particles.ring(c, 1.4, 34);
+          this.particles.debris(c.clone().setY(0.15), 12);
+          this.fx.shock(e.pos.x, e.pos.z, 0.3, 3.2, 0.4, 0.55, 0xffe6bb, 0.6);
+          this.cam.addTrauma(0.45);
+          this.cam.punchFov(1.6);
+          break;
+        }
         case 'lionHop': {
           this.particles.puff(new V3(e.pos.x, 0.05, e.pos.z), 1.0, undefined, 10);
           this.cam.addTrauma(0.15);

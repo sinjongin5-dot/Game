@@ -173,6 +173,8 @@ export class GladiatorActor {
   swordTip = new THREE.Vector3();
   swordBase = new THREE.Vector3();
   private sword: THREE.Object3D[] = [];
+  private yawHist: { time: number; yaw: number }[] = [];
+  private lastTurn = -10;
 
   constructor(assets: LoadedAssets) {
     const g = assets.gltf.gladiator;
@@ -199,6 +201,8 @@ export class GladiatorActor {
 
   reset() {
     this.animator.reset();
+    this.yawHist.length = 0;
+    this.lastTurn = -10;
   }
 
   update(sim: GameSim, alpha: number, dt: number, time: number, opts: { scripted?: PlayerViewOverride } = {}) {
@@ -235,8 +239,15 @@ export class GladiatorActor {
       victoryT: sim.phase === 'victory' ? sim.victoryT : p.modeT,
       ...(opts.scripted ?? {}),
     };
+    // 제자리에서 급격히(약 150° 이상) 돌아서면 180도 회전 모션을 재생한다 (회전 자체는 시뮬레이션이 담당)
+    this.yawHist.push({ time, yaw: t.yaw });
+    while (this.yawHist.length && time - this.yawHist[0].time > 0.28) this.yawHist.shift();
+    if (this.yawHist.length > 2 && p.mode === 'free' && !p.lockOn && time - this.lastTurn > 0.9) {
+      if (Math.abs(angleDiff(t.yaw, this.yawHist[0].yaw)) > 2.6 && p.speed < 5) { this.animator.startTurn(); this.lastTurn = time; }
+    }
     this.animator.update(hold ? 0 : dt, view);
     this.animator.rig.applyTo(this.bones);
+    for (const m of this.sword) m.visible = !this.animator.swordHidden;
     if (this.flask) this.flask.visible = this.animator.flaskVisible;
     this.lastFeet.length = 0;
     for (const e of this.animator.footEvents as FootEvent[]) {

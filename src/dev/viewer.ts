@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { createCharMaterial } from '../render/charMaterials';
+import { MocapSampler, type MocapName } from '../animation/mocap';
 import { GladiatorAnimator, type PlayerView } from '../animation/gladiatorAnimator';
 import { LionAnimator, type LionView } from '../animation/lionAnimator';
 import { mapBones } from '../render/skeletonUtil';
@@ -96,6 +97,13 @@ _gl.load(`/assets/models/${model}.glb`, (g) => {
     if (pose === 'strafe') { v.speed = 3; v.moveLocal = { x: 3, z: 0 }; }
     const steps = pose === 'walk' || pose === 'run' || pose === 'strafe' ? Math.round(T * 60) : 3;
     for (let i = 0; i < steps; i++) anim.update(1 / 60, v);
+    if (pose.startsWith('mc_')) {
+      // 리타게팅한 모션 캡처 클립을 그대로 재생 (확인용): ?pose=mc_attack&t=1.1
+      const sampler = new MocapSampler(pose.slice(3) as MocapName);
+      anim.rig.reset();
+      sampler.apply(anim.rig, T);
+      anim.rig.fk();
+    }
     anim.rig.applyTo(bones);
     g.scene.traverse((o) => { if (o.name === 'flask') o.visible = anim.flaskVisible; });
   }

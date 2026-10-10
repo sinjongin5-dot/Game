@@ -29,6 +29,26 @@ async function fight(seed: number, skill: number, maxSec = 420) {
 }
 
 describe('Rapier 물리 + 전체 전투 시뮬레이션', () => {
+  it('걷는 동안 속도가 일정하다 (바닥 접촉 때문에 떨리던 문제의 회귀 테스트)', async () => {
+    for (const mode of ['forward', 'strafe-lock'] as const) {
+      const sim = new GameSim(await RapierPhysics.create(), { skipIntro: true, seed: 3 });
+      sim.ctx.graceUntil = 1e9;
+      sim.ctx.lion.mode = mode === 'forward' ? 'dormant' : 'idle';
+      sim.ctx.lion.modeDur = 1e9;
+      sim.player.lockOn = mode === 'strafe-lock';
+      const sp: number[] = [], lat: number[] = [];
+      for (let i = 0; i < 150; i++) {
+        sim.step({ ...emptyInput(), cameraYaw: 0, moveY: mode === 'forward' ? 1 : 0, moveX: mode === 'forward' ? 0 : 1 });
+        if (i > 25) { sp.push(sim.player.speed); lat.push(mode === 'forward' ? sim.player.moveLocal.x : sim.player.moveLocal.z); }
+      }
+      const sd = (a: number[]) => { const m = a.reduce((x, y) => x + y, 0) / a.length; return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length); };
+      expect(sd(sp), mode).toBeLessThan(0.02);
+      expect(Math.max(...sp) - Math.min(...sp), mode).toBeLessThan(0.1);
+      if (mode === 'forward') expect(Math.max(...lat.map(Math.abs)), `${mode} 옆 성분`).toBeLessThan(0.05);
+      sim.dispose();
+    }
+  });
+
   it('플레이어는 벽 밖으로 나가지 못하고 사자를 통과하지 못한다', async () => {
     const sim = new GameSim(await RapierPhysics.create(), { skipIntro: true });
     sim.ctx.lion.mode = 'dormant';

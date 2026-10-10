@@ -1,4 +1,4 @@
-import { LIGHT_CHAIN, PLAYER_ATTACKS, sampleSword, SWORD, type PlayerAttackId } from '../combat/attackData';
+import { clipTravel, LIGHT_CHAIN, PLAYER_ATTACKS, sampleSword, SWORD, type PlayerAttackId } from '../combat/attackData';
 import type { SimContext } from './context';
 import {
   approach, approachAngle, clamp, dist2, forward, leftOf, len2, norm2, v2, wrapAngle, yawOf,
@@ -13,7 +13,7 @@ export function createPlayer(): PlayerState {
   return {
     pos: { x: 0, z: -8.2 }, yaw: 0, vel: v2(), hp: T.hp, hpMax: T.hp, stamina: T.stamina, staminaMax: T.stamina,
     staminaDelay: 0, exhausted: false, heals: T.heal.charges, mode: 'free', modeT: 0,
-    attackId: null, attackSerial: 0, attackHitDone: false, attackChain: 0, lastAttackEnd: -10,
+    attackId: null, attackSerial: 0, attackHitDone: false, attackTravel: 0, slamFired: false, attackChain: 0, lastAttackEnd: -10,
     dodge: { dir: v2(0, 1), backstep: false, dodgedSet: 0 },
     guardHeld: false, guardUpT: 0, guardImpact: 0, healApplied: false,
     hitDir: v2(0, -1), hitHeavy: false, invulnT: 0, knock: v2(), lockOn: false, running: false, speed: 0,
@@ -106,6 +106,16 @@ function startAttack(ctx: SimContext, p: PlayerState, id: PlayerAttackId, chain:
   p.modeT = 0;
   p.attackId = id;
   p.attackSerial++;
+  p.slamFired = false;
+  p.attackTravel = 0;
+  if (def.clip) {
+    // 도약 내려찍기: 사자 앞 1.7m 지점에 내려앉도록 이동 거리를 정한다 (사자가 없거나 정면이 아니면 기본 거리)
+    const lion = ctx.lion;
+    const dl = dist2(p.pos, lion.pos);
+    const toLion = yawOf(norm2({ x: lion.pos.x - p.pos.x, z: lion.pos.z - p.pos.z }));
+    const ahead = lion.mode !== 'dying' && lion.mode !== 'dead' && Math.abs(wrapAngle(p.yaw - toLion)) < 0.9 && dl < 7.5;
+    p.attackTravel = ahead ? clamp(dl - 1.7, 0.35, def.clip.travelMax) : 2.0;
+  }
   p.attackHitDone = false;
   p.attackChain = chain;
   p.prevBlade = null;
@@ -246,11 +256,22 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       }
       // 돌진 이동 (루트 모션)
       const f = forward(p.yaw);
-      const lt0 = def.lunge.start, lt1 = def.lunge.end;
-      const lungeSpeed = t >= lt0 && t <= lt1 ? (def.lunge.distance / (lt1 - lt0)) : 0;
-      // 정지 상태에서 시작하면 일정 속도로 나가되, 사자와 너무 가까우면 멈춘다
-      const close = dist2(p.pos, lion.pos) < TUNING.arena.lionRadius + TUNING.arena.playerRadius + 0.55;
-      const ls = close ? 0 : lungeSpeed;
+      let ls: number;
+      if (def.clip) {
+        // 클립 이동 곡선의 미분: 이번 스텝에 진행한 만큼 나아간다
+        const dProg = clipTravel(def.clip.name, t) - clipTravel(def.clip.name, Math.max(0, t - dt));
+        ls = (dProg * p.attackTravel) / dt;
+        if (!p.slamFired && t >= def.clip.slamAt) {
+          p.slamFired = true;
+          ctx.events.push({ type: 'playerSlam', pos: { x: p.pos.x + f.x * 1.1, z: p.pos.z + f.z * 1.1 }, hit: false });
+        }
+      } else {
+        const lt0 = def.lunge.start, lt1 = def.lunge.end;
+        const lungeSpeed = t >= lt0 && t <= lt1 ? (def.lunge.distance / (lt1 - lt0)) : 0;
+        // 정지 상태에서 시작하면 일정 속도로 나가되, 사자와 너무 가까우면 멈춘다
+        const close = dist2(p.pos, lion.pos) < TUNING.arena.lionRadius + TUNING.arena.playerRadius + 0.55;
+        ls = close ? 0 : lungeSpeed;
+      }
       p.vel = { x: f.x * ls, z: f.z * ls };
       delta = { x: (p.vel.x + p.knock.x) * dt, z: (p.vel.z + p.knock.z) * dt };
       // 스윙 소리 시점

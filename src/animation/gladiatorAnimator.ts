@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { HUMAN_BONES } from '../rig/humanRig';
 import { PLAYER_ATTACKS, SWORD_IDLE, sampleSword, type PlayerAttackId } from '../combat/attackData';
 import { PoseRig, AXIS, easeInOut, easeOutCubic, clamp01 } from './poseRig';
+import { MocapSampler, UPPER_BODY, type MocapName } from './mocap';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const lerp = THREE.MathUtils.lerp;
@@ -82,6 +83,12 @@ export class GladiatorAnimator {
     this.footPosFrozen.R.copy(this.footPos.R);
     this.smoothLean = 0;
     this.smoothSide = 0;
+    this.act = null;
+    this.fade = null;
+    this.guardSmooth = 0;
+    this.turnT = null;
+    this.swordHidden = false;
+    this.atk.active = false;
   }
 
   // ── 하위 자세 도우미 ────────────────────────────────────────────────────────
@@ -294,8 +301,80 @@ export class GladiatorAnimator {
     this.shieldArm(f, n, u);
   }
 
-  /** 프레임 갱신 */
+  // ── 모션 캡처 레이어 ────────────────────────────────────────────────────────
+  private samplers: Record<MocapName, MocapSampler> = {
+    attack: new MocapSampler('attack'), block: new MocapSampler('block'), death: new MocapSampler('death'), sheath: new MocapSampler('sheath'), turn180: new MocapSampler('turn180'),
+  };
+  private act: { name: MocapName; upper: boolean; t: number; w: number } | null = null;
+  private fade: { name: MocapName; upper: boolean; t: number; w: number } | null = null;
+  private guardSmooth = 0;
+  /** 180도 회전 연출 경과 시간 (null = 재생 안 함). 시뮬레이션 yaw 가 급격히 돌 때 렌더 쪽이 시작시킨다. */
+  turnT: number | null = null;
+  static readonly TURN_SPEED = 3.4;
+  /** 납검이 끝나 검이 칼집에 들어간 상태 */
+  swordHidden = false;
+
+  startTurn() { if (this.turnT === null) this.turnT = 0; }
+
+  /** 프레임 갱신: 절차적 자세를 만든 뒤 모션 캡처 레이어를 덮어쓴다 */
   update(dt: number, v: PlayerView) {
+    this.poseProcedural(dt, v);
+    this.applyClips(dt, v);
+    this.updateSwordMarks();
+  }
+
+  private wantLayer(dt: number, v: PlayerView): { name: MocapName; upper: boolean; t: number; w: number } | null {
+    const sm01 = (a: number, b: number, x: number) => easeInOut(clamp01((x - a) / (b - a)));
+    if (v.mode === 'attack' && v.attackId) {
+      const def = PLAYER_ATTACKS[v.attackId];
+      if (def.clip) return { name: def.clip.name, upper: false, t: v.modeT * def.clip.speed, w: sm01(0, 0.07, v.modeT) };
+    }
+    if (v.mode === 'dead') return { name: 'death', upper: false, t: v.deadT, w: sm01(0, 0.1, v.deadT) };
+    if (v.mode === 'victory' && v.victoryT > 1.5) return { name: 'sheath', upper: false, t: v.victoryT - 1.5, w: sm01(0, 0.25, v.victoryT - 1.5) };
+    if (this.turnT !== null) {
+      this.turnT += dt;
+      const dur = this.samplers.turn180.duration / GladiatorAnimator.TURN_SPEED;
+      if (this.turnT >= dur || v.mode !== 'free') this.turnT = null;
+      else return { name: 'turn180', upper: false, t: this.turnT * GladiatorAnimator.TURN_SPEED, w: sm01(0, 0.05, this.turnT) * (1 - sm01(dur - 0.07, dur, this.turnT)) };
+    }
+    // 방어: 방패를 들어 올리는 동작을 상체에만 얹는다 (걸으면서도 방어 가능)
+    const target = v.guardHeld && v.mode === 'free' ? 1 : 0;
+    this.guardSmooth += clamp(target - this.guardSmooth, -dt / 0.22, dt / 0.14);
+    if (this.guardSmooth > 0.01 && v.mode === 'free') {
+      return { name: 'block', upper: true, t: this.guardSmooth * (this.samplers.block.duration - 1 / 30), w: Math.min(1, this.guardSmooth * 3) };
+    }
+    return null;
+  }
+
+  private applyClips(dt: number, v: PlayerView) {
+    const want = this.wantLayer(dt, v);
+    if (want) {
+      if (this.act && this.act.name !== want.name) { this.fade = { ...this.act }; }
+      this.act = want;
+    } else if (this.act) {
+      this.fade = { ...this.act };
+      this.act = null;
+    }
+    if (this.fade) {
+      // 레이어가 끝나면 마지막 자세에서 절차적 자세로 서서히 돌아온다
+      this.fade.w -= dt / 0.16;
+      if (this.fade.w <= 0 || (this.act && this.act.name === this.fade.name)) this.fade = null;
+    }
+    this.swordHidden = !!(this.act && this.act.name === 'sheath' && this.act.t > 1.0) || !!(this.fade && this.fade.name === 'sheath' && this.fade.w > 0);
+    const r = this.rig;
+    if (this.fade && this.fade.w > 0) this.samplers[this.fade.name].apply(r, this.fade.t, { mask: this.fade.upper ? UPPER_BODY : undefined, weight: this.fade.w });
+    if (this.act && this.act.w > 0) {
+      this.samplers[this.act.name].apply(r, this.act.t, { mask: this.act.upper ? UPPER_BODY : undefined, weight: this.act.w });
+      // 방패에 맞은 반동: 방어 레이어 위에 가슴을 살짝 젖힌다
+      if (this.act.upper && v.guardImpact > 0.01) {
+        const g = this.ids;
+        r.localQ[g.chest].multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-v.guardImpact * 0.22, 0, 0)));
+        r.fk();
+      }
+    }
+  }
+
+  private poseProcedural(dt: number, v: PlayerView) {
     const r = this.rig;
     r.reset();
     this.flaskVisible = false;
@@ -327,7 +406,7 @@ export class GladiatorAnimator {
     const guarding = v.guardHeld || v.mode === 'attack';
     const wide = guarding ? 0.03 : 0.0;
     // 보행 위상 갱신 및 발 목표
-    if (v.mode === 'attack' && v.attackId) this.attackFeet(dt, v);
+    if (v.mode === 'attack' && v.attackId && !PLAYER_ATTACKS[v.attackId].clip) this.attackFeet(dt, v);
     else {
       this.atk.active = false;
       this.computeFeet(dt, v.moveLocal.x, v.moveLocal.z, gaitSpeed, 0, wide);
@@ -459,7 +538,7 @@ export class GladiatorAnimator {
     const t = v.victoryT;
     // 숨 고르기: 가슴이 크게 오르내리고 어깨가 처진다
     const heave = Math.sin(t * 3.0) * 0.5 + 0.5;
-    const raise = smooth(2.0, 3.2, t);
+    const raise = 0; // 승리 후에는 납검 모션(모션 캡처)이 이어받는다
     this.setHips(hipsY - 0.02, 0, 0, 0);
     this.spine(0, 0.12 - 0.1 * raise + heave * 0.03 * (1 - raise), 0);
     r.fk();

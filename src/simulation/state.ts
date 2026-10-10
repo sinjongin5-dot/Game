@@ -34,6 +34,9 @@ export interface PlayerState {
   attackId: PlayerAttackId | null;
   attackSerial: number;
   attackHitDone: boolean;
+  /** 클립 공격(도약 내려찍기)이 이번에 이동할 총 거리(m) */
+  attackTravel: number;
+  slamFired: boolean;
   attackChain: number;
   lastAttackEnd: number;
   dodge: { dir: V2; backstep: boolean; dodgedSet: number };
@@ -131,6 +134,7 @@ export interface LionState {
 
 export type SimEvent =
   | { type: 'playerSwing'; id: PlayerAttackId }
+  | { type: 'playerSlam'; pos: V2; hit: boolean }
   | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean; dir: V3; killing: boolean; combo: number }
   | { type: 'playerBlocked'; strength: number; pos: V3; broke: boolean; attack: LionAttackId; perfect: boolean }
   | { type: 'playerHit'; dmg: number; pos: V3; heavy: boolean; attack: LionAttackId }
