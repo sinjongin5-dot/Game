@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { GameSim } from '../simulation/sim';
 import { ARENA } from '../simulation/arena';
 import { angleDiff, clamp, forward as fwd2 } from '../simulation/math';
+import { interpLion, interpPlayer } from './characters';
 
 export interface CameraSettings {
   sensitivity: number; // 1 = 기본
@@ -140,10 +141,11 @@ export class CameraRig {
   }
 
   /** 전투 중 카메라 */
-  gameplay(sim: GameSim, look: { dx: number; dy: number }, dt: number, raycast: (o: THREE.Vector3, d: THREE.Vector3, max: number) => number | null, controlEnabled: boolean) {
+  gameplay(sim: GameSim, look: { dx: number; dy: number }, dt: number, raycast: (o: THREE.Vector3, d: THREE.Vector3, max: number) => number | null, controlEnabled: boolean, alpha = 1) {
     const p = sim.player;
     const l = sim.lion;
     const s = this.settings;
+    const pp = interpPlayer(sim, alpha), ll = interpLion(sim, alpha);
     const lock = p.lockOn && l.mode !== 'dead' && l.mode !== 'dying';
     this.lockBlend = damp(this.lockBlend, lock ? 1 : 0, 5, dt);
 
@@ -157,13 +159,13 @@ export class CameraRig {
       }
     }
     if (lock) {
-      const toLion = Math.atan2(l.pos.x - p.pos.x, l.pos.z - p.pos.z);
+      const toLion = Math.atan2(ll.x - pp.x, ll.z - pp.z);
       this.yaw += angleDiff(toLion + this.lookOffset, this.yaw) * (1 - Math.exp(-7 * dt));
       this.lookOffset = damp(this.lookOffset, 0, 0.9, dt);
     } else {
       this.lookOffset = damp(this.lookOffset, 0, 3, dt);
     }
-    const sep = Math.hypot(l.pos.x - p.pos.x, l.pos.z - p.pos.z);
+    const sep = Math.hypot(ll.x - pp.x, ll.z - pp.z);
     // 목표 거리/피치: 락온 시 사자와 함께 프레임에 들어오게
     const close = clamp((7 - sep) / 4.5, 0, 1); // 가까울수록 높이 들어 올려 사자가 플레이어에 가려지지 않게
     const lockDist = clamp(4.6 + 0.28 * Math.max(0, sep - 3), 4.6, 8.2) + 0.5 * close;
@@ -173,8 +175,9 @@ export class CameraRig {
 
     // 피벗 (플레이어 가슴 높이), 약간의 지연
     const py = 1.5 - (p.mode === 'dead' ? 0.9 : 0);
-    this.pivot.x = damp(this.pivot.x, p.pos.x, 22, dt);
-    this.pivot.z = damp(this.pivot.z, p.pos.z, 22, dt);
+    // 캐릭터 메시와 같은 보간 위치를 따라가야 화면에서 캐릭터가 떨리지 않는다 (시뮬레이션 위치는 60Hz 로 계단 이동)
+    this.pivot.x = damp(this.pivot.x, pp.x, 45, dt);
+    this.pivot.z = damp(this.pivot.z, pp.z, 45, dt);
     this.pivot.y = damp(this.pivot.y, py, 8, dt);
 
     const f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
@@ -198,8 +201,8 @@ export class CameraRig {
     // 항상 아레나 안쪽 + 바닥 위
     pos.y = Math.max(0.5, pos.y);
     // 시선 목표
-    const chest = new THREE.Vector3(p.pos.x, 1.45, p.pos.z);
-    const lionChest = new THREE.Vector3(l.pos.x, 1.0 + l.y * 0.6, l.pos.z);
+    const chest = new THREE.Vector3(pp.x, 1.45, pp.z);
+    const lionChest = new THREE.Vector3(ll.x, 1.0 + ll.y * 0.6, ll.z);
     const lookT = chest.clone().lerp(lionChest, 0.62 * this.lockBlend);
     lookT.addScaledVector(right, 0.5 * (1 - this.lockBlend));
     lookT.y += (1 - this.lockBlend) * 0.1;
@@ -217,7 +220,7 @@ export class CameraRig {
     if (sim.phase === 'victory') {
       this.victoryAng += dt * 0.18;
       const r = 6.2;
-      const c = new THREE.Vector3(p.pos.x, 0, p.pos.z);
+      const c = new THREE.Vector3(pp.x, 0, pp.z);
       this.tmpPos.set(c.x + Math.sin(this.yaw + this.victoryAng + Math.PI) * r, 1.9 + 0.5 * Math.sin(this.victoryAng * 2), c.z + Math.cos(this.yaw + this.victoryAng + Math.PI) * r);
       // 항상 경기장 안쪽에서 바라보게 한다 (벽/터널 뒤로 넘어가지 않도록)
       const qx = this.tmpPos.x / (ARENA.a - 2.2), qz = this.tmpPos.z / (ARENA.b - 2.2);

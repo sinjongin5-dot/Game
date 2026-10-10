@@ -4,6 +4,12 @@ import { TUNING } from '../simulation/tuning';
 import type { V2, V3 } from '../simulation/math';
 import type { CharId, Physics } from './types';
 
+/**
+ * 캐릭터 충돌체를 바닥에서 살짝 띄운다. 바닥에 정확히 닿은 채로 수평 이동을 계산하면 Rapier 의
+ * 캐릭터 컨트롤러가 바닥 접촉을 옆으로 미는 힘/감속으로 해석해 걷는 동안 속도와 방향이 불규칙하게 튀었다(떨림).
+ */
+const GROUND_CLEARANCE = 0.08;
+
 let rapierReady: Promise<void> | null = null;
 export function initRapier(): Promise<void> {
   if (!rapierReady) rapierReady = RAPIER.init();
@@ -87,7 +93,7 @@ export class RapierPhysics implements Physics {
   }
 
   private makePlayer(): Char {
-    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0.9, 0));
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, GROUND_CLEARANCE + 0.9, 0));
     const r = TUNING.player.radius;
     const main = this.world.createCollider(RAPIER.ColliderDesc.capsule(0.5, r), body);
     const kcc = this.world.createCharacterController(0.02);
@@ -95,11 +101,11 @@ export class RapierPhysics implements Physics {
     kcc.setSlideEnabled(true);
     kcc.setApplyImpulsesToDynamicBodies(false);
     this.playerHandles.add(main.handle);
-    return { body, main, extra: [], kcc, yaw: 0, y: 0.9 };
+    return { body, main, extra: [], kcc, yaw: 0, y: GROUND_CLEARANCE + 0.9 };
   }
 
   private makeLion(): Char {
-    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0.6, 5));
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, GROUND_CLEARANCE + 0.6, 5));
     // 몸통(주 충돌체) + 머리 + 엉덩이
     const main = this.world.createCollider(RAPIER.ColliderDesc.cylinder(0.6, TUNING.arena.lionRadius * 0.9), body);
     const head = this.world.createCollider(RAPIER.ColliderDesc.ball(0.36).setTranslation(0, 0.1, 1.25), body);
@@ -110,7 +116,7 @@ export class RapierPhysics implements Physics {
     this.lionHandles.add(main.handle);
     this.lionHandles.add(head.handle);
     this.lionHandles.add(rump.handle);
-    return { body, main, extra: [head, rump], kcc, yaw: 0, y: 0.6 };
+    return { body, main, extra: [head, rump], kcc, yaw: 0, y: GROUND_CLEARANCE + 0.6 };
   }
 
   moveCharacter(id: CharId, pos: V2, delta: V2): V2 {

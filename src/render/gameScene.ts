@@ -441,7 +441,7 @@ export class GameScene {
     // 카메라
     if (this.mode === 'title') this.cam.title(this.time);
     else if (phase === 'intro') this.cam.intro(sim, dt);
-    else this.cam.gameplay(sim, look, dt, (o, d, m) => sim.physics.raycast({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, m), controlEnabled);
+    else this.cam.gameplay(sim, look, dt, (o, d, m) => sim.physics.raycast({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, m), controlEnabled, alpha);
 
     // 태양 그림자 카메라는 고정 (아레나 전체)
     this.debug.update(sim);
