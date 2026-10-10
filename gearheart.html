@@ -6863,9 +6863,9 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   const labels = {
     keyboard: '키보드 모드 · 진동 대기', disabled: '진동 꺼짐',
     waiting: 'Xbox 연결 후 버튼을 눌러 주세요', unsupported: '이 컨트롤러는 브라우저 진동을 지원하지 않습니다',
-    ready: 'Xbox 연결됨 · 듀얼 모터 진동', pulse: '컨트롤러 연결됨 · 기본 진동',
+    ready: 'Xbox 연결됨 · 듀얼 모터 진동', readyTrigger: 'Xbox 연결됨 · 본체 + 임펄스 트리거 진동', pulse: '컨트롤러 연결됨 · 기본 진동',
     hidden: '화면 밖에서는 진동을 멈춥니다', blocked: '브라우저에서 진동을 사용할 수 없습니다',
-    preview: '진동 체험 · 타격 → 하중 → 준비 → 위험 → 코어',
+    preview: '진동 체험 · 타격 → 하중 → 준비 → 위험 → 코어 → 충돌',
     insecure: '진동 연결을 위해 로컬 파일 또는 보안 연결로 실행하세요'
   };
   // Knots are [elapsed milliseconds, low-frequency motor, high-frequency motor].
@@ -7000,15 +7000,53 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     ui() { return { p: 1, gap: 70, ui: true, k: [[0,0,.055],[22,0,.085],[43,0,0]] }; }
   };
 
+  // Later modules (enemy / boss haptics) extend the mixer through these registries instead of editing it.
+  const triggerProfiles = {};   // name -> (detail, titan) => [[ms, leftTrigger, rightTrigger], ...]
+  const customTextures = new Map();   // name -> (tex, ageSeconds, pulse01, progress) => [low, high, leftTrigger, rightTrigger]
   const worldNames = new Set(['world-impact','explosion','machine-click','platform-start','platform-stop','near-miss','boss-heartbeat','steam-enter','wind-enter','hydraulic-release']);
   const signalNames = new Set(['ready','air-dash','danger','weakpoint-open','weakpoint-closing']);
   const textureNames = new Set(['charge','focus','charger','rail-hum','hang-load','wall-slide','pound-descent','machinery','platform-motion','hydraulic-pressure','wind','steam']);
   const worldTextures = new Set(['machinery','platform-motion','hydraulic-pressure','wind','steam']);
   const contactNames = new Set(['hit','core-impact','pound-land','boss-hit']);
   const broadenNames = new Set(['footstep','jump','land','dash','attack','hit','hurt','launch','pound','pound-land','armor','death','rail','spring','boss-hit','break']);
+  Object.assign(triggerProfiles, {
+    attack: (d, titan) => titan ? [[0,.06,.62],[28,.02,.36],[70,0,0]] : [[0,0,.5],[22,0,.26],[55,0,0]],
+    hit: (d, titan) => d.finisher ? [[0,.62,1],[26,.52,.72],[90,.26,.30],[190,0,0]] :
+      titan ? [[0,.20,.92],[24,.10,.52],[80,0,.12],[140,0,0]] : [[0,0,.78],[20,0,.42],[62,0,.10],[105,0,0]],
+    hurt: (d, titan) => {
+      const s = d.side || 0, l = s <= 0 ? 1 : .32, r = s >= 0 ? 1 : .32;   // the trigger on the side that got hit bites hardest
+      return [[0,.92*l,.92*r],[34,.66*l,.66*r],[80,.30*l,.30*r],[118,.5*l,.5*r],[210,.12*l,.12*r],[290,0,0]];
+    },
+    death: () => [[0,.95,.95],[40,.85,.85],[160,.5,.5],[320,.2,.2],[520,0,0]],
+    parry: () => [[0,.7,.7],[54.9,.7,.7],[55,0,0],[119.9,0,0],[120,.4,.4],[174.9,.4,.4],[175,0,0]],
+    dash: (d, titan) => titan ? [[0,.34,.34],[40,.5,.5],[110,.2,.2],[190,0,0]] : [[0,.22,.22],[34,.30,.30],[100,0,0]],
+    jump: (d, titan) => titan ? [[0,.26,.26],[40,.12,.12],[110,0,0]] : [[0,.08,.08],[40,0,0]],
+    land: (d, titan) => titan ? [[0,.82,.82],[34,.60,.60],[110,.28,.28],[210,0,0]] : [[0,.28,.28],[34,.12,.12],[90,0,0]],
+    'pound-land': () => [[0,1,1],[30,.86,.86],[90,.6,.6],[170,.34,.34],[320,0,0]],
+    'boss-hit': () => [[0,.84,1],[32,.72,.86],[110,.4,.5],[240,.14,.18],[400,0,0]],
+    'core-impact': () => [[0,1,1],[55,1,1],[120,.7,.7],[190,.46,.46],[290,.2,.2],[440,0,0]],
+    'posture-break': () => [[0,.5,.92],[26,.4,.62],[116,.5,.5],[180,.2,.2],[290,0,0]],
+    'weakpoint-open': () => [[0,0,.5],[69.9,0,.5],[70,0,0],[149.9,0,0],[150,.4,.95],[239.9,.4,.95],[240,0,0]],
+    danger: () => [[0,.34,.34],[54.9,.34,.34],[55,0,0],[119.9,0,0],[120,.56,.56],[174.9,.56,.56],[175,0,0],[239.9,0,0],[240,.9,.9],[294.9,.9,.9],[295,0,0]],
+    ready: () => [[0,.30,.30],[64.9,.30,.30],[65,0,0]],
+    heal: () => [[0,.30,0],[40,.52,0],[92,.34,0],[135,.58,0],[200,.16,0],[315,0,0]],
+    explosion: () => [[0,.8,.8],[55,.8,.8],[130,.4,.4],[310,0,0]],
+    'world-impact': (d) => d.heavy ? [[0,.7,.7],[55,.7,.7],[125,.4,.4],[260,0,0]] : [[0,.4,.4],[55,.4,.4],[120,0,0]],
+    transform: (d) => d.stage === 'ignition' ? [[0,.9,.9],[120,.6,.6],[380,0,0]] : d.stage === 'complete' ? [[0,.8,.8],[100,.4,.4],[240,0,0]] : null,
+    'transform-complete': () => [[0,.8,.8],[100,.4,.4],[240,0,0]],
+    'core-online': () => [[0,.95,.95],[120,.7,.7],[260,.35,.35],[510,0,0]],
+    'armor': () => [[0,.32,.5],[40,.14,.2],[100,0,0]],
+    checkpoint: () => [[0,.2,.2],[28,.4,.4],[78,0,0],[120,.3,.3],[165,.5,.5],[250,0,0]],
+    pickup: () => [[0,0,.2],[22,0,.32],[70,0,0]],
+    spring: () => [[0,.2,.2],[40,.4,.4],[110,0,0]],
+    valve: () => [[0,.5,.5],[40,.4,.4],[150,.1,.1],[215,0,0]],
+    'steam-enter': () => [[0,.16,.16],[150,.1,.1],[230,0,0]],
+    'near-miss': () => [[0,.18,.18],[60,0,0]]
+  });
   function specFor(name,d,titan) {
     const spec=profiles[name] && profiles[name](d,titan);
     if (!spec) return null;
+    if (!spec.t && triggerProfiles[name]) { try { spec.t = triggerProfiles[name](d,titan) || null; } catch (_) { spec.t = null; } }
     if (name==='death') spec.p=10;
     else if (name==='hurt') spec.p=9;
     else if (name==='parry'||name==='reflect'||name==='core-impact'||name==='boss-hit'||name==='hit'&&d.finisher) spec.p=8;
@@ -7028,9 +7066,9 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       this.game = null; this.options = {}; this.active = []; this.textures = new Map();
       this.lastEvents = new Map(); this.device = null; this.actuator = null; this.deviceKey = '';
       this.api = ''; this.now = time; this.lastUpdate = 0; this.nextSend = 0; this.packetEnds = 0;
-      this.lastOutput = [0,0]; this.epoch = 0; this.serial = 0; this.previewUntil = 0;
+      this.lastOutput = [0,0,0,0]; this.epoch = 0; this.serial = 0; this.previewUntil = 0;
       this.focused = true; this.fail = ''; this.fallback = false; this.sequence = 0;
-      this.pending=[];this.lastSend=-Infinity;this.lastCritical=-Infinity;
+      this.pending=[];this.lastSend=-Infinity;this.lastCritical=-Infinity;this.trig=false;this.trigFail=false;this.sideHint=null;
       this.ambientSince=null;this.ambientQuietSince=null;this.mixedWorldSources=[];
       this.stats = { emitted:0, coalesced:0, sent:0, stopped:0, errors:0, queued:0, expired:0 };
     }
@@ -7049,6 +7087,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
         playerStrength:gain(raw.playerStrength??raw.hapticPlayer,1),
         worldStrength:gain(raw.worldStrength??raw.hapticWorld,.6),
         signalStrength:gain(raw.signalStrength??raw.hapticSignals,1),
+        triggerStrength:gain(raw.triggerStrength??raw.hapticTrigger,1),
         console: mode === 'xbox' || mode === 'console' || mode === 'gamepad' };
     }
     getPad() {
@@ -7070,11 +7109,16 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
         const candidates = [pad.vibrationActuator, ...Array.from(pad.hapticActuators || [])].filter(Boolean);
         if (!this.fallback) for (const a of candidates) {
           const effects = a.effects ? Array.from(a.effects) : null;
-          if (typeof a.playEffect === 'function' && (!effects || effects.includes('dual-rumble'))) { actuator = a; api = 'dual'; break; }
+          if (typeof a.playEffect === 'function' && (!effects || effects.includes('dual-rumble'))) {
+            actuator = a; api = 'dual';
+            // Xbox impulse triggers: only when the browser explicitly advertises the effect (never assumed).
+            this.trig = !!(effects && effects.includes('trigger-rumble')) && !this.trigFail;
+            break;
+          }
         }
         if (!actuator) for (const a of candidates) if (typeof a.pulse === 'function') { actuator = a; api = 'pulse'; break; }
       }
-      this.actuator = actuator; this.api = api;
+      this.actuator = actuator; this.api = api; if (api !== 'dual') this.trig = false;
       return !!(this.actuator && !this.fail);
     }
     paused() {
@@ -7098,11 +7142,12 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       else if (!this.api) code = 'unsupported';
       else if (this.now() < this.previewUntil) code = 'preview';
       else if (this.api === 'pulse') code = 'pulse';
+      else if (this.trig) code = 'readyTrigger';
       return { code, label: labels[code], connected: !!this.device, supported: !!this.api && !this.fail,
-        dualMotor: this.api === 'dual', mode: cfg.mode, strength: cfg.strength, deviceId: this.device ? this.device.id : '' };
+        dualMotor: this.api === 'dual', triggers: !!(this.api === 'dual' && this.trig), mode: cfg.mode, strength: cfg.strength, deviceId: this.device ? this.device.id : '' };
     }
     emit(name, detail) {
-      const d = detail || {};
+      let d = detail || {};
       if (name === 'transform' && d.stage === 'heartbeat') name = 'core-beat';
       else if (name === 'transform' && d.stage === 'complete') name = 'transform-complete';
       if (name === 'charge-stop' || name === 'focus-stop') { this.cancel(name.split('-')[0]); return true; }
@@ -7110,6 +7155,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       const at = this.now(), ui = name === 'ui';
       if (this.paused() && !ui && !d.preview) return false;
       const form = d.form || (this.game && this.game.player && this.game.player.form), titan = form === 'titan';
+      if (name === 'hurt' && d.side == null && this.sideHint != null) d = Object.assign({}, d, {side:this.sideHint});
       if (textureNames.has(name)) return this.setTexture(name,d.sourceId||name,d);
       const spec = specFor(name,d,titan); if (!spec) return false;
       this.trim(at);
@@ -7127,7 +7173,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
           // A real core hit upgrades the same downward action; it never adds
           // a second landing/explosion envelope on top of that contact.
           if (name==='core-impact'&&old.name!=='core-impact') {
-            Object.assign(old,{name,k:spec.k,priority:spec.p,category});
+            Object.assign(old,{name,k:spec.k,t:spec.t||null,priority:spec.p,category});
           }
         }
         this.stats.coalesced++;return false;
@@ -7137,7 +7183,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       if (name === 'hurt' || name === 'heal' || name === 'jump') this.removeTextures('focus');
       if (name === 'jump' || name === 'pound' || name === 'detransform') this.removeTextures('charge');
       const offset=name==='danger'?Math.max(0,295-clamp(d.remainingMs??300,0,300)):0;
-      const pattern={name,at:at-offset,k:spec.k,priority:spec.p,gain,colour:category==='world'?this.spatialColour(d):[1,1],category,sourceId,actionId,key,
+      const pattern={name,at:at-offset,k:spec.k,t:spec.t||null,priority:spec.p,gain,colour:category==='world'?this.spatialColour(d):[1,1],category,sourceId,actionId,key,
         ui:!!spec.ui||!!d.preview,cinematic:!!d.cinematic,id:++this.sequence,
         firstSend:name!=='danger',createdAt:at,preservePulses:name==='danger'&&(d.remainingMs??300)>=240};
       if ((name==='ready'||name==='air-dash')&&this.hasContact(at)) {
@@ -7183,7 +7229,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
         progress:clamp(d.charge??d.progress??0),phase:Number.isFinite(d.phase)?d.phase:null,
         gain,relevance:Number.isFinite(d.relevance)?d.relevance:gain,cinematic:!!d.cinematic,
         contact:!!d.contact,load:clamp(d.load??1,0,1.2),turbulence:clamp(d.turbulence??.5),
-        pressure:clamp(d.pressure??d.force??1,0,1.2),side:Math.sign(d.side||0),
+        pressure:clamp(d.pressure??d.force??1,0,1.2),side:Math.sign(d.side||0),priority:Number.isFinite(d.priority)?d.priority:1,
         contactHeight:clamp(d.contactHeight??.5),worldX:d.contactX??d.worldX,worldY:d.contactY??d.worldY,
         colour:category==='world'?this.spatialColour(d):[1,1]});
       if(this.textures.size>16){const stale=Array.from(this.textures.entries()).sort((a,b)=>a[1].relevance-b[1].relevance)[0];this.textures.delete(stale[0]);}
@@ -7237,12 +7283,39 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       }
       return [0,0];
     }
+    sampleT(pattern, at) {
+      const k=pattern.t;
+      if(!k||!this.trig)return [0,0];
+      const elapsed=at-pattern.at;
+      if(elapsed<0||elapsed>k[k.length-1][0])return [0,0];
+      for(let i=1;i<k.length;i++)if(elapsed<=k[i][0]){
+        const a=k[i-1],b=k[i],u=clamp((elapsed-a[0])/(b[0]-a[0]));
+        return [lerp(a[1],b[1],u)*pattern.gain,lerp(a[2],b[2],u)*pattern.gain];
+      }
+      return [0,0];
+    }
+    define(name, build, options={}) {
+      if(typeof build!=='function')return false;
+      profiles[name]=build;
+      if(typeof options.trigger==='function')triggerProfiles[name]=options.trigger;
+      if(options.category==='world')worldNames.add(name);
+      if(options.category==='signals')signalNames.add(name);
+      if(options.contact)contactNames.add(name);
+      if(options.broaden)broadenNames.add(name);
+      return true;
+    }
+    defineTexture(name, shape, options={}) {
+      if(typeof shape!=='function')return false;
+      customTextures.set(name,shape);textureNames.add(name);
+      if(options.category==='world')worldTextures.add(name);
+      return true;
+    }
     mix(at) {
       this.trim(at);
       const cfg=this.config();
       const categoryGain=c=>c==='world'?cfg.worldStrength:c==='signals'?cfg.signalStrength:cfg.playerStrength;
       const layers = this.active.map(p => ({priority:p.priority,category:p.category||'player',name:p.name,
-        value:this.sample(p,at).map(v=>v*categoryGain(p.category))}))
+        value:this.sample(p,at).concat(this.sampleT(p,at)).map(v=>v*categoryGain(p.category))}))
         .filter(p=>Math.max(...p.value)>.001);
       const environmental=Array.from(this.textures.values()).filter(t=>t.category==='world')
         .sort((a,b)=>(b.relevance+(b.contact?2:0))-(a.relevance+(a.contact?2:0))||a.sourceId.localeCompare(b.sourceId)).slice(0,2);
@@ -7260,14 +7333,16 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
         const age=(at-t.start)/1000,progress=t.progress;
         const pulse=.5+.5*Math.sin(t.phase!==null?t.phase*Math.PI*2:age*(t.name==='charge'?21:12));
         const ramp = clamp((at-t.start)/90);
-        let low,high;
-        switch(t.name){
-          case 'charge':low=(.09+.24*progress)*(.83+.17*pulse);high=(.035+.12*progress)*(.4+.6*pulse);break;
+        let low,high,lt=0,rt=0;
+        const custom=customTextures.get(t.name);
+        if(custom){const o=custom(t,age,pulse,progress)||[0,0,0,0];low=o[0];high=o[1];lt=o[2]||0;rt=o[3]||0;}
+        else switch(t.name){
+          case 'charge':low=(.09+.24*progress)*(.83+.17*pulse);high=(.035+.12*progress)*(.4+.6*pulse);lt=rt=(.10+.34*progress)*(.55+.45*pulse);break;
           case 'charger':low=.10*(.80+.20*pulse);high=.07*(.4+.6*pulse);break;
           case 'hang-load':low=(.055+.085*t.load)*(.65+.35*pulse);high=.035*(.4+.6*pulse);break;
           case 'rail-hum':low=(.025+.025*progress)*(.7+.3*pulse);high=(.045+.10*progress)*(.65+.35*pulse);break;
           case 'wall-slide':low=.012+.022*progress;high=(.055+.09*progress)*(.55+.45*pulse);break;
-          case 'pound-descent':low=.16+.17*progress;high=.08*(.6+.4*pulse);break;
+          case 'pound-descent':low=.16+.17*progress;high=.08*(.6+.4*pulse);lt=rt=.10+.40*progress;break;
           case 'platform-motion':low=.19*(.8+.2*pulse);high=.10*(.5+.5*pulse);break;
           case 'machinery':low=.16*(.4+.6*pulse);high=.12*(.25+.75*pulse);break;
           case 'hydraulic-pressure':low=(.08+.22*progress)*(.86+.14*pulse);high=(.025+.06*progress)*(.4+.6*pulse);break;
@@ -7275,14 +7350,16 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
           case 'steam':low=(.10+.17*progress)*(.85+.15*pulse);high=(.11+.10*t.turbulence)*(.7+.3*pulse);break;
           default:low=(.028+.09*progress)*(.7+.3*pulse);high=(.055+.13*progress)*(.5+.5*pulse);
         }
-        const value=[low,high].map((v,i)=>v*ramp*t.gain*categoryGain(t.category)*t.colour[i]);
+        if(t.name==='focus'){lt=.16+.14*pulse;rt=0;}   // holding LT to mend: the left trigger answers back with a slow, gentle pulse
+        const tg=this.trig?ramp*t.gain*categoryGain(t.category):0;
+        const value=[low,high].map((v,i)=>v*ramp*t.gain*categoryGain(t.category)*t.colour[i]).concat([lt*tg,rt*tg]);
         if(t.category==='world') {const aggregate=t.contact?contact:ambient;for(let i=0;i<2;i++)aggregate[i]=1-(1-aggregate[i])*(1-clamp(value[i]));}
-        else layers.push({priority:1,category:'player',texture:true,value});
+        else layers.push({priority:t.priority||1,category:t.category,texture:true,value});
       }
       if(environmental.length) layers.push({priority:1,category:'world',texture:true,
-        value:[Math.min(.12,ambient[0])*fatigue,Math.min(.10,ambient[1])*fatigue]});
+        value:[Math.min(.12,ambient[0])*fatigue,Math.min(.10,ambient[1])*fatigue,0,0]});
       if(contact.some(v=>v>0))layers.push({priority:2,category:'world',texture:true,
-        value:[Math.min(.24,contact[0])*fatigue,Math.min(.20,contact[1])*fatigue]});
+        value:[Math.min(.24,contact[0])*fatigue,Math.min(.20,contact[1])*fatigue,0,0]});
       // Silence belongs to the tactile code as much as its pulses. Lower
       // layers cannot fill the gaps in the three-pulse danger or core signal.
       const silentCode=this.active.filter(p=>['danger','weakpoint-open'].includes(p.name)&&
@@ -7291,24 +7368,31 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       if(layers.some(p=>p.priority>=6&&!p.texture&&p.category!=='world'))this.lastCritical=at;
       const environmentDuck=lerp(.05,1,clamp((at-this.lastCritical)/120));
       const top=layers.reduce((m,p) => Math.max(m,p.priority),0);
-      let low=0,high=0;
+      let low=0,high=0,lt=0,rt=0;
       for (const p of layers) {
         if(silentCode&&p.priority<=silentCode)continue;
         const duck=p.category==='world'&&p.texture?environmentDuck:
           p.priority>=top-1?1:top>=8?.04:top>=5?.12:.45;
         low = 1-(1-low)*(1-clamp(p.value[0]*duck));
         high = 1-(1-high)*(1-clamp(p.value[1]*duck));
+        lt = 1-(1-lt)*(1-clamp((p.value[2]||0)*duck));
+        rt = 1-(1-rt)*(1-clamp((p.value[3]||0)*duck));
       }
-      return [clamp(low*cfg.strength),clamp(high*cfg.strength)];
+      const ts=cfg.strength*cfg.triggerStrength;
+      return [clamp(low*cfg.strength),clamp(high*cfg.strength),clamp(lt*ts),clamp(rt*ts)];
     }
     send(value, at) {
       if (!this.actuator) return;
       const epoch=this.epoch, serial=++this.serial, key=this.deviceKey, actuator=this.actuator;
       const duration=55;
+      const trig=this.api==='dual'&&this.trig&&(value[2]>.004||value[3]>.004||this.lastOutput[2]>0||this.lastOutput[3]>0);
       this.lastOutput=value; this.lastSend=at; this.nextSend=at+28; this.packetEnds=at+duration; this.stats.sent++;
+      if(trig)this.stats.triggerPackets=(this.stats.triggerPackets||0)+1;
       let promise;
       try {
-        promise = this.api==='dual' ? actuator.playEffect('dual-rumble',{
+        promise = trig ? actuator.playEffect('trigger-rumble',{
+          duration,startDelay:0,strongMagnitude:value[0],weakMagnitude:value[1],leftTrigger:value[2],rightTrigger:value[3]
+        }) : this.api==='dual' ? actuator.playEffect('dual-rumble',{
           duration,startDelay:0,strongMagnitude:value[0],weakMagnitude:value[1]
         }) : actuator.pulse(clamp(Math.max(value[0],value[1]*.76)),duration);
       } catch (error) { this.error(error,epoch,serial,key); return; }
@@ -7320,8 +7404,10 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     error(error, epoch, serial, key) {
       if (epoch!==this.epoch || key!==this.deviceKey || serial!==this.serial) return;
       this.stats.errors++;
+      // Some builds advertise trigger-rumble yet reject it: keep the body motors and drop only the triggers.
+      if (error && error.name==='NotSupportedError' && this.api==='dual' && this.trig) { this.trig=false; this.trigFail=true; this.nextSend=0; return; }
       if (error && error.name==='NotSupportedError' && this.api==='dual' && this.actuator && typeof this.actuator.pulse==='function') {
-        this.fallback=true;this.api='pulse';this.nextSend=0;this.lastOutput=[0,0];this.packetEnds=0;return;
+        this.fallback=true;this.api='pulse';this.nextSend=0;this.lastOutput=[0,0,0,0];this.packetEnds=0;return;
       }
       if (error && error.name==='InvalidStateError') { this.stop('inactive'); return; }
       this.fail=error && error.name || 'HapticError'; this.stop('error');
@@ -7346,16 +7432,16 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       }
       const value=this.mix(at), maximum=Math.max(...value);
       if (maximum < .008) {
-        if (this.lastOutput[0] || this.lastOutput[1]) this.silence();
+        if (this.lastOutput.some(v=>v>0)) this.silence();
         return;
       }
       if(at<this.nextSend||at-this.lastSend<28)return;
-      const change=Math.max(Math.abs(value[0]-this.lastOutput[0]),Math.abs(value[1]-this.lastOutput[1]));
+      const change=Math.max(...value.map((v,i)=>Math.abs(v-(this.lastOutput[i]||0))));
       if (change >= .018 || at >= this.packetEnds-16) this.send(value,at);
     }
     silence() {
       const actuator=this.actuator,hadOutput=this.packetEnds>0||this.lastOutput.some(v=>v>0);this.serial++;
-      this.lastOutput=[0,0]; this.packetEnds=0; this.nextSend=0;
+      this.lastOutput=[0,0,0,0]; this.packetEnds=0; this.nextSend=0;
       // Repeated source cancellations in a quiet frame need no USB/Bluetooth
       // reset call. One reset cancels the current packet and its older promises.
       if (!actuator||!hadOutput) return;
@@ -7374,13 +7460,14 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     }
     preview() {
       if (!this.available()) return false;
-      this.stop('preview'); const at=this.now(); this.previewUntil=at+2700;
+      this.stop('preview'); const at=this.now(); this.previewUntil=at+3400;
       const add=(name,delay,d={})=>{const spec=specFor(name,d,d.form==='titan');
         this.active.push({name,at:at+delay,k:spec.k,priority:spec.p,gain:spec.gain??1,
           category:signalNames.has(name)?'signals':'player',ui:true,sourceId:'preview:'+name,id:++this.sequence});};
       add('hit',0,{form:'normal',force:.75});
       add('land',300,{form:'titan',velocity:720});
       add('ready',720);add('danger',1050);add('weakpoint-open',1600);add('core-impact',2050);
+      if(profiles['warden-crash'])add('warden-crash',2600);
       this.nextSend=0; this.update(); return true;
     }
     debug() { return {status:this.status(),active:this.active.map(p=>({name:p.name,priority:p.priority,id:p.id,
@@ -7414,7 +7501,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   SET2.inputMode = SET2.inputMode === 'xbox' ? 'xbox' : 'keyboard';
   SET2.haptics = SET2.haptics !== false;
   SET2.hapticStrength = Number.isFinite(+SET2.hapticStrength) ? clamp(+SET2.hapticStrength,0,1) : 0.8;
-  for (const [key,value] of [['hapticPlayer',1],['hapticWorld',.6],['hapticSignals',1]])
+  for (const [key,value] of [['hapticPlayer',1],['hapticWorld',.7],['hapticSignals',1],['hapticTrigger',1]])
     SET2[key] = typeof SET2[key]==='number'&&Number.isFinite(SET2[key]) ? clamp(SET2[key],0,1) : value;
   let boundGame = null, selectedPad = null, selectedKey = '', lastMode = SET2.inputMode;
   let padHeldGuard = new Set(), disconnected = false;
@@ -7575,6 +7662,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       {id:'hapticPlayer',label:'주인공 · 접촉과 전투',kind:'choice',val:()=>Math.round(SET2.hapticPlayer*100)+'%',desc:()=>'발 디딤·착지·명중·피격·변신의 강도를 10%씩 조절'},
       {id:'hapticWorld',label:'주변 환경 · 기계와 폭발',kind:'choice',val:()=>Math.round(SET2.hapticWorld*100)+'%',desc:()=>'거리와 접촉에 맞춘 주변 기계·발판·폭발의 강도'},
       {id:'hapticSignals',label:'상황 알림 · 준비와 위험',kind:'choice',val:()=>Math.round(SET2.hapticSignals*100)+'%',desc:()=>'준비 1번 · 위험 빠른 3번 · 코어 열림 짧게→길게'},
+      {id:'hapticTrigger',label:'임펄스 트리거 · LT / RT',kind:'choice',val:()=>Math.round(SET2.hapticTrigger*100)+'%',desc:()=>'트리거 진동 지원 컨트롤러 전용 · 타격은 RT, 피격은 맞은 쪽 LT/RT가 반응'},
       {id:'hapticTest',label:'진동 체험',kind:'btn',val:()=>xbox()?'A':'Enter / Z',desc:()=>'렌치 → 착지 → 준비 1번 → 위험 3번 → 코어 열림·명중'},
       ...items
     ];
@@ -7584,7 +7672,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     if(!it)return;
     if(it.id==='inputMode'){setMode(dir<0?'keyboard':'xbox');this.g.audio.play('click');return;}
     if(it.id==='haptics'){SET2.haptics=!SET2.haptics;saveSet2();this.g.audio.play('click');if(!SET2.haptics&&window.GH_HAPTICS)window.GH_HAPTICS.stop();return;}
-    if(['hapticStrength','hapticPlayer','hapticWorld','hapticSignals'].includes(it.id)){
+    if(['hapticStrength','hapticPlayer','hapticWorld','hapticSignals','hapticTrigger'].includes(it.id)){
       SET2[it.id]=clamp(Math.round(SET2[it.id]*10+dir)/10,0,1);saveSet2();this.g.audio.play('click');
       if(SET2[it.id]===0&&window.GH_HAPTICS)window.GH_HAPTICS.update(0);return;
     }
@@ -7593,7 +7681,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   UI.prototype.activate=function(it){
     if(this.screen==='settings'&&it){
       if(it.id==='inputMode'){setMode(xbox()?'keyboard':'xbox');this.g.audio.play('click');return;}
-      if(['haptics','hapticStrength','hapticPlayer','hapticWorld','hapticSignals'].includes(it.id)){this.adjust(it,1);return;}
+      if(['haptics','hapticStrength','hapticPlayer','hapticWorld','hapticSignals','hapticTrigger'].includes(it.id)){this.adjust(it,1);return;}
       if(it.id==='hapticTest'){
         const s=status();this.g.audio.play('click');
         if(!xbox())this.g.toast('조작 방식을 콘솔 · Xbox로 바꾸세요');
@@ -9253,7 +9341,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     window.GH_CONTROLS.bindGame(g);
     H.bindGame(g, {
       getConfig:() => ({mode:SET2.inputMode, enabled:SET2.haptics, strength:SET2.hapticStrength,
-        playerStrength:SET2.hapticPlayer,worldStrength:SET2.hapticWorld,signalStrength:SET2.hapticSignals}),
+        playerStrength:SET2.hapticPlayer,worldStrength:SET2.hapticWorld,signalStrength:SET2.hapticSignals,triggerStrength:SET2.hapticTrigger}),
       getGamepad:() => window.GH_CONTROLS.getGamepad()
     });
     window.GH_WORLD_FEEDBACK?.bindGame(g);
@@ -10808,6 +10896,319 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     ctx.restore(); ctx.save(); ctx.strokeStyle = C.brass; ctx.lineWidth = 3; ctx.strokeRect(x, y, s, s); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x + 3, y + 3, s - 6, s - 6); ctx.restore();
   };
   window.GH_MID = {Warden};
+})();
+
+// ================= HAPTICS PLUS · every machine has its own touch (impulse triggers + roster + Warden) =================
+// The base mixer (XBOX CONTROLS / EVENT HAPTICS) already owns the actuator. This module only teaches it new vocabulary:
+//   · profiles / textures for the nine roster machines and the Warden mid-boss, each with a distinct tactile signature
+//       Watcher  - two crisp ticks, then a mosquito buzz        Riveter - sharp double tap          Kettle - rising whistle, soft lob
+//       Jack     - lid click, springy lunge                      Grinder - revving buzz, rolling rumble
+//       Bulwark  - clank, low brace that swells, hammer bash     Arclamp - crackle that climbs, one hard zap
+//       Drillmole- ground tremor that swells, eruption          Welder  - hiss that sharpens, rough flame
+//       Warden   - flywheel whine (slam / charge / hook / overload each with its own pitch), crash, hook clank, phase roar, collapse
+//   · telegraph textures are 'signals' (so the player can tell *which* threat is winding up); hits are 'player' contact
+//   · LT / RT carry the side a threat comes from, so you can feel it before you see it (only with trigger-rumble hardware)
+//   · blocked hits (armour) get their own tink; the player's last health point gets a heartbeat
+// Observers only read entity state; nothing here touches physics, damage or timing.
+(() => {
+  'use strict';
+  const H = window.GH_HAPTICS;
+  if (!H || typeof H.define !== 'function' || typeof H.defineTexture !== 'function') return;
+  const errors = [];
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, Number(v) || 0));
+  const sgn = Math.sign;
+  const abs = Math.abs, sin = Math.sin;
+  const F = d => clamp(d.force == null ? 1 : d.force, 0.25, 1.2);
+
+  // ---------------------------------------------------------------- vocabulary
+  // trig(d) -> [[ms, leftTrigger, rightTrigger], ...]; the side the threat comes from (d.side: -1 left, +1 right, 0 both) bites harder.
+  const sk = (d, arr) => { const l = (d.side || 0) <= 0 ? 1 : 0.45, r = (d.side || 0) >= 0 ? 1 : 0.45; return arr.map(a => [a[0], a[1] * l, a[1] * r]); };
+  const def = (name, p, gap, k, trig, opts) => H.define(name, d => ({p, gap, gain: F(d), k}),
+    Object.assign({trigger: trig ? d => trig(d) : null, broaden: false}, opts));
+
+  // --- Watcher (drone)
+  def('foe-ping', 4, 60, [[0,0,.55],[40,0,.55],[41,0,0],[119,0,0],[120,0,.85],[165,0,.85],[166,0,0]],
+    d => sk(d, [[0,.25],[40,.25],[41,0],[119,0],[120,.45],[165,.45],[166,0]]));
+  def('foe-rush', 5, 80, [[0,.06,.38],[60,.12,.55],[200,.05,.22],[330,0,0]], d => sk(d, [[0,.2],[80,.4],[220,.15],[330,0]]));
+  // --- Riveter (turret)
+  def('foe-lock', 3, 60, [[0,0,.32],[28,0,.32],[29,0,0]], null);
+  def('foe-tap', 5, 60, [[0,.14,.78],[20,.2,.45],[52,.05,.1],[90,0,0]], d => sk(d, [[0,.1],[24,.62],[60,0],[90,0]]), {broaden: true});
+  // --- Kettle (mortar)
+  def('foe-lob', 5, 80, [[0,.58,.22],[30,.42,.10],[90,.12,0],[170,0,0]], d => sk(d, [[0,.3],[60,.18],[140,0]]), {broaden: true});
+  // --- Jack (hopper)
+  def('foe-lid', 4, 60, [[0,.05,.62],[28,0,.12],[44,.05,.58],[74,0,0]], d => sk(d, [[0,.22],[28,0],[44,.28],[74,0]]));
+  def('foe-lunge', 6, 100, [[0,.26,.55],[34,.34,.30],[100,.09,.10],[180,0,0]], d => sk(d, [[0,.4],[50,.3],[140,0]]), {broaden: true});
+  // --- Bulwark
+  def('foe-clank', 4, 80, [[0,.2,.72],[18,.26,.30],[50,0,.06],[92,0,0]], d => sk(d, [[0,.3],[40,.12],[80,0]]));
+  def('foe-bash', 8, 180, [[0,.95,.55],[28,1,.28],[80,.66,.09],[150,.34,.05],[260,0,0]],
+    d => sk(d, [[0,.95],[40,.85],[120,.45],[240,0]]), {broaden: true});
+  def('foe-vent', 3, 200, [[0,.10,.32],[80,.13,.26],[220,.05,.10],[340,0,0]], null);
+  // --- Arclamp (jelly)
+  def('foe-zap', 8, 160, [[0,.28,1],[15,.42,.62],[34,.12,1],[60,.32,.42],[100,.12,.22],[170,0,0]],
+    d => sk(d, [[0,1],[15,.5],[34,.9],[70,.3],[110,0],[170,0]]), {broaden: true});
+  // --- Drillmole (burrower)
+  def('foe-erupt', 8, 220, [[0,.98,.58],[22,.9,.32],[72,.58,.10],[142,.28,.05],[235,0,0]],
+    d => [[0,.9,.9],[40,.7,.7],[120,.34,.34],[230,0,0]], {broaden: true});
+  // --- Welder
+  def('foe-ignite', 6, 160, [[0,.30,.60],[40,.24,.30],[120,.10,.10],[200,0,0]], d => sk(d, [[0,.5],[60,.3],[160,0]]), {broaden: true});
+  // --- armour deflection: all metal, no weight (the wrench bounced)
+  H.define('foe-block', d => ({p: 6, gap: 60, gain: F(d), k: [[0,.04,.9],[14,0,.45],[34,0,.12],[70,0,0]]}),
+    {trigger: () => [[0,0,.7],[24,0,.25],[60,0,0]], broaden: true});
+  // --- Warden (mid-boss)
+  def('warden-wake', 8, 600, [[0,.74,.42],[80,.95,.30],[240,.54,.30],[480,.30,.10],[900,0,0]], () => [[0,.7,.7],[90,.8,.8],[300,.4,.4],[700,0,0]]);
+  def('warden-step', 3, 100, [[0,.46,.10],[40,.22,.05],[96,0,0]], null, {broaden: true});
+  def('warden-launch', 7, 200, [[0,.62,.92],[40,.5,.3],[140,.2,.1],[260,0,0]], d => sk(d, [[0,.7],[120,.4],[260,0]]), {broaden: true});
+  def('warden-slam', 9, 350, [[0,1,.96],[24,.98,.62],[70,.82,.20],[140,.62,.08],[220,.40,.20],[340,.18,.04],[520,0,0]],
+    () => [[0,1,1],[30,.9,.9],[100,.6,.6],[200,.34,.34],[360,0,0]], {broaden: true});
+  def('warden-crash', 9, 500, [[0,1,1],[30,1,.72],[90,.92,.32],[170,.72,.18],[250,.52,.36],[330,.32,.08],[480,.12,.02],[680,0,0]],
+    () => [[0,1,1],[40,1,1],[120,.8,.8],[260,.5,.5],[420,.2,.2],[680,0,0]], {broaden: true});
+  def('warden-rebound', 7, 200, [[0,.82,.52],[40,.62,.22],[130,.16,.04],[220,0,0]], () => [[0,.7,.7],[100,.3,.3],[220,0,0]], {broaden: true});
+  def('warden-hook-throw', 5, 160, [[0,.20,.58],[40,.10,.30],[110,0,0]], d => sk(d, [[0,.3],[60,.15],[110,0]]));
+  def('warden-hook-clank', 7, 200, [[0,.32,.92],[20,.22,.44],[60,0,.12],[110,0,0]], () => [[0,.6,.9],[40,.2,.3],[100,0,0]], {broaden: true});
+  def('warden-overload', 9, 600, [[0,.92,1],[30,1,.72],[100,.72,.32],[180,.46,.52],[260,.30,.22],[400,.12,.06],[580,0,0]],
+    () => [[0,1,1],[60,.9,.9],[180,.6,.6],[360,.3,.3],[580,0,0]], {broaden: true});
+  def('warden-quake', 6, 120, [[0,.52,.30],[50,.40,.12],[130,0,0]], () => [[0,.4,.4],[80,.15,.15],[130,0,0]]);
+  def('warden-phase', 9, 1500, [[0,.92,.8],[60,1,.5],[160,.74,.3],[300,.9,.6],[500,.7,.3],[800,.55,.5],[1200,.4,.2],[1700,.2,.1],[2300,0,0]],
+    () => [[0,.9,.9],[160,.7,.7],[300,.9,.9],[800,.5,.5],[1500,.3,.3],[2300,0,0]]);
+  def('warden-final', 10, 3000, [[0,1,1],[40,1,.64],[200,.84,.3],[500,.64,.5],[900,.42,.22],[1500,.16,.06],[2200,0,0]],
+    () => [[0,1,1],[200,.9,.9],[600,.6,.6],[1200,.3,.3],[2200,0,0]]);
+  // --- player: the last health point beats like a pulse in the palm
+  H.define('low-hp', d => ({p: 3, gap: 400, k: [[0,.30,.04],[48,.27,.04],[88,0,0],[148,0,0],[170,.20,.03],[214,.18,.03],[252,0,0]]}),
+    {trigger: () => [[0,.16,0],[50,.12,0],[88,0,0],[170,.10,0],[214,0,0]]});
+
+  // ---------------------------------------------------------------- continuous textures (re-armed each frame, expire in 120 ms)
+  const side = t => [(t.side || 0) <= 0 ? 1 : 0.45, (t.side || 0) >= 0 ? 1 : 0.45];
+  const shape = (name, fn, opts) => H.defineTexture(name, (t, age, pulse, k) => {
+    const o = fn(k, age, t) || [0, 0, 0, 0], s = side(t);
+    return [o[0], o[1], (o[2] || 0) * s[0], (o[3] || 0) * s[1]];
+  }, opts);
+  const tri = (age, f) => abs(sin(age * f));
+  shape('foe-buzz', (k, a) => [.04, .16 + .12 * tri(a, 80), .08, .08]);
+  shape('foe-whistle', (k, a) => [.02, (.08 + .42 * k) * (.55 + .45 * tri(a, 70 + 120 * k)), .02 + .08 * k, .04 + .16 * k]);
+  shape('foe-rev', (k, a) => [.07 + .16 * k, (.06 + .30 * k) * (.5 + .5 * tri(a, 60 + 90 * k)), .05 + .2 * k, .05 + .2 * k]);
+  shape('foe-roll', (k, a) => [.20 * (.7 + .3 * sin(a * 34)), .10 * (.6 + .4 * sin(a * 57)), .10, .10]);
+  shape('foe-brace', (k, a) => [(.10 + .46 * k) * (.75 + .25 * sin(a * (14 + 14 * k))), .03 + .10 * k, .12 + .5 * k, .12 + .5 * k]);
+  shape('foe-arc', (k, a) => [.03, (.12 + .50 * k) * (.35 + .65 * tri(a, 47 + 70 * k) * tri(a, 131)), (.04 + .24 * k) * tri(a, 90), (.04 + .24 * k) * tri(a, 77)]);
+  shape('foe-tremor', (k, a) => [(.10 + .45 * k) * (.55 + .45 * sin(a * (30 + 16 * k))), .03 + .10 * k, .14 * k, .14 * k]);
+  shape('foe-weld', (k, a) => [.03, (.10 + .32 * k) * (.5 + .5 * tri(a, 110)), 0, .05 + .12 * k]);
+  shape('foe-flame', (k, a) => [.20 * (.75 + .25 * sin(a * 43)), .20 * (.6 + .4 * tri(a, 97)), .12, .12]);
+  shape('warden-whine', (k, a) => [(.05 + .52 * k) * (.7 + .3 * sin(a * (16 + 24 * k))), (.04 + .46 * k * k) * (.4 + .6 * tri(a, 55 + 95 * k)),
+    (.08 + .62 * k) * (.6 + .4 * sin(a * 40)), (.08 + .62 * k) * (.6 + .4 * sin(a * 40))]);
+  shape('warden-slam-wind', (k, a) => [(.04 + .38 * k) * (.8 + .2 * sin(a * 12)), .02 + .20 * k, .05 + .45 * k, .05 + .45 * k]);
+  shape('warden-hook-wind', (k, a) => [.03 + .12 * k, (.08 + .45 * k) * (.5 + .5 * tri(a, 80 + 80 * k)), .05 + .3 * k, .05 + .3 * k]);
+  shape('warden-over-wind', (k, a) => [(.06 + .70 * Math.pow(k, 1.3)) * (.65 + .35 * sin(a * (14 + 30 * k))),
+    (.05 + .55 * Math.pow(k, 1.5)) * (.4 + .6 * tri(a, 60 + 100 * k)), .10 + .80 * k, .10 + .80 * k]);
+  shape('warden-rumble', (k, a) => [.56 * (.72 + .28 * sin(a * 28)), .22 * (.5 + .5 * tri(a, 64)), .40, .40]);
+  shape('warden-wheel', (k, a) => [(.02 + .07 * k) * (.6 + .4 * sin(a * (10 + 20 * k))), (.01 + .05 * k) * (.5 + .5 * sin(a * (25 + 40 * k))), 0, 0], {category: 'world'});
+
+  // ---------------------------------------------------------------- observation
+  const recs = new WeakMap();
+  let serial = 0, game = null, hb = 0;
+  const rec = e => { let r = recs.get(e); if (!r) { r = {id: 'foe:' + (++serial), n: 0, p: {}, t: {}}; recs.set(e, r); } return r; };
+  // Records a value; returns {from} only when it changed from a previously seen value (the first sight is silent).
+  const ch = (r, k, v) => { const o = r.p[k]; r.p[k] = v; return o === undefined || o === v ? null : {from: o}; };
+
+  function context(g, e, reach) {
+    const p = g.player, r = rec(e);
+    const dx = e.x - p.x, dy = (e.y - (e.h || 0) / 2) - (p.y - (p.h || 0) / 2), dist = Math.hypot(dx, dy);
+    const f = Math.pow(clamp(1 - dist / reach), 0.7) * 1.15;
+    const c = {g, e, p, r, dist, side: sgn(dx), f, far: f < 0.1, quiet: !g._hapLive || f < 0.1};
+    c.ev = (name, d = {}) => {
+      if (c.quiet) return;
+      const n = ++r.n;
+      H.emit(name, Object.assign({category: 'player', sourceId: r.id, eventId: `${r.id}:${name}:${n}`, actionId: `${r.id}:${name}:${n}`,
+        worldX: e.x, worldY: e.y - (e.h || 0) / 2, force: f, side: c.side}, d));
+    };
+    // cinematic cues (boss wake / collapse) belong to a scripted scene: they ignore dialogue, director state and distance, not death
+    c.cin = (name, d = {}) => {
+      if (g.state !== 'play' || p.dead) return;
+      const n = ++r.n;
+      H.emit(name, Object.assign({category: 'player', sourceId: r.id, eventId: `${r.id}:${name}:${n}`, actionId: `${r.id}:${name}:${n}`,
+        worldX: e.x, worldY: e.y - (e.h || 0) / 2, force: 1, side: c.side, cinematic: true}, d));
+    };
+    c.tx = (name, charge, d = {}) => {
+      if (c.quiet) return;
+      H.emit(name, Object.assign({category: 'signals', sourceId: r.id + ':' + name, worldX: e.x, worldY: e.y - (e.h || 0) / 2,
+        force: f, side: c.side, charge: clamp(charge), priority: 4, relevance: f}, d));
+    };
+    return c;
+  }
+
+  const R = () => window.GH_ROSTER || {}, M = () => window.GH_MID || {};
+  const handlers = new Map();
+  const reg = (cls, reach, fn) => { if (typeof cls === 'function') handlers.set(cls, {reach, fn}); };
+
+  function setup() {
+    handlers.clear();
+    reg(Drone, 520, c => {
+      const e = c.e, wk = e.wk || 0, t = ch(c.r, 'wk', wk);
+      if (t && wk === 'ping') c.ev('foe-ping');
+      if (t && wk === 'rush') c.ev('foe-rush');
+      if (wk === 'rush' && !(e.stun > 0)) c.tx('foe-buzz', (e.wt || 0) / 1.0);
+    });
+    reg(Turret, 520, c => {
+      const e = c.e, cd = e.cd || 0, pcd = c.r.p.cd; c.r.p.cd = cd;
+      if (pcd !== undefined && cd > pcd + 0.5) c.ev('foe-tap');
+      const b2 = e._b2 || 0, pb = c.r.p.b2; c.r.p.b2 = b2;
+      if (pb > 0 && b2 <= 0 && !(e.stun > 0)) c.ev('foe-tap');
+      const al = !!e.alert, t = ch(c.r, 'al', al);
+      if (t && al) c.ev('foe-lock');
+    });
+    reg(Mortar, 560, c => {
+      const e = c.e, cd = e.cd || 0, pcd = c.r.p.cd; c.r.p.cd = cd;
+      if (pcd !== undefined && cd > pcd + 0.5) c.ev('foe-lob');
+      // Mortar.cd keeps counting below zero while Lin is out of range (it glows "armed" all that time), so the whistle needs a target too
+      const dx = abs(c.p.x - e.x), armed = !c.p.dead && dx < 470 && dx > 80 && abs(c.p.y - e.y) < 320;
+      if (cd < 0.6 && armed && !(e.stun > 0)) c.tx('foe-whistle', 1 - Math.max(cd, 0) / 0.6);
+    });
+    reg(Hopper, 480, c => {
+      const e = c.e, al = !!e.alert, t = ch(c.r, 'al', al);
+      if (t && al) c.ev('foe-lid');
+      const hn = e.hn || 0, pn = c.r.p.hn; c.r.p.hn = hn;
+      if (pn !== undefined && hn > pn && (hn - 1) % 3 === 2) c.ev('foe-lunge');
+    });
+    reg(Roller, 520, c => {
+      const e = c.e, t = ch(c.r, 'st', e.st);
+      if (t && e.st === 'rev') c.r.t.rev = c.g.time;
+      if (e.st === 'rev' && !(e.stun > 0)) c.tx('foe-rev', (c.g.time - (c.r.t.rev || c.g.time)) / 0.75);
+      if (e.st === 'roll' && !(e.stun > 0)) c.tx('foe-roll', 1);
+    });
+    reg(Welder, 460, c => {
+      const e = c.e, t = ch(c.r, 'st', e.st);
+      if (t && e.st === 'flame') c.ev('foe-ignite');
+      if (e.st === 'warn') c.tx('foe-weld', (e.st_t || 0) / 0.55);
+      if (e.st === 'flame') c.tx('foe-flame', 1);
+    });
+    const ros = R();
+    reg(ros.Bulwark, 520, c => {
+      const e = c.e, t = ch(c.r, 'st', e.st);
+      if (t && e.st === 'guard' && t.from === 'patrol') c.ev('foe-clank', {force: c.f * 0.7});
+      if (t && e.st === 'bash') c.ev('foe-bash');
+      if (t && e.st === 'tired' && t.from === 'bash') c.ev('foe-vent');
+      if (e.st === 'wind') c.tx('foe-brace', (e.stt || 0) / 0.65);
+    });
+    reg(ros.Jelly, 520, c => {
+      const e = c.e, t = ch(c.r, 'st', e.st);
+      if (t && e.st === 'zap') c.ev('foe-zap');
+      if (e.st === 'charge') c.tx('foe-arc', (e.stt || 0) / 0.9);
+    });
+    reg(ros.Burrower, 560, c => {
+      const e = c.e, t = ch(c.r, 'st', e.st);
+      if (t && e.st === 'out') c.ev('foe-erupt');
+      if (e.st === 'tremor') c.tx('foe-tremor', Math.max((e.stt || 0) / 0.75, 1 - abs(e.x - c.p.x) / 180) * 0.9 + 0.1);
+    });
+    reg(M().Warden, 900, warden);
+  }
+
+  const WIND = {charge_t: 'warden-whine', slam_t: 'warden-slam-wind', hook_t: 'warden-hook-wind', over_t: 'warden-over-wind'};
+  function warden(c) {
+    const e = c.e, r = c.r, st = e.st, ph = e.phase ? 1 : 0;
+    const sc = ch(r, 'state', e.state);
+    if (sc && e.state === 'intro') c.cin('warden-wake');                       // the gong as the pit gate shuts
+    const card = !!c.g.midCard, tc = ch(r, 'card', card);
+    if (tc && card && e.state === 'intro') c.cin('warden-phase');               // its roar on the name card
+    if (e.state === 'dying') {
+      const q = Math.floor((e.stt || 0) * 4), pq = r.p.q; r.p.q = q;
+      if (pq !== undefined && q > pq && (e.stt || 0) < 2.4) c.cin('warden-quake');
+    }
+    const fin = !!e._fin, tf = ch(r, 'fin', fin);
+    if (tf && fin) c.cin('warden-final');
+    if (e.state !== 'fight') return;
+    const t = ch(r, 'st', st);
+    if (t) {
+      if (t.from === 'charge_t' && st === 'charging') c.ev('warden-launch', {force: 1});
+      if (st === 'stuck') c.ev('warden-slam', {force: 1});
+      if (st === 'crash' || st === 'rebound') c.ev(st === 'crash' ? 'warden-crash' : 'warden-rebound', {force: 1});
+      if (t.from === 'hook_t' && st === 'hooking') c.ev('warden-hook-throw');
+      if (st === 'vent') c.ev('warden-overload', {force: 1});
+      if (st === 'phase') c.ev('warden-phase', {force: 1});
+    }
+    // wind-ups: pitch / weight of the whine says which attack is coming
+    const wind = WIND[st];
+    if (wind) c.tx(wind, (e.stt || 0) / (st === 'charge_t' ? (ph ? 0.78 : 1.0) : st === 'slam_t' ? (ph ? 0.6 : 0.8) : st === 'hook_t' ? (ph ? 0.66 : 0.82) : 1.25), {force: Math.max(c.f, 0.9)});
+    if (st === 'charging') c.tx('warden-rumble', 1, {force: Math.max(c.f, 0.85)});
+    // hook reaching the end of the chain
+    const out = e.hook ? !!e.hook.out : null, to = ch(r, 'hookOut', out);
+    if (to && to.from === true && out === false) c.ev('warden-hook-clank');
+    // footfalls while it walks to the slam
+    if (st === 'walk') {
+      const s = Math.floor((e.t || 0) * 9 / Math.PI), ps = r.p.step; r.p.step = s;
+      if (ps !== undefined && s > ps) c.ev('warden-step', {force: c.f * 0.9});
+    }
+    // the window: cue it after the impact has settled, warn just before it closes
+    const vuln = !!e.vuln, tv = ch(r, 'vuln', vuln);
+    if (tv && vuln) r.t.cue = 0.45;
+    if (vuln && r.t.cue > 0) { r.t.cue -= c.dt; if (r.t.cue <= 0) c.sig('weakpoint-open'); }
+    if (!vuln) { r.t.cue = 0; r.t.closing = false; }
+    else {
+      const left = (st === 'stuck' ? (ph ? 1.2 : 1.45) : st === 'crash' ? (ph ? 2.0 : 2.4) : st === 'vent' ? 1.7 : 99) - (e.stt || 0);
+      if (left < 0.35 && !r.t.closing) { r.t.closing = true; c.sig('weakpoint-closing'); }
+    }
+    // the flywheel hums at its own rpm
+    const k = clamp(((e.rpm || 0) - 2) / 24);
+    c.tx('warden-wheel', k, {category: 'world', priority: 1, force: 1});
+  }
+
+  function observe(g, dt) {
+    if (!(SET2.inputMode === 'xbox' && SET2.haptics)) return;
+    const p = g.player, L = g.level && g.level.entities;
+    if (!p || !L) return;
+    g._hapLive = g.state === 'play' && !p.dead && !(g.dialogue && g.dialogue.active) && !(g.director && g.director.active);
+    if (game !== g) { game = g; hb = 0; }
+    for (const e of L) {
+      if (!e || e.dead) continue;
+      const h = handlers.get(e.constructor);
+      if (!h) continue;
+      const c = context(g, e, h.reach);
+      c.dt = dt;
+      c.sig = name => { if (!c.quiet) H.emit(name, {category: 'signals', sourceId: c.r.id + ':' + name, eventId: `${c.r.id}:${name}:${++c.r.n}`, form: p.form}); };
+      h.fn(c);
+    }
+    // heartbeat on the last health point (never in one-touch chapters, where 1 HP is the rule)
+    if (g._hapLive && p.hp <= 1 && p.maxHp > 1) {
+      hb -= dt;
+      if (hb <= 0) { hb = 0.95; H.emit('low-hp', {category: 'player', sourceId: 'player:low-hp', eventId: 'low-hp:' + (++serial), force: 1}); }
+    } else hb = 0;
+  }
+
+  // ---------------------------------------------------------------- wiring
+  const baseStep = Game.prototype.step;
+  Game.prototype.step = function (dt) {
+    const result = baseStep.call(this, dt);
+    try {
+      if (!handlers.size) setup();
+      observe(this, dt);
+    } catch (err) { errors.push(String(err && err.message || err)); if (errors.length > 20) errors.shift(); }
+    return result;
+  };
+
+  // The side a blow comes from decides which trigger bites: Player.hurt(dir) receives the blow's travel direction.
+  const baseHurt = Player.prototype.hurt;
+  Player.prototype.hurt = function (...args) {
+    const d = Number(args[0]);
+    H.sideHint = Number.isFinite(d) && d !== 0 ? -sgn(d) : null;
+    try { return baseHurt.apply(this, args); } finally { H.sideHint = null; }
+  };
+
+  // Deflected blows (armour, shields) produce no damage event upstream - give them their metallic tink here.
+  if (window.GH_COMBAT && typeof window.GH_COMBAT.onEvent === 'function') {
+    window.GH_COMBAT.onEvent((name, detail = {}) => {
+      if (name !== 'hit' || !detail.armored || detail.damage > 0 || !detail.target) return;
+      const g = detail.player && detail.player.g;
+      if (!g || g.state !== 'play') return;
+      const id = detail.actionId || detail.id || ('blk:' + (++serial));
+      H.emit('foe-block', {category: 'player', sourceId: 'block:' + id, eventId: 'block:' + id, actionId: 'block:' + id, force: 1, form: detail.form});
+    });
+  }
+
+  // A damaging blow on the Warden's exposed core is a boss hit, not an ordinary one.
+  const baseEmit = H.emit.bind(H);
+  H.emit = function (name, detail) {
+    if (name === 'hit' && detail && detail.weakpoint && detail.target === 'Warden') name = 'boss-hit';
+    return baseEmit(name, detail);
+  };
+
+  window.GH_HAPTICS_PLUS = {errors, observe, setup, handlers};
 })();
 
 // ================= READABILITY PASS · actors keep a visible edge after the lightmap =================
