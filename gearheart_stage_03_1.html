@@ -5980,13 +5980,18 @@ const TUT_POSTS=[2,13,21,30,47,59,74,84];
   const L=this.level,fy=14*TS;this.tut={done:{},cur:-1,wall:0,heal:0,lastHp:this.player.hp,lastPogo:false,healPrimed:false,doneT:0};
   TUT_POSTS.forEach((tx,i)=>L.entities.push(new TutPost(this,tx*TS+16,fy,i)));
   L.entities.push(new Dummy(this,63*TS,fy,false),new Dummy(this,67*TS+16,fy,true));
-  const m=this.M();m.atkHint=m.dashHint=m.focusHint=1;};}
+  const m=this.M();m.atkHint=m.dashHint=m.focusHint=1;
+  // PATCH v4: a finished (or already passed) course never nags again
+  if(this.save.tutDone||this.save.tutSeen){this.tut.quiet=true;TUT_ST.forEach(s=>this.tut.done[s.id]=1);}};}
 // ---------- progress tracking ----------
 {const _st=Game.prototype.step;Game.prototype.step=function(dt){_st.call(this,dt);const T=this.tut,p=this.player;if(!T||this.state!=='play'||!p||p.dead)return;
   const np=window.GH_CONNECTED.nativePosition(this),px=np.x,py=np.y,tx=px/TS;let cur=-1;for(let i=0;i<TUT_ST.length;i++)if(tx>=TUT_ST[i].x0&&tx<TUT_ST[i].x1){cur=i;break;}
   if(cur!==T.cur){T.cur=cur;T.cardT=0;}T.cardT=(T.cardT||0)+dt;if(T.doneT>0)T.doneT-=dt;
   const D=T.done,fin=id=>{if(D[id])return;D[id]=1;T.doneT=1.6;T.doneId=id;this.audio.play('checkpoint');this.particles.sparks(p.x,p.y-30,14,'#9ff8c0',0.6);
-    if(TUT_ST.every(s=>D[s.id]))setTimeout(()=>this.toast&&this.toast('훈련 완료! 이제 실전이다 →'),900);};
+    if(TUT_ST.every(s=>D[s.id])){T.complete=true;if(!this.save.tutDone){this.save.tutDone=1;this.persist();}setTimeout(()=>this.toast&&this.toast('훈련 완료! 이제 실전이다 →'),900);}};
+  if(T.quiet)return;
+  // PATCH v4: walking out of the course (or finishing every post) retires the tutorial for good
+  if(tx>=TUT_W-1&&!T.left){T.left=true;if(!this.save.tutSeen){this.save.tutSeen=1;this.persist();}}
   if(cur<0)return;const id=TUT_ST[cur].id;
   if(id==='move'&&px>10.5*TS)fin('move');
   if(id==='jump'&&p.grounded&&py<=11*TS+1&&tx>=18&&tx<21)fin('jump');
@@ -6021,15 +6026,17 @@ function tutCap(ctx,x,y,w,h,label,lit,clicked){const dy=lit?4:0,r=h/2.4;ctx.save
   if(lit){ctx.globalCompositeOperation='lighter';glow(ctx,x+w/2,y+h/2+dy,w*0.8,'255,160,70',0.22);}
   ctx.restore();}
 {const _hud=UI.prototype.drawHUD;UI.prototype.drawHUD=function(ctx){_hud.call(this,ctx);const g=this.g,T=g.tut;g.tutBtns=[];
-  if(!T||g.state!=='play'||!g.player||g.player.dead||g.director.active||g.dialogue.active||g.lb>0.05)return;
-  // station chips (always visible during the course)
+  if(!T||T.quiet||T.left||g.state!=='play'||!g.player||g.player.dead||g.director.active||g.dialogue.active||g.lb>0.05)return;
+  // station chips (only while the player is actually inside the course)
   const n=TUT_ST.length,cw=22,gap=6,tw=n*cw+(n-1)*gap,cx0=W/2-tw/2,cy0=16;
-  if(T.cur>=0||Object.keys(T.done).length<n){ctx.save();ghPlate(ctx,cx0-14,cy0-7,tw+28,36,{seed:991,role:'support',cut:5,rivets:false,groove:false});
+  if(T.cur>=0&&!T.complete){ctx.save();ghPlate(ctx,cx0-14,cy0-7,tw+28,36,{seed:991,role:'support',cut:5,rivets:false,groove:false});
     TUT_ST.forEach((s,i)=>{const x=cx0+i*(cw+gap),d=T.done[s.id],a=i===T.cur;ctx.fillStyle=d?GH_ART.tones.iron.mid:a?'#7a5418':GH_ART.tones.iron.dark;rr(ctx,x,cy0,cw,cw,6);ctx.fill();ctx.strokeStyle=d?GH_ART.palette.brass:a?GH_ART.palette.core:GH_ART.tones.iron.edge;ctx.lineWidth=a?2:1;rr(ctx,x+0.5,cy0+0.5,cw-1,cw-1,6);ctx.stroke();
       ctx.fillStyle=GH_ART.tones.text.main;ctx.font='bold 11px '+MONO;ctx.textAlign='center';ctx.fillText(d?'✓':String(i+1),x+cw/2,cy0+15);});
     ctx.font=GH_ART.type.support+'px '+FONT;ctx.fillStyle=GH_ART.tones.text.muted;ctx.fillText('훈련장 '+Object.keys(T.done).length+' / '+n,W/2,cy0+36);ctx.textAlign='left';ctx.restore();}
   if(T.cur<0)return;
+  if(T.complete&&T.doneT<=0)return;
   const s=TUT_ST[T.cur],k=ease.outCubic(Math.min(1,T.cardT/0.35)),done=T.done[s.id];
+  if(done&&!(T.doneT>0&&T.doneId===s.id))return;
   const capW=s.caps.map(c=>c[0].length>3?84:54),capsW=capW.reduce((a,b)=>a+b,0)+(s.caps.length-1)*10;
   const pw=Math.max(520,capsW+330),ph=86,px=W/2-pw/2,py=window.GH_COMBAT_UI?.tutorialCardY(g,px,pw,ph,k)??(H-ph-34+(1-k)*30);
   ctx.save();ctx.globalAlpha=k;uPanel(ctx,px,py,pw,ph,{role:'secondary',accent:done?GH_ART.palette.brass:GH_ART.palette.core,aw:pw-20,c1:'rgba(10,18,24,0.94)',c2:'rgba(6,10,14,0.94)'});
@@ -8790,7 +8797,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     const result=original.apply(this,args);applyDifficulty(this,true);meta(this);
     if(this.tut){this.tut.combatLesson=newLinLesson();
       const lesson=TUT_ST.find(s=>s.id==='atk');if(lesson)lesson.title='띄우기 · 공중 콤보';}
-    if(this.chapter===2&&this.level&&!this.level._combatSigns){
+    if(this.chapter===2&&this.level&&!this.level._combatSigns&&!this.save.titanLesson){
       this.level._combatSigns=true;
       const p=this.player;
       const sign=new Sign(this,p.x+170,p.y,'린 연타로 코어를 모은 뒤 S 변신 → 타이탄 2연타 마무리');
@@ -8942,7 +8949,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     }else if(name==='detransform')resetTitanAttempt(lesson);
     else if(name==='hit'&&p.form==='titan'&&detail.kind==='attack'&&detail.damage>0&&detail.finisher&&
       lesson.stage==='finisher'&&detail.target===lesson.target&&time<=lesson.expires){
-      lesson.complete=true;lesson.target=null;g.toast(titanLessonCopy(lesson));
+      lesson.complete=true;lesson.target=null;g.toast(titanLessonCopy(lesson));if(!g.save.titanLesson){g.save.titanLesson=1;g.persist();}
     }
   }
   if(combat()?.onEvent)combat().onEvent(lessonEvent);
@@ -8969,7 +8976,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     }
     if(titan?.sign)titan.sign.text=titanLessonCopy(titan);
     if(titan&&!titan.seen&&this.state==='play'&&this.stats.time>3&&!this.director.active&&!this.dialogue.active){
-      titan.seen=true;this.toast(titanLessonCopy(titan));
+      titan.seen=true;this.toast(titanLessonCopy(titan));if(!this.save.titanLesson){this.save.titanLesson=1;this.persist();}
     }
     return result;
   });
