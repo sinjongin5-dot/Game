@@ -9534,6 +9534,114 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   })};
 })();
 
+// ================= READABILITY PASS · actors keep a visible edge after the lightmap =================
+// Why: the ink outline (outlined()) is DARK and the rim light (drawWithRim) only exists next to a light source, so in the
+// dark zones Lin's navy trousers and the grey Welder / Turret / Mortar sink into the background (measured: ~41 % of Lin's
+// silhouette edge differs from the wall behind her by < 7 % luminance; ground enemies sit within 2-5 % of their surroundings).
+// What: one thin (1 screen px) light edge per actor, drawn on a screen-space layer that is composited right AFTER the
+// lightmap multiply, so darkness cannot swallow it. Strength follows how dark the spot really is (ambient + nearby lights),
+// so lit rooms stay clean. Roles: Lin = warm cream, hostile = cool steel, hostile in its attack-warning state = orange
+// (orange stays reserved for danger). Works at every quality level; costs ~10 small blits per visible actor.
+(() => {
+  'use strict';
+  const RO = window.GH_READ = {on: true, cur: null, dirty: false, stats: {actors: 0}};
+  const OL = mkCv(W, H), olx = OL.getContext('2d');
+  const sil = {a: null, ax: null, b: null, bx: null, w: 0, h: 0};
+  const ROLE = {
+    player: {c: [255, 236, 200], lit: 0.20, dark: 0.66},
+    enemy:  {c: [190, 212, 228], lit: 0.18, dark: 0.55},
+    alert:  {c: [255, 128, 58],  lit: 0.70, dark: 0.95}
+  };
+  const OFFS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const lum = c => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+  function size(w, h) {
+    if (sil.a && sil.w >= w && sil.h >= h) return;
+    sil.w = Math.max(w, sil.w, 160); sil.h = Math.max(h, sil.h, 160);
+    sil.a = mkCv(sil.w, sil.h); sil.ax = sil.a.getContext('2d');
+    sil.b = mkCv(sil.w, sil.h); sil.bx = sil.b.getContext('2d');
+  }
+  // how bright the lightmap will make this spot: zone ambient + every light that reaches it (own light excluded)
+  function illum(g, x, y, own) {
+    const a = g.ambCur; let L = lum(a);
+    for (const l of g.lm.list) {
+      if (l.own === own || l.rimOnly) continue;
+      const dx = x - l.x, dy = y - l.y, d = Math.hypot(dx, dy);
+      if (d >= l.r) continue;
+      L += l.i * l.k * (1 - d / l.r) * lum(l.c) * 0.9;
+    }
+    return L;
+  }
+  // is this foe about to hurt? (same thresholds the foes use for their own warning blink)
+  function alerting(e) {
+    if (!e || e.stun > 0) return false;
+    if (e instanceof Welder) return e.st === 'warn' || e.st === 'flame';
+    if (e instanceof Turret) return e.cd < 0.5;
+    if (e instanceof Mortar) return e.cd < 0.6;
+    if (e instanceof Roller) return e.st === 'rev';
+    return false;
+  }
+  function stamp(g, z, box, drawFn, role, strength) {
+    const bx = Math.floor(box.x), by = Math.floor(box.y), pad = 2;
+    const w = Math.ceil(box.w * z) + pad * 2, h = Math.ceil(box.h * z) + pad * 2;
+    if (w > 900 || h > 900) return;
+    size(w, h);
+    const a = sil.ax, b = sil.bx;
+    a.setTransform(1, 0, 0, 1, 0, 0); a.globalAlpha = 1; a.globalCompositeOperation = 'source-over'; a.filter = 'none'; a.clearRect(0, 0, w, h);
+    a.setTransform(z, 0, 0, z, -bx * z + pad, -by * z + pad);
+    OUT.d++; try { drawFn(a); } finally { OUT.d--; }              // OUT.d: skip the dark ink pass, only the silhouette matters
+    a.setTransform(1, 0, 0, 1, 0, 0); a.filter = 'none';
+    b.setTransform(1, 0, 0, 1, 0, 0); b.globalAlpha = 1; b.globalCompositeOperation = 'source-over'; b.clearRect(0, 0, w, h);
+    for (const [ox, oy] of OFFS) b.drawImage(sil.a, 0, 0, w, h, ox, oy, w, h);
+    b.globalCompositeOperation = 'destination-out'; b.drawImage(sil.a, 0, 0, w, h, 0, 0, w, h);
+    b.globalCompositeOperation = 'source-in'; b.fillStyle = rgbS(role.c); b.fillRect(0, 0, w, h);
+    b.globalCompositeOperation = 'source-over';
+    g.camera.apply(olx);
+    olx.globalAlpha = Math.min(1, strength); olx.imageSmoothingEnabled = false;
+    olx.drawImage(sil.b, 0, 0, w, h, bx - pad / z, by - pad / z, w / z, h / z);
+    olx.globalAlpha = 1; RO.dirty = true; RO.stats.actors++;
+  }
+  // every actor already funnels through drawWithRim(ctx, zoom, box, drawFn, lights, strength, own, post)
+  const baseRim = drawWithRim;
+  drawWithRim = function (ctx, z, box, drawFn, lights, strength, own, post) {
+    const g = typeof game !== 'undefined' ? game : null;
+    const world = RO.on && g && g.state === 'play' && g.level && g.post && ctx === g.post.x && !post;
+    const isPlayer = world && typeof Player !== 'undefined' && own instanceof Player;
+    if (world && !isPlayer) RO.cur = null;
+    baseRim.apply(this, arguments);
+    if (!world) return;
+    let role, cx = box.x + box.w / 2, cy = box.y + box.h / 2, e = null;
+    if (isPlayer) { if (own.dead) return; role = ROLE.player; cx = own.x; cy = own.y - own.h / 2; }
+    else if (!own && RO.cur) { e = RO.cur; role = alerting(e) ? ROLE.alert : ROLE.enemy; cx = e.x; cy = e.y - (e.h || 20) / 2; }
+    else return;
+    const dark = clamp((0.95 - illum(g, cx, cy, own)) / 0.6, 0, 1);
+    let k = lerp(role.lit, role.dark, dark);
+    if (role === ROLE.alert) k *= 0.78 + 0.22 * Math.sin(g.time * 18);
+    stamp(g, z, box, drawFn, role, k);
+  };
+  // the foe draw wrappers tell us which entity a drawWithRim call belongs to (the call itself only carries a closure)
+  for (const cls of [Drone, Welder, Turret, Mortar, Hopper, Roller, typeof Dummy !== 'undefined' ? Dummy : null]) {
+    if (!cls) continue;
+    const d = cls.prototype.draw;
+    cls.prototype.draw = function (c) { RO.cur = this; return d.call(this, c); };
+  }
+  // composite right after the lightmap multiply (before emissive glow + bloom), then clear for the next frame
+  const baseApply = LightMap.prototype.apply;
+  LightMap.prototype.apply = function (ctx) {
+    baseApply.call(this, ctx);
+    const g = typeof game !== 'undefined' ? game : null;
+    if (!RO.dirty || !g || this !== g.lm || ctx !== g.post.x) return;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(OL, 0, 0); ctx.restore();
+    olx.setTransform(1, 0, 0, 1, 0, 0); olx.clearRect(0, 0, W, H); RO.dirty = false;
+  };
+  // a frame that never reaches the lightmap (title, cutscene) must not leave a stale layer behind
+  const baseCollect = Game.prototype.collectLights;
+  Game.prototype.collectLights = function (view) {
+    if (RO.dirty) { olx.setTransform(1, 0, 0, 1, 0, 0); olx.clearRect(0, 0, W, H); RO.dirty = false; }
+    return baseCollect.call(this, view);
+  };
+})();
+
 // ================= BOOT / FIXED TIMESTEP LOOP =================
 const game=new Game();
 window.GH_FEEDBACK.bindGame(game);
