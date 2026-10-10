@@ -251,7 +251,7 @@ describe('회복', () => {
     s.ctx.lion.attack!.t = 0.7;
     run(s, 0.6);
     expect(s.player.heals).toBe(1);
-    expect(s.player.hp).toBeLessThanOrEqual(60 - 20 + 0);
+    expect(s.player.hp).toBeLessThanOrEqual(60 - LION_ATTACKS.swipe.damage);
   });
 });
 

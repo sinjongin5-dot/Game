@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-10T02:08:51.799Z",
+  "startedAt": "2026-10-10T03:48:21.927Z",
   "checks": [
     {
       "name": "설정 패널 열림",
@@ -74,7 +74,7 @@
     {
       "name": "W 키로 전진",
       "ok": true,
-      "detail": "moved 2.64m"
+      "detail": "moved 3.78m"
     },
     {
       "name": "F 로 락온",
@@ -179,7 +179,7 @@
     {
       "name": "재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음",
       "ok": true,
-      "detail": "[{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":1},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2}]"
+      "detail": "[{\"objects\":14,\"geometries\":134,\"textures\":11,\"audioActive\":1},{\"objects\":14,\"geometries\":134,\"textures\":11,\"audioActive\":2},{\"objects\":14,\"geometries\":134,\"textures\":11,\"audioActive\":2}]"
     },
     {
       "name": "오디오 소스가 누적되지 않음",
@@ -216,21 +216,21 @@
     {
       "objCounts": [
         {
-          "objects": 11,
-          "geometries": 143,
-          "textures": 8,
+          "objects": 14,
+          "geometries": 134,
+          "textures": 11,
           "audioActive": 1
         },
         {
-          "objects": 11,
-          "geometries": 143,
-          "textures": 8,
+          "objects": 14,
+          "geometries": 134,
+          "textures": 11,
           "audioActive": 2
         },
         {
-          "objects": 11,
-          "geometries": 143,
-          "textures": 8,
+          "objects": 14,
+          "geometries": 134,
+          "textures": 11,
           "audioActive": 2
         }
       ]

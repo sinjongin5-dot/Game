@@ -33,7 +33,7 @@ export class Bot {
       if (a.id === 'backHop') this.plan.mode = 'none';
     }
     const attackDone = !a || a.t > LION_ATTACKS[a.id].activeEnd + 0.05 || (a.id === 'charge' && a.braking);
-    if (a && !attackDone && p.mode === 'free') {
+    if (a && !attackDone && (p.mode === 'free' || p.mode === 'attack' && this.plan.mode === 'dodge')) {  // 공격 중이어도 회피 입력을 미리 눌러 두면 취소 가능 시점에 바로 구른다
       if (this.plan.mode === 'dodge' && a.t >= this.plan.at && a.t < this.plan.at + 0.12 && p.stamina >= 25) {
         inp.pressed.dodge = true;
         inp.moveX = this.plan.lateral;

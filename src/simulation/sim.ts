@@ -1,6 +1,6 @@
 import { RapierPhysics } from '../physics/rapierPhysics';
 import type { Physics } from '../physics/types';
-import { ARENA } from './arena';
+import { ARENA, wallDistance } from './arena';
 import { resolveLionAttack, resolvePlayerAttack } from './combat';
 import type { SimContext } from './context';
 import { createLion, setLionMode, updateLion } from './lion';
@@ -189,8 +189,30 @@ export class GameSim {
       resolvePlayerAttack(c);
       resolveLionAttack(c);
       this.physics.step();
+      this.enforceBounds();
       this.checkEnd(dt);
     }
+  }
+
+  /**
+   * 안전장치: 넉백/충격파/벽과 몸통 사이에 끼는 등 극단적인 상황에서도 캐릭터 중심이 경기장 타원 밖으로
+   * 나가지 않게 한다 (콜라이더 접합부 틈으로 새는 경우 대비).
+   */
+  private enforceBounds() {
+    const c = this.ctx;
+    const fix = (id: 'player' | 'lion', pos: { x: number; z: number }, yaw: number, min: number) => {
+      const wd = wallDistance(pos);
+      if (wd >= min) return null;
+      const r = Math.hypot(pos.x, pos.z) || 1;
+      const k = Math.max(0, r - (min - wd)) / r;
+      const np = wd < 0 ? { x: pos.x * Math.min(k, 0.98), z: pos.z * Math.min(k, 0.98) } : { x: pos.x * k, z: pos.z * k };
+      this.physics.teleport(id, np, yaw);
+      return np;
+    };
+    const np = fix('player', c.player.pos, c.player.yaw, 0.3);
+    if (np) c.player.pos = np;
+    const nl = fix('lion', c.lion.pos, c.lion.yaw, 0.45);
+    if (nl) c.lion.pos = nl;
   }
 
   private stepIntro(dt: number) {

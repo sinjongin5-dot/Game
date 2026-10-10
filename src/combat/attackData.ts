@@ -171,7 +171,7 @@ export interface LionAttackDef {
 export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   swipe: {
     id: 'swipe', kind: 'paw', duration: 1.55, windup: 0.78, activeStart: 0.78, activeEnd: 0.96,
-    trackUntil: 0.5, trackRate: 2.2, damage: 20, blockCost: 26, poiseHit: true, heavyHit: false,
+    trackUntil: 0.5, trackRate: 2.2, damage: 18, blockCost: 26, poiseHit: true, heavyHit: false,
     range: [0.5, 3.1], bearingMax: 1.0, cooldown: 3.0, radius: 0.3,
     // 사자의 오른발 기준 경로 (왼발은 x 반전)
     path: [
@@ -188,7 +188,7 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   },
   bite: {
     id: 'bite', kind: 'bite', duration: 1.5, windup: 0.62, activeStart: 0.62, activeEnd: 0.8,
-    trackUntil: 0.38, trackRate: 2.0, damage: 28, blockCost: 30, poiseHit: true, heavyHit: false,
+    trackUntil: 0.38, trackRate: 2.0, damage: 25, blockCost: 30, poiseHit: true, heavyHit: false,
     range: [1.0, 2.8], bearingMax: 0.7, cooldown: 3.6, radius: 0.32,
     path: [
       { t: 0.0, p: [0, 1.15, 1.4] },
@@ -204,17 +204,17 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   },
   pounce: {
     id: 'pounce', kind: 'body', duration: 2.6, windup: 0.95, activeStart: 1.18, activeEnd: 1.72,
-    trackUntil: 0.7, trackRate: 2.4, damage: 36, blockCost: 48, poiseHit: true, heavyHit: true,
+    trackUntil: 0.7, trackRate: 2.4, damage: 32, blockCost: 48, poiseHit: true, heavyHit: true,
     range: [3.2, 8.5], bearingMax: 0.6, cooldown: 5.5, radius: 0.55, counterWindow: [1.8, 2.5],
   },
   charge: {
     id: 'charge', kind: 'body', duration: 4.0, windup: 1.15, activeStart: 1.35, activeEnd: 3.3,
-    trackUntil: 0.9, trackRate: 2.2, damage: 34, blockCost: 55, poiseHit: true, heavyHit: true,
+    trackUntil: 0.9, trackRate: 2.2, damage: 30, blockCost: 55, poiseHit: true, heavyHit: true,
     range: [7.0, 18], bearingMax: 0.5, cooldown: 7.0, radius: 0.55, counterWindow: [3.0, 4.0],
   },
   rear: {
     id: 'rear', kind: 'paw', duration: 1.7, windup: 0.85, activeStart: 0.85, activeEnd: 1.02,
-    trackUntil: 0.25, trackRate: 1.0, damage: 18, blockCost: 24, poiseHit: true, heavyHit: false,
+    trackUntil: 0.25, trackRate: 1.0, damage: 16, blockCost: 24, poiseHit: true, heavyHit: false,
     range: [0.8, 3.2], bearingMax: Math.PI, cooldown: 4.5, radius: 0.32,
     path: [
       { t: 0.0, p: [-0.22, 0.2, 0.55] },
@@ -230,7 +230,7 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   // 2페이즈 연계
   swipeBite: {
     id: 'swipeBite', kind: 'bite', duration: 1.0, windup: 0.42, activeStart: 0.42, activeEnd: 0.58,
-    trackUntil: 0.1, trackRate: 1.4, damage: 30, blockCost: 32, poiseHit: true, heavyHit: false,
+    trackUntil: 0.1, trackRate: 1.4, damage: 26, blockCost: 32, poiseHit: true, heavyHit: false,
     range: [0.8, 3.0], bearingMax: 0.8, cooldown: 0, radius: 0.34,
     path: [
       { t: 0.0, p: [0, 1.1, 1.4] },
@@ -245,7 +245,7 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   },
   pounceSwat: {
     id: 'pounceSwat', kind: 'paw', duration: 1.0, windup: 0.4, activeStart: 0.4, activeEnd: 0.54,
-    trackUntil: 0.12, trackRate: 1.6, damage: 22, blockCost: 28, poiseHit: true, heavyHit: false,
+    trackUntil: 0.12, trackRate: 1.6, damage: 20, blockCost: 28, poiseHit: true, heavyHit: false,
     range: [0.5, 3.0], bearingMax: 1.2, cooldown: 0, radius: 0.32,
     path: [
       { t: 0.0, p: [-0.22, 0.2, 0.55] },
@@ -264,8 +264,8 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   flurry: {
     id: 'flurry', kind: 'paw', duration: 2.5, windup: 0.7, activeStart: 0.7, activeEnd: 1.78,
     windows: [[0.7, 0.84], [1.12, 1.26], [1.62, 1.78]],
-    trackUntil: 0.42, trackRate: 2.2, damage: 16, blockCost: 20, poiseHit: true, heavyHit: false,
-    range: [0.5, 3.1], bearingMax: 0.9, cooldown: 6.5, radius: 0.32,
+    trackUntil: 0.42, trackRate: 2.2, damage: 13, blockCost: 20, poiseHit: true, heavyHit: false,
+    range: [0.5, 3.1], bearingMax: 0.9, cooldown: 7.5, radius: 0.32,
     path: [
       { t: 0.0, p: [-0.22, 0.2, 0.55] },
       { t: 0.4, p: [-0.3, 1.1, 0.85] },
@@ -293,8 +293,8 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   // 돌진 물기: 몸을 낮췄다가 한 번에 파고들어 문다. 중거리에서 거리를 확 줄인다.
   dashBite: {
     id: 'dashBite', kind: 'bite', duration: 1.75, windup: 0.78, activeStart: 0.78, activeEnd: 0.98,
-    trackUntil: 0.5, trackRate: 2.4, damage: 30, blockCost: 34, poiseHit: true, heavyHit: false,
-    range: [3.2, 7.5], bearingMax: 0.45, cooldown: 7.0, radius: 0.34,
+    trackUntil: 0.5, trackRate: 2.4, damage: 26, blockCost: 34, poiseHit: true, heavyHit: false,
+    range: [3.2, 7.5], bearingMax: 0.45, cooldown: 8.0, radius: 0.34,
     path: [
       { t: 0.0, p: [0, 1.1, 1.4] },
       { t: 0.45, p: [0, 0.85, 1.3] },
@@ -311,24 +311,38 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   backHop: {
     id: 'backHop', kind: 'none', duration: 0.7, windup: 0.7, activeStart: 99, activeEnd: 99,
     trackUntil: 0.7, trackRate: 3.0, damage: 0, blockCost: 0, poiseHit: false, heavyHit: false,
-    range: [2.2, 5.5], bearingMax: 0.9, cooldown: 8.0, radius: 0,
+    range: [2.2, 5.5], bearingMax: 0.9, cooldown: 9.0, radius: 0,
     counterWindow: [0, 0], comboAt: 0.62,
   },
   // 충격파 강타: 뒷다리로 일어서서 땅을 내리찍으면 바닥을 따라 링이 퍼진다. 방어/회피, 또는 멀리서 피한다.
   quake: {
     id: 'quake', kind: 'ring', duration: 2.4, windup: 1.0, activeStart: 1.0, activeEnd: 1.7,
-    trackUntil: 0.55, trackRate: 2.0, damage: 28, blockCost: 50, poiseHit: true, heavyHit: true,
-    range: [0.0, 6.5], bearingMax: Math.PI, cooldown: 9.0, radius: 0,
+    trackUntil: 0.55, trackRate: 2.0, damage: 24, blockCost: 40, poiseHit: true, heavyHit: true,
+    range: [0.0, 6.5], bearingMax: Math.PI, cooldown: 11.0, radius: 0,
     ring: { r0: 0.9, r1: 8.2, width: 1.15 }, counterWindow: [1.8, 2.3],
   },
   // 회전 꼬리치기: 제자리에서 한 바퀴 몸을 돌려 주변을 전부 쓸어낸다. 붙어 있거나 등 뒤에 선 상대를 벌한다.
   whirl: {
     id: 'whirl', kind: 'body', duration: 2.0, windup: 0.85, activeStart: 0.85, activeEnd: 1.4,
-    trackUntil: 0.3, trackRate: 1.6, damage: 24, blockCost: 40, poiseHit: true, heavyHit: true,
-    range: [0.4, 3.0], bearingMax: Math.PI, cooldown: 8.0, radius: 0.5,
+    trackUntil: 0.3, trackRate: 1.6, damage: 22, blockCost: 40, poiseHit: true, heavyHit: true,
+    range: [0.4, 3.0], bearingMax: Math.PI, cooldown: 9.5, radius: 0.5,
     bodyCap: { z0: -1.9, z1: 1.0, r: 0.5 }, counterWindow: [1.6, 1.95],
   },
 };
+
+/**
+ * 연타 할퀴기의 박자 보정: 둘째·셋째 타 앞에 틈을 더 주어(0.28→0.35s, 0.28→0.37s) 사람이 눈으로 보고 반응할 수 있게 한다.
+ * 경로 키/유효 구간/길이를 같은 규칙으로 밀기 때문에 판정과 애니메이션은 계속 일치한다.
+ */
+(function spaceFlurry() {
+  const d = LION_ATTACKS.flurry;
+  const shift = (t: number) => t + (t >= 0.9 ? 0.07 : 0) + (t >= 1.4 ? 0.09 : 0);
+  for (const k of d.path!) k.t = shift(k.t);
+  d.windows = d.windows!.map(([a, b]) => [shift(a), shift(b)] as [number, number]);
+  d.activeEnd = shift(d.activeEnd);
+  d.duration = shift(d.duration);
+  d.counterWindow = [shift(d.counterWindow[0]), shift(d.counterWindow[1])];
+})();
 
 /** 키 보간 (Catmull-Rom). 시간 t 에서 값. */
 export function sampleKeys<T extends { t: number }>(keys: T[], t: number, get: (k: T) => number[]): number[] {

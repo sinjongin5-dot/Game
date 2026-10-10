@@ -135,7 +135,7 @@ export function resolveLionAttack(ctx: SimContext) {
   }
   if (p.invulnT > 0) return;
   a.hitDone = true;
-  const dmg = Math.round(def.damage * (l.phase === 2 ? 1.1 : 1));
+  const dmg = Math.round(def.damage * (l.phase === 2 ? 1.05 : 1));
   const toAttacker = yawOf(norm2({ x: contact.x - p.pos.x, z: contact.z - p.pos.z }));
   const away = norm2({ x: p.pos.x - contact.x, z: p.pos.z - contact.z });
   const inCone = Math.abs(angleDiff(toAttacker, p.yaw)) <= T.block.halfAngle;

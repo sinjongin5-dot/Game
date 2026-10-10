@@ -30,7 +30,7 @@ describe('새 보스 패턴', () => {
     // 맞아도 쓰러지지 않게 체력을 키우고, 넉백/경직 후에도 사정권에 있도록 위치를 고정한다
     s.player.hp = s.player.hpMax = 1000;
     const dmg: number[] = [];
-    for (let i = 0; i < 60 * 2.6; i++) {
+    for (let i = 0; i < 60 * 2.9; i++) {
       s.step(input());
       s.player.pos = { x: 0, z: 0 };
       s.player.knock = { x: 0, z: 0 };
@@ -49,7 +49,7 @@ describe('새 보스 패턴', () => {
     s.player.guardHeld = true;
     const st0 = s.player.stamina;
     const blocks: number[] = [];
-    for (let i = 0; i < 60 * 2.6; i++) {
+    for (let i = 0; i < 60 * 2.9; i++) {
       s.step(input({ guard: true }));
       s.player.pos = { x: 0, z: 0 };
       for (const e of s.drainEvents()) if (e.type === 'playerBlocked') blocks.push(e.strength);
