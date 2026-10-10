@@ -102,3 +102,10 @@ function placeNotes(g,ex){
   removeWhere(g,e=>e._exNote);
   for(const k of NOTE_ORDER){const s=spots[k];if(s)addWorld(g,new ExpNote(g,s.x,s.y,k));}}
 
+// the hub folk react to what you have read on the road (each reaction once)
+function lines(g,id){const L=linesBase(g,id),r=res(g),b1=flag(g,'boss.bram'),b2=flag(g,'boss.bello'),once=k=>{if(r.met[k])return false;r.met[k]=true;return true;};
+  if(id==='orr'&&!b1&&flag(g,'note.bram.2')&&once('orr.note'))L.push(['orr','명부 보고 왔어? 이름 칸이 닳아 있었지.'],['orr','교대장이 8년 동안 그 칸만 쓸었대. 이기든 지든, 그 자리는 네 몫이야.']);
+  if(id==='ine'&&!b2&&flag(g,'note.bello.2')&&once('ine.note'))L.push(['ine','영수증에 "잔액 1"이라고… 우리 집 난로가 꺼지지 않은 이유가 그거였나 봐.'],['ine','징수관이 나쁜 사람이었는지는 모르겠어. 정확한 사람이긴 했고.']);
+  if(id==='soi'&&b1&&flag(g,'note.bram.e')&&once('soi.note'))L.push(['soi','언니 얼굴이 그래서 그랬구나. …할아버지 얘기, 맞지?'],['soi','나는 괜찮아. 같이 불 켜러 가자. 이번엔 약속 말고, 같이.']);
+  if(id==='mora'&&b2&&flag(g,'note.bello.e')&&once('mora.note'))L.push(['mora','거버너가 장부를 받으면 가만있진 않겠지. 렌치 상태부터 보자.']);
+  return L;}
