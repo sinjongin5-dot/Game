@@ -266,13 +266,5 @@
     };
   }
 
-  // ---- manual page --------------------------------------------------------------------------------------------------
-  try {
-    if (typeof GH_GROUPS !== 'undefined') {
-      const atk = GH_GROUPS.find(g => g[0] === '공격'), foc = GH_GROUPS.find(g => g[0] === '집중');
-      if (atk && atk[1].length < 3) atk[1].push(['X (길게)', '', '놓으면 충전 베기  ·  ↑ 회전 베기  ·  공중 ↓ 급강하'], ['C 중 X', '', '돌진 베기 (적을 베면 대시 즉시 회복)']);
-      if (foc) { foc[1][0][2] = '꾹 누르면 소울 33 → 체력 1 회복'; if (foc[1].length < 2) foc[1].push(['A (짧게)', '', '증기탄 · 소울 22 (↑ 위로 발사)']); }
-    }
-  } catch (e) { /* manual page is cosmetic */ }
   window.GH_COMBAT_V4 = { SteamShot, GroundWave, strike };
 })();

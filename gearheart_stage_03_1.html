@@ -7904,20 +7904,20 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     const rows=xbox()?[
       ['이동','스틱 / D-pad','이동 · ↑ / ↓로 공격 방향 조준 · 정지 중 화면 보기'],
       ['점프','A / LB','길게 누르면 높게 · 벽 점프 · ↓ + A 발판 아래로'],
-      ['공격','X / RT','린 3연타 · 타이탄 2연타 · ↑ 공격으로 적 띄우기'],
+      ['공격','X / RT','3연타 · 길게 눌러 놓으면 충전 베기 (↑ 회전 · 공중 ↓ 급강하)'],
       ['공중 연계','↑ + 공격','점프로 따라가서 공중 4타까지 · 첫 명중 시 공중 대시 회복'],
-      ['대시','B / RB','무적 돌진 · 공격 중 0.06초 뒤 대시로 빠져나오기'],
-      ['집중','LT 꾹','소울 33 소모 → 체력 1 회복'],
+      ['대시','B / RB','무적 돌진 · 대시 중 X = 돌진 베기 (적을 베면 대시 회복)'],
+      ['집중','LT','꾹 = 회복 (소울 33) · 톡 = 증기탄 (소울 22 · ↑ 위로)'],
       ['타이탄','Y','0.18초 변신 / 해제 · 코어 8 · 공중 ↓ 공격 = 그라운드 브레이커'],
       ['메뉴','Menu / View','Menu 일시정지 · View 지도 / 장면 건너뛰기'],
       ['선택','A / B','A 선택 · B 뒤로 · ↑ + A 대화 / 장치 · 길게 잔해 회수']
     ]:[
       ['이동','← → ↑ ↓','이동 · ↑ / ↓로 공격 방향 조준 · 정지 중 화면 보기'],
       ['점프','Z / SPACE','길게 누르면 높게 · 벽 점프 · ↓ + Z 발판 아래로'],
-      ['공격','X','린 3연타 · 타이탄 2연타 · ↑ + X로 적 띄우기'],
+      ['공격','X','3연타 · 길게 눌러 놓으면 충전 베기 (↑ 회전 · 공중 ↓ 급강하)'],
       ['공중 연계','↑ + X','Z로 따라가 공중 4타까지 · 첫 명중 시 공중 대시 회복'],
-      ['대시','C / SHIFT','무적 돌진 · 공격 중 0.06초 뒤 대시로 빠져나오기'],
-      ['집중','A 꾹','소울 33 소모 → 체력 1 회복'],
+      ['대시','C / SHIFT','무적 돌진 · 대시 중 X = 돌진 베기 (적을 베면 대시 회복)'],
+      ['집중','A','꾹 = 회복 (소울 33) · 톡 = 증기탄 (소울 22 · ↑ 위로)'],
       ['타이탄','S','0.18초 변신 / 해제 · 코어 8 · 공중 ↓ + X = 그라운드 브레이커'],
       ['메뉴','ESC / Tab','Esc / P 일시정지 · Tab 지도 · R 꾹 재시작'],
       ['상호작용','Enter','대화·장치·출구 · 꾹 눌러 잔해 회수 · F 화면 / M 음소거']
@@ -13226,6 +13226,8 @@ function populate(g,s){
       addWorld(g,new ExpGate(g,ar.gate,ar.flag));
       cp(ar.x+58*T+16,ar.floor);}
     for(const id of Object.keys(ex.docks))addWorld(g,new ExpHatch(g,ex.docks[id]));
+    // the second return tunnel now runs from the end of chapter 4 all the way home: give it benches along the way
+    {const t2=ex.tunnels[1];if(t2){const xa=ex.docks['tun2.hub'].x,xb=ex.docks['tun2.rear'].x;for(let i=1;i<6;i++)cp(Math.round((xa+(xb-xa)*i/6)/T)*T+16,t2.floor);}}
     placeNotes(g,ex);
     for(const pk of pickups(g,ex))if(!re.picked[pk[1]])addWorld(g,new ExpPickup(g,pk[0],pk[1],pk[2],pk[3]));
     // 일반 기계: 등록 → 배치 (휴식하면 같은 목록이 다시 선다)
@@ -13320,6 +13322,41 @@ return {SCALE,hud,migrate,onKill,snapshot,populate,portrait,hpBonus,drainFactor,
 })();
 window.GH_EXP=GH_EXP;
 
+/*@AUDIO_BEGIN*/
+// ================= AUDIO · PATCH v4 : each chapter sounds like its own place =================
+// The exploration music is one theme for the whole game. Every chapter now plays it in its own key and adds a small rhythm bed of its own
+// (dripping pipes, a clock ticking, press stomps, a flywheel whoosh, static crackle, furnace rumble, a heartbeat). Boss music is untouched.
+(() => {
+  'use strict';
+  const WA = window.GH_WORLD_AUDIO; if (!WA || typeof AudioEngine === 'undefined') return;
+  const SHIFT = { blue: 0, pipes: -2, brass: 3, cam: -5, fly: 5, arc: 7, furnace: -7, heart: -12 };
+  const _tone = AudioEngine.prototype.toneAt;
+  AudioEngine.prototype.toneAt = function (t, f, dur, type, vol, f2, dest, lp) {
+    if (this._ps && this._psr !== 1) { f *= this._psr; if (f2) f2 *= this._psr; if (lp) lp *= Math.min(1.6, this._psr); }
+    return _tone.call(this, t, f, dur, type, vol, f2, dest, lp);
+  };
+  function bed(a, th, i, bar, t) {
+    const M = a.music, tone = (f, d, ty, v, f2, lp) => a.toneAt(t, f, d, ty, v, f2, M, lp), noise = (d, ft, fr, v, q, f2) => a.noiseAt(t, d, ft, fr, v, q, f2, M);
+    switch (th) {
+      case 'blue': if (i === 8 && bar % 2 === 0) noise(.9, 'bandpass', 600, .012, .5, 280); break;
+      case 'pipes': if (i % 4 === 2 && Math.random() < .5) tone(1700 + Math.random() * 1000, .07, 'sine', .014); if (i === 0 && bar % 2 === 0) noise(.5, 'highpass', 3000, .008, .7, 6000); break;
+      case 'brass': if (i % 2 === 0) tone(i % 4 === 0 ? 2300 : 1850, .025, 'square', .009, null, 3200); break;
+      case 'cam': if (i === 0 || i === 8) { tone(70, .15, 'sine', .08, 40); noise(.1, 'lowpass', 600, .05, 1); } if (i === 4 || i === 12) noise(.04, 'highpass', 5000, .014, 1); break;
+      case 'fly': if (i % 8 === 0) noise(.5, 'bandpass', 700 + bar * 70, .014, .7, 2400); break;
+      case 'arc': if (i === 0) tone(60, .5, 'sawtooth', .01, null, 300); if (i % 2 === 1 && Math.random() < .35) tone(2400 + Math.random() * 2200, .04, 'square', .009, null, 5200); break;
+      case 'furnace': if (i === 0) noise(.7, 'lowpass', 170, .07, 1); if (i === 10 && Math.random() < .5) noise(.12, 'highpass', 4000, .02, 1); break;
+      case 'heart': if (i === 0 || i === 3) tone(55, .2, 'sine', .11, 38); break;
+    }
+  }
+  const _ps = WA.playStep;
+  WA.playStep = function (a, s, t) {
+    const g = window.game, th = g && g.state === 'play' && g.level && g.level.def && g.level.def.theme, sh = th && !g.bossActive ? (SHIFT[th] || 0) : 0;
+    a._ps = true; a._psr = Math.pow(2, sh / 12);
+    try { _ps.call(this, a, s, t); } finally { a._ps = false; }
+    if (th && !g.bossActive && a.ctx && a.music) { try { bed(a, th, s % 16, Math.floor(s / 16) % 8, t); } catch (e) { /* audio decoration only */ } }
+  };
+})();
+/*@AUDIO_END*/
 /*@BG_BEGIN*/
 // ================= BACKGROUND · PATCH v4 : every chapter gets its own skyline =================
 // The original builder draws one skyline recipe and only re-tints it, so chapters 4-6 (cam / fly / arc) were literally the same picture.
@@ -13809,7 +13846,7 @@ window.GH_EXP=GH_EXP;
   }
   const BaseLevel = Level;
   Level = class extends BaseLevel {
-    constructor(g, def) { super(g, def); try { if (def && def.theme) placeProps(this, g, def); } catch (e) { console.error('placeProps', e); } }
+    constructor(g, def) { super(g, def); try { if (def && def.theme && ((def.intro && def.intro.length) || (def.rows && def.rows.length === 24 && def.rows[0].length === 64))) placeProps(this, g, def); } catch (e) { console.error('placeProps', e); } }
   };
   window.GH_PROPS_V4 = { KINDS, placeProps };
 })();
@@ -14460,14 +14497,6 @@ window.GH_EXP=GH_EXP;
     };
   }
 
-  // ---- manual page --------------------------------------------------------------------------------------------------
-  try {
-    if (typeof GH_GROUPS !== 'undefined') {
-      const atk = GH_GROUPS.find(g => g[0] === '공격'), foc = GH_GROUPS.find(g => g[0] === '집중');
-      if (atk && atk[1].length < 3) atk[1].push(['X (길게)', '', '놓으면 충전 베기  ·  ↑ 회전 베기  ·  공중 ↓ 급강하'], ['C 중 X', '', '돌진 베기 (적을 베면 대시 즉시 회복)']);
-      if (foc) { foc[1][0][2] = '꾹 누르면 소울 33 → 체력 1 회복'; if (foc[1].length < 2) foc[1].push(['A (짧게)', '', '증기탄 · 소울 22 (↑ 위로 발사)']); }
-    }
-  } catch (e) { /* manual page is cosmetic */ }
   window.GH_COMBAT_V4 = { SteamShot, GroundWave, strike };
 })();
 /*@COMBAT_END*/

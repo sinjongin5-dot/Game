@@ -146,7 +146,7 @@
   }
   const BaseLevel = Level;
   Level = class extends BaseLevel {
-    constructor(g, def) { super(g, def); try { if (def && def.theme) placeProps(this, g, def); } catch (e) { console.error('placeProps', e); } }
+    constructor(g, def) { super(g, def); try { if (def && def.theme && ((def.intro && def.intro.length) || (def.rows && def.rows.length === 24 && def.rows[0].length === 64))) placeProps(this, g, def); } catch (e) { console.error('placeProps', e); } }
   };
   window.GH_PROPS_V4 = { KINDS, placeProps };
 })();
