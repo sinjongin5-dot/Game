@@ -9534,6 +9534,399 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   })};
 })();
 
+// ================= STAGE DETAIL PASS · A : structure inside the wall mass + surface dressing =================
+// The stage is mostly solid wall, and every solid tile was the same panel with a scratch (the title reads rich because it shows
+// big machinery at every scale). Baked once into the tile cache (zero per-frame cost except a few additive glows):
+//   - bulkhead plates (3x2 / 2x2) with bolts, stencil labels and hazard chevrons
+//   - flanged conduits running through the mass (horizontal + vertical) with junction collars and rust drips
+//   - recessed machine windows, themed per stage (gear / clock face / pressure dial / furnace grate / coil / flywheel / cam)
+//   - surface dressing: floor gratings and cable bundles, ceiling duct runs + hanging cable swags, wall pipe runs
+// Everything stays inside its own tile or hangs >= 3 tiles above the floor, so collision reading is unchanged.
+(() => {
+  'use strict';
+  const STY = {
+    blue:    {acc: [63, 246, 255],  win: 'gear',   plate: 0.30, pipe: 0.55, winP: 0.40, metal: [74, 92, 106]},
+    pipes:   {acc: [110, 235, 170], win: 'dial',   plate: 0.22, pipe: 0.95, winP: 0.40, metal: [70, 100, 96]},
+    brass:   {acc: [255, 206, 120], win: 'clock',  plate: 0.36, pipe: 0.45, winP: 0.46, metal: [104, 88, 58]},
+    furnace: {acc: [255, 138, 42],  win: 'grate',  plate: 0.30, pipe: 0.60, winP: 0.50, metal: [96, 66, 52]},
+    cam:     {acc: [255, 176, 80],  win: 'cam',    plate: 0.30, pipe: 0.55, winP: 0.40, metal: [96, 84, 62]},
+    fly:     {acc: [63, 246, 255],  win: 'wheel',  plate: 0.26, pipe: 0.70, winP: 0.42, metal: [62, 104, 102]},
+    arc:     {acc: [178, 140, 255], win: 'coil',   plate: 0.28, pipe: 0.60, winP: 0.42, metal: [84, 72, 112]},
+    heart:   {acc: [255, 90, 60],   win: 'grate',  plate: 0.20, pipe: 0.40, winP: 0.30, metal: [96, 52, 46]}
+  };
+  const LBL = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  const lerp3 = (a, b, t) => mixC(a, b, t);
+
+  function plate(c, x, y, w, h, st, R, tint) {
+    const m = st.metal;
+    c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(x + 1, y + 1, w - 2, h - 2);
+    const g = c.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, rgbS(lerp3(m, [255, 255, 255], 0.10))); g.addColorStop(0.5, rgbS(m)); g.addColorStop(1, rgbS(lerp3(m, [0, 0, 0], 0.4)));
+    c.fillStyle = g; c.fillRect(x + 3, y + 3, w - 6, h - 6);
+    c.fillStyle = rgbS(tint, 0.14); c.fillRect(x + 3, y + 3, w - 6, h - 6);
+    c.fillStyle = 'rgba(255,255,255,0.14)'; c.fillRect(x + 3, y + 3, w - 6, 1.5); c.fillRect(x + 3, y + 3, 1.5, h - 6);
+    c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + 3, y + h - 4.5, w - 6, 1.5); c.fillRect(x + w - 4.5, y + 3, 1.5, h - 6);
+    for (const [bx, by] of [[x + 8, y + 8], [x + w - 8, y + 8], [x + 8, y + h - 8], [x + w - 8, y + h - 8]]) rivet(c, bx, by, 1.8);
+    // inner embossed frame
+    c.strokeStyle = 'rgba(0,0,0,0.38)'; c.lineWidth = 1; c.strokeRect(x + 12.5, y + 12.5, w - 25, h - 25);
+    c.strokeStyle = 'rgba(255,255,255,0.08)'; c.strokeRect(x + 13.5, y + 13.5, w - 25, h - 25);
+    // stencil + chevrons
+    const lab = LBL[(R() * LBL.length) | 0] + '-' + String(1 + ((R() * 19) | 0)).padStart(2, '0');
+    c.font = 'bold 11px ' + MONO; c.textAlign = 'left'; c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillText(lab, x + 17, y + 31);
+    c.fillStyle = 'rgba(235,225,200,0.34)'; c.fillText(lab, x + 16, y + 30);
+    if (R() < 0.6) { c.fillStyle = rgbS(st.acc, 0.5); const cx0 = x + w - 38; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(cx0 + i * 8, y + 19); c.lineTo(cx0 + i * 8 + 6, y + 25); c.lineTo(cx0 + i * 8, y + 31); c.lineTo(cx0 + i * 8 + 2.5, y + 25); c.closePath(); c.fill(); } }
+    if (R() < 0.35) stripes(c, x + 14, y + h - 22, w - 28, 6, 5);
+    if (R() < 0.5) { c.fillStyle = 'rgba(150,66,32,0.30)'; c.fillRect(x + 6 + ((R() * (w - 20)) | 0), y + 4, 2.6, 14 + ((R() * 30) | 0)); }
+  }
+
+  function pipeH(c, x0, y, len, r, st, R) {
+    const m = lerp3(st.metal, [150, 160, 170], 0.18);
+    c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(x0, y - r + 2, len, r * 2 + 2);
+    const g = c.createLinearGradient(0, y - r, 0, y + r);
+    g.addColorStop(0, rgbS(lerp3(m, [255, 255, 255], 0.28))); g.addColorStop(0.25, rgbS(m)); g.addColorStop(1, rgbS(lerp3(m, [0, 0, 0], 0.62)));
+    c.fillStyle = g; c.fillRect(x0, y - r, len, r * 2);
+    c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(x0, y - r + 1.5, len, 1);
+    c.fillStyle = rgbS(st.acc, 0.35); if (R() < 0.7) c.fillRect(x0, y + r - 2.5, len, 1);                 // accent bead (the line that carries the stage colour)
+    for (let x = x0 + TS; x < x0 + len - 6; x += TS * (2 + ((R() * 2) | 0))) {                              // flange collars
+      c.fillStyle = rgbS(lerp3(m, [0, 0, 0], 0.35)); c.fillRect(x, y - r - 3, 7, r * 2 + 6);
+      c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(x, y - r - 3, 7, 1.2); rivet(c, x + 3.5, y - r, 1.2); rivet(c, x + 3.5, y + r, 1.2);
+      if (R() < 0.4) { c.fillStyle = 'rgba(150,66,32,0.38)'; c.fillRect(x + 2, y + r + 3, 2.2, 8 + ((R() * 18) | 0)); }
+    }
+    c.fillStyle = rgbS(lerp3(m, [0, 0, 0], 0.4)); c.fillRect(x0, y - r - 2, 5, r * 2 + 4); c.fillRect(x0 + len - 5, y - r - 2, 5, r * 2 + 4);
+  }
+  function pipeV(c, x, y0, len, r, st, R) {
+    const m = lerp3(st.metal, [150, 160, 170], 0.18);
+    c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(x - r + 2, y0, r * 2 + 2, len);
+    const g = c.createLinearGradient(x - r, 0, x + r, 0);
+    g.addColorStop(0, rgbS(lerp3(m, [255, 255, 255], 0.26))); g.addColorStop(0.3, rgbS(m)); g.addColorStop(1, rgbS(lerp3(m, [0, 0, 0], 0.62)));
+    c.fillStyle = g; c.fillRect(x - r, y0, r * 2, len);
+    c.fillStyle = 'rgba(255,255,255,0.2)'; c.fillRect(x - r + 1.5, y0, 1, len);
+    for (let y = y0 + TS; y < y0 + len - 6; y += TS * 2) { c.fillStyle = rgbS(lerp3(m, [0, 0, 0], 0.35)); c.fillRect(x - r - 3, y, r * 2 + 6, 6); c.fillStyle = 'rgba(255,255,255,0.16)'; c.fillRect(x - r - 3, y, r * 2 + 6, 1.2); rivet(c, x - r, y + 3, 1.1); rivet(c, x + r, y + 3, 1.1); }
+    c.fillStyle = rgbS(lerp3(m, [0, 0, 0], 0.4)); c.fillRect(x - r - 2, y0, r * 2 + 4, 5); c.fillRect(x - r - 2, y0 + len - 5, r * 2 + 4, 5);
+  }
+
+  // ----- machine windows (w x h in px, drawn inside a recess). returns glow descriptor or null
+  function win(c, x, y, w, h, st, kind, R, t0) {
+    c.save();
+    c.fillStyle = rgbS(lerp3(st.metal, [0, 0, 0], 0.5)); c.fillRect(x - 3, y - 3, w + 6, h + 6);
+    c.fillStyle = C.brassD; c.fillRect(x - 3, y - 3, w + 6, 1.6);
+    c.fillStyle = '#050709'; c.fillRect(x, y, w, h);
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    const cx = x + w / 2, cy = y + h / 2; let glowR = null;
+    const back = c.createLinearGradient(0, y, 0, y + h); back.addColorStop(0, rgbS(st.acc, 0.05)); back.addColorStop(1, rgbS(st.acc, 0.18)); c.fillStyle = back; c.fillRect(x, y, w, h);
+    if (kind === 'gear') {
+      drawGear(c, cx - 6, cy, Math.min(h * 0.46, 20), 12, R() * 6, '#1b242c', '#050709', 5); drawGear(c, cx + 16, cy - 7, 11, 8, R() * 6, '#232e38', '#050709', 4);
+      glowR = {r: 38, a: 0.10};
+    } else if (kind === 'clock') {
+      const r = Math.min(w, h) * 0.42; c.fillStyle = '#d9c28a'; circ(c, cx, cy, r); c.fillStyle = '#6a5426'; circ(c, cx, cy, r - 2.2); c.fillStyle = '#e9dcb6'; circ(c, cx, cy, r - 3.6);
+      c.strokeStyle = '#3a2a10'; c.lineWidth = 1; for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; line(c, cx + Math.cos(a) * (r - 4.8), cy + Math.sin(a) * (r - 4.8), cx + Math.cos(a) * (r - 7), cy + Math.sin(a) * (r - 7)); }
+      const ha = R() * 6.283, ma = R() * 6.283; c.lineWidth = 1.8; line(c, cx, cy, cx + Math.cos(ha) * (r * 0.5), cy + Math.sin(ha) * (r * 0.5)); c.lineWidth = 1.1; line(c, cx, cy, cx + Math.cos(ma) * (r * 0.75), cy + Math.sin(ma) * (r * 0.75));
+      c.fillStyle = '#6a5426'; circ(c, cx, cy, 1.8); glowR = {r: 34, a: 0.07};
+    } else if (kind === 'dial') {
+      const r = Math.min(w, h) * 0.42; c.fillStyle = '#10171c'; circ(c, cx, cy, r); c.strokeStyle = '#4a5864'; c.lineWidth = 2; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
+      c.strokeStyle = 'rgba(255,70,40,0.75)'; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, r - 4, Math.PI * 0.75 + Math.PI * 1.5 * 0.78, Math.PI * 0.75 + Math.PI * 1.5); c.stroke();
+      c.strokeStyle = '#7a8892'; c.lineWidth = 1; for (let i = 0; i <= 10; i++) { const a = Math.PI * 0.75 + i / 10 * Math.PI * 1.5; line(c, cx + Math.cos(a) * (r - 6), cy + Math.sin(a) * (r - 6), cx + Math.cos(a) * (r - 2.5), cy + Math.sin(a) * (r - 2.5)); }
+      const na = Math.PI * 0.75 + (0.2 + R() * 0.6) * Math.PI * 1.5; c.strokeStyle = rgbS(st.acc); c.lineWidth = 1.6; line(c, cx, cy, cx + Math.cos(na) * (r - 5), cy + Math.sin(na) * (r - 5)); c.fillStyle = '#4a5864'; circ(c, cx, cy, 2);
+      glowR = {r: 30, a: 0.07};
+    } else if (kind === 'grate') {
+      const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, 'rgba(190,64,20,0.95)'); g.addColorStop(0.55, 'rgba(255,138,42,0.95)'); g.addColorStop(1, 'rgba(255,214,120,0.95)'); c.fillStyle = g; c.fillRect(x, y, w, h);
+      c.fillStyle = '#120c0a'; for (let i = 0; i < w; i += 5) c.fillRect(x + i, y, 2, h); for (let j = 4; j < h; j += 8) c.fillRect(x, y + j, w, 1.6);
+      glowR = {r: 64, a: 0.34, flick: 1};
+    } else if (kind === 'coil') {
+      c.fillStyle = '#0c0a14'; c.fillRect(cx - 3, y, 6, h);
+      for (let j = 3; j < h - 3; j += 6) { c.fillStyle = '#2a2142'; c.beginPath(); c.ellipse(cx, y + j, 12, 2.6, 0, 0, 7); c.fill(); c.fillStyle = rgbS(st.acc, 0.55); c.fillRect(cx - 12, y + j - 0.6, 24, 1); }
+      c.strokeStyle = rgbS(st.acc, 0.8); c.lineWidth = 1; c.beginPath(); c.moveTo(cx, y + 2); for (let j = 0; j < 6; j++) c.lineTo(cx + (R() - 0.5) * 18, y + 2 + (j + 1) * (h - 4) / 6); c.stroke();
+      glowR = {r: 44, a: 0.22, flick: 1};
+    } else if (kind === 'wheel') {
+      for (let r = 4; r < h * 0.55; r += 5) { c.strokeStyle = r % 10 < 5 ? '#1f3a3c' : '#122326'; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
+      c.strokeStyle = '#2c4e50'; c.lineWidth = 2; for (let i = 0; i < 6; i++) { const a = R() * 3 + i * 1.047; line(c, cx, cy, cx + Math.cos(a) * h * 0.5, cy + Math.sin(a) * h * 0.5); } c.fillStyle = rgbS(st.acc, 0.7); circ(c, cx, cy, 2.4);
+      glowR = {r: 36, a: 0.12};
+    } else if (kind === 'cam') {
+      c.save(); c.translate(cx - 6, cy); c.rotate(R() * 6); c.fillStyle = '#262e36'; c.beginPath(); for (let i = 0; i <= 24; i++) { const a = i / 24 * 6.283, rr2 = 10 + 8 * Math.max(0, Math.cos(a)) ** 2; i ? c.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2) : c.moveTo(rr2, 0); } c.closePath(); c.fill(); c.fillStyle = '#050709'; circ(c, 0, 0, 3); c.restore();
+      c.fillStyle = '#3a4650'; c.fillRect(cx + 10, y + 3, 4, h - 6); c.fillStyle = rgbS(st.acc, 0.6); circ(c, cx + 12, cy + 2, 2.4);
+      glowR = {r: 34, a: 0.1};
+    }
+    // glass sheen + grille
+    const sh = c.createLinearGradient(x, y, x + w, y + h); sh.addColorStop(0, 'rgba(255,255,255,0.10)'); sh.addColorStop(0.45, 'rgba(255,255,255,0)'); c.fillStyle = sh; c.fillRect(x, y, w, h);
+    c.restore();
+    c.strokeStyle = 'rgba(255,255,255,0.12)'; c.lineWidth = 1; c.strokeRect(x - 2.5, y - 2.5, w + 5, h + 5);
+    rivet(c, x - 5, y - 5, 1.2); rivet(c, x + w + 5, y - 5, 1.2); rivet(c, x - 5, y + h + 5, 1.2); rivet(c, x + w + 5, y + h + 5, 1.2);
+    return glowR ? {x: cx, y: cy, r: glowR.r, a: glowR.a, flick: glowR.flick || 0, ph: t0, rgb: rgbK(st.acc)} : null;
+  }
+
+  function stageDetail(tm, theme) {
+    const st = STY[theme] || STY.blue, th = tm.th || THEMES[theme] || THEMES.blue;
+    const R = rng32((tm.w * 7919 + tm.h * 104729 + (theme.length * 31 + theme.charCodeAt(0))) >>> 0);
+    const c = tm.cache.getContext('2d'), W_ = tm.w, H_ = tm.h, tint = th.tint;
+    const mass = (x, y) => tm.get(x, y) === '#' && x >= 0 && x < W_ && y >= 0 && y < H_;
+    const deep = (x, y) => { for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (!mass(x + i, y + j)) return false; return true; };
+    const used = new Uint8Array(W_ * H_);
+    const free = (x, y, w, h) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { if (x + i >= W_ || y + j >= H_ || used[(y + j) * W_ + x + i]) return false; } return true; };
+    const take = (x, y, w, h) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) used[(y + j) * W_ + x + i] = 1; };
+    const allDeep = (x, y, w, h) => { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (!deep(x + i, y + j)) return false; return true; };
+    const glows = []; tm.dGlow = glows;
+    // 1) conduits first (long thin features), then windows, then plates
+    for (let y = 1; y < H_ - 1; y++) {
+      let x = 1;
+      while (x < W_ - 1) {
+        if (!deep(x, y) || used[y * W_ + x]) { x++; continue; }
+        let n = 0; while (x + n < W_ - 1 && deep(x + n, y) && !used[y * W_ + x + n]) n++;
+        if (n >= 4 && R() < st.pipe * 0.42) {
+          const len = Math.min(n, 4 + ((R() * 8) | 0)), r = 5 + ((R() * 2) | 0), py = y * TS + 9 + ((R() * 14) | 0), px = x * TS + ((R() * (n - len) * TS) | 0);
+          pipeH(c, px, py, len * TS, r, st, R); for (let i = 0; i < len; i++) used[y * W_ + ((px / TS) | 0) + i] = 1; x += n; continue;
+        }
+        x += Math.max(1, n);
+      }
+    }
+    for (let x = 1; x < W_ - 1; x++) {
+      let y = 1;
+      while (y < H_ - 1) {
+        if (!deep(x, y) || used[y * W_ + x]) { y++; continue; }
+        let n = 0; while (y + n < H_ - 1 && deep(x, y + n) && !used[(y + n) * W_ + x]) n++;
+        if (n >= 4 && R() < st.pipe * 0.30) {
+          const len = Math.min(n, 4 + ((R() * 6) | 0)); pipeV(c, x * TS + 10 + ((R() * 12) | 0), y * TS, len * TS, 4 + ((R() * 2) | 0), st, R); for (let j = 0; j < len; j++) used[(y + j) * W_ + x] = 1; y += n; continue;
+        }
+        y += Math.max(1, n);
+      }
+    }
+    for (let y = 1; y < H_ - 1; y++) for (let x = 1; x < W_ - 1; x++) {
+      if (R() > st.winP * 0.16 || !deep(x, y)) continue;
+      const w2 = R() < 0.5 ? 2 : 1, h2 = w2 === 2 ? 1 : 2;
+      if (!allDeep(x, y, w2, h2) || !free(x, y, w2, h2)) continue;
+      take(x, y, w2, h2);
+      const g = win(c, x * TS + 5, y * TS + 5, w2 * TS - 10, h2 * TS - 10, st, st.win, R, R() * 6.28); if (g) glows.push(g);
+    }
+    for (let y = 1; y < H_ - 2; y += 1) for (let x = 1; x < W_ - 3; x++) {
+      if (R() > st.plate * 0.12 || !deep(x, y)) continue;
+      const w2 = R() < 0.55 ? 3 : 2, h2 = 2;
+      if (!allDeep(x, y, w2, h2) || !free(x, y, w2, h2)) continue;
+      take(x, y, w2, h2); plate(c, x * TS + 1, y * TS + 1, w2 * TS - 2, h2 * TS - 2, st, R, tint);
+    }
+    // 2) surface dressing on the exposed faces
+    for (let y = 1; y < H_ - 1; y++) for (let x = 0; x < W_; x++) {
+      if (!mass(x, y)) continue;
+      const px = x * TS, py = y * TS, up = !tm.solid(x, y - 1) && tm.get(x, y - 1) !== '-', dn = !tm.solid(x, y + 1) && tm.get(x, y + 1) !== '-';
+      const lf = !tm.solid(x - 1, y), rt = !tm.solid(x + 1, y);
+      if (up && R() < 0.16 && tm.get(x - 1, y) === '#' && tm.get(x + 1, y) === '#') {                      // floor grating inset (below the walking strip)
+        c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(px + 3, py + 9, TS - 6, 8); c.fillStyle = '#0a0e11'; c.fillRect(px + 4, py + 10, TS - 8, 6);
+        c.fillStyle = 'rgba(160,175,185,0.30)'; for (let i = 6; i < TS - 5; i += 4) c.fillRect(px + i, py + 10, 1.6, 6);
+        c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(px + 3, py + 17, TS - 6, 1);
+      } else if (up && R() < 0.10) {                                                                         // cable bundle lying in the floor seam
+        const n = 2 + ((R() * 3) | 0); if (tm.get(x + n, y) === '#' && tm.get(x + n, y - 1) !== '#') {
+          for (let k = 0; k < 2; k++) { c.strokeStyle = k ? rgbS(st.acc, 0.5) : '#0b0f13'; c.lineWidth = k ? 1 : 3; c.beginPath(); c.moveTo(px, py + 11 + k * 0.5); for (let s = 0; s <= n * 4; s++) c.lineTo(px + s * TS / 4, py + 11 + Math.sin(s * 0.9 + x) * 1.6 + k * 0.5); c.stroke(); }
+          c.fillStyle = '#1a2128'; c.fillRect(px + n * TS - 1, py + 8, 5, 7); }
+      }
+      if (up && R() < 0.07) { c.fillStyle = 'rgba(150,66,32,0.42)'; c.fillRect(px + 4 + ((R() * 22) | 0), py + 5, 2.4, 10 + ((R() * 16) | 0)); }
+      if (dn && tm.get(x - 1, y) === '#' && tm.get(x + 1, y) === '#') {
+        if (R() < 0.14) {                                                                                    // duct run on the underside (flush with the tile)
+          const m = lerp3(st.metal, [150, 160, 170], 0.12); c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(px, py + TS - 14, TS, 11);
+          const g = c.createLinearGradient(0, py + TS - 13, 0, py + TS - 4); g.addColorStop(0, rgbS(lerp3(m, [255, 255, 255], 0.2))); g.addColorStop(1, rgbS(lerp3(m, [0, 0, 0], 0.5))); c.fillStyle = g; c.fillRect(px, py + TS - 13, TS, 9);
+          c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(px + 14, py + TS - 13, 1.4, 9); rivet(c, px + 6, py + TS - 8, 1.1); rivet(c, px + TS - 6, py + TS - 8, 1.1);
+        } else if (R() < 0.05) {                                                                             // hanging cable swag (3 tiles clear below)
+          if (!tm.solid(x, y + 2) && !tm.solid(x, y + 3) && !tm.solid(x + 1, y + 2) && !tm.solid(x + 1, y + 3)) {
+            const sag = 8 + R() * 10; c.strokeStyle = '#080b0e'; c.lineWidth = 3; c.beginPath(); c.moveTo(px + 6, py + TS); c.quadraticCurveTo(px + TS, py + TS + sag * 2, px + TS * 2 - 6, py + TS); c.stroke();
+            c.strokeStyle = 'rgba(120,135,148,0.45)'; c.lineWidth = 1; c.stroke(); c.fillStyle = '#1a2128'; c.fillRect(px + 3, py + TS - 3, 6, 4); c.fillRect(px + TS * 2 - 9, py + TS - 3, 6, 4);
+          }
+        }
+      }
+      if ((lf || rt) && !up && !dn && R() < 0.12 && tm.get(x, y - 1) === '#' && tm.get(x, y + 1) === '#') {   // wall-face pipe: 2-3 tiles tall, hugging the open side
+        const sx = lf ? px + 3 : px + TS - 10, n = 2 + ((R() * 2) | 0); if (tm.get(x, y + n) === '#' && (lf ? !tm.solid(x - 1, y + n - 1) : !tm.solid(x + 1, y + n - 1))) {
+          pipeV(c, sx + 3.5, py, n * TS, 3.5, st, R); for (let j = 0; j < n; j++) used[(y + j) * W_ + x] = 1; y += 0; }
+      }
+    }
+  }
+
+  const baseBuild = Tilemap.prototype.buildCache;
+  Tilemap.prototype.buildCache = function (theme, lights) {
+    baseBuild.call(this, theme, lights);
+    try { stageDetail(this, this.theme); } catch (e) { console.error('stage detail', e); }
+  };
+  // additive glows for lit windows (furnace grates, coils …) — drawn in the emissive pass, culled to the view
+  const baseEmit = LightMap.prototype.emit;
+  LightMap.prototype.emit = function (ctx, view) {
+    baseEmit.call(this, ctx, view);
+    const g = typeof game !== 'undefined' ? game : null;
+    if (!g || this !== g.lm || !g.level || !g.level.tm.dGlow) return;
+    const t = g.time;
+    for (const w of g.level.tm.dGlow) {
+      if (w.x < view.x0 - w.r || w.x > view.x1 + w.r || w.y < view.y0 - w.r || w.y > view.y1 + w.r) continue;
+      const k = w.flick ? 0.8 + 0.2 * Math.sin(t * 7 + w.ph) * Math.sin(t * 2.3 + w.ph * 2) : 1;
+      blob(ctx, w.x, w.y, w.r, w.rgb, w.a * k);
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+
+// ================= STAGE DETAIL PASS · B : the room behind the room (enclosed-space back wall) =================
+// Open air in a stage showed only the distant parallax, so rooms read as empty boxes cut out of a skyline. Wherever a space is
+// enclosed by solid tiles, a back wall is now baked once (half resolution, per level) between the parallax and the tile layer:
+// panelled wall, columns, truss girders, pipe bundles, a themed mural machine and arched windows that open onto the parallax.
+// It is low-contrast and sits UNDER the lightmap, so lamps still pick out the walkable edges; open shafts and the boss arena stay clear.
+(() => {
+  'use strict';
+  const SC = 0.5;
+  function mixd(a, b, t) { return mixC(a, b, t); }
+
+  function buildBack(tm, theme, def) {
+    const th = THEMES[theme] || THEMES.blue, st = {acc: {blue: [63, 246, 255], pipes: [110, 235, 170], brass: [255, 206, 120], furnace: [255, 138, 42], cam: [255, 176, 80], fly: [63, 246, 255], arc: [178, 140, 255], heart: [255, 90, 60]}[theme] || [63, 246, 255]};
+    const Wp = tm.w * TS, Hp = tm.h * TS;
+    const cv = mkCv(Math.ceil(Wp * SC), Math.ceil(Hp * SC)), c = cv.getContext('2d');
+    const R = rng32((tm.w * 15485863 + tm.h * 32452843 + theme.length * 97) >>> 0);
+    const base = parseColor(th.mid), hi = parseColor(th.midL);
+    const wallA = mixd(base, [0, 0, 0], 0.10), wallB = mixd(base, hi, 0.45), beam = mixd(hi, [0, 0, 0], 0.08), dk = mixd(base, [0, 0, 0], 0.55), lt = mixd(hi, [200, 205, 210], 0.22);
+    c.scale(SC, SC);
+    // ---- 1. panelled wall (5x4 tiles per panel, seeded brightness) ----
+    const PW = TS * 5, PH = TS * 4;
+    for (let py = 0; py < Hp; py += PH) for (let px = 0; px < Wp; px += PW) {
+      const k = R(); c.fillStyle = rgbS(mixd(wallA, wallB, k * 0.6), 0.34 + k * 0.12); c.fillRect(px, py, PW, PH);   // translucent: the parallax keeps showing through the panels
+      c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(px, py, PW, 3); c.fillRect(px, py, 3, PH);
+      c.fillStyle = 'rgba(255,255,255,0.07)'; c.fillRect(px + 2.5, py + 2.5, PW - 2.5, 1.5); c.fillRect(px + 2.5, py + 2.5, 1.5, PH - 2.5);
+      for (const [bx, by] of [[px + 9, py + 9], [px + PW - 9, py + 9], [px + 9, py + PH - 9], [px + PW - 9, py + PH - 9]]) rivet(c, bx, by, 1.8);
+      if (R() < 0.18) { c.fillStyle = 'rgba(150,66,32,0.16)'; c.fillRect(px + 12 + ((R() * (PW - 30)) | 0), py + 4, 4, 30 + ((R() * 60) | 0)); }
+      if (R() < 0.14) { c.font = 'bold 12px ' + MONO; c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillText('SEC.' + String(1 + ((R() * 40) | 0)).padStart(2, '0'), px + 16, py + 28); }
+    }
+    // ---- 2. columns with collars + truss girders between them ----
+    const cols = []; for (let x = 4 + ((R() * 5) | 0); x < tm.w; x += 8 + ((R() * 6) | 0)) cols.push(x * TS);
+    for (const x of cols) {
+      const w = 22 + ((R() * 8) | 0), g = c.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, rgbS(mixd(beam, [255, 255, 255], 0.10))); g.addColorStop(0.35, rgbS(beam)); g.addColorStop(1, rgbS(dk));
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x + 4, 0, w, Hp); c.fillStyle = g; c.fillRect(x, 0, w, Hp);
+      c.fillStyle = 'rgba(255,255,255,0.10)'; c.fillRect(x + 2, 0, 1.5, Hp);
+      for (let y = 40; y < Hp; y += 96) { c.fillStyle = rgbS(mixd(dk, beam, 0.35)); c.fillRect(x - 4, y, w + 8, 8); c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(x - 4, y, w + 8, 1.2); rivet(c, x + 3, y + 4, 1.1); rivet(c, x + w - 3, y + 4, 1.1); }
+    }
+    for (let i = 0; i + 1 < cols.length; i++) {
+      if (R() > 0.7) continue; const x0 = cols[i] + 24, x1 = cols[i + 1], y0 = (2 + ((R() * Math.max(1, tm.h - 6)) | 0)) * TS;
+      if (x1 - x0 < 60) continue;
+      c.fillStyle = rgbS(beam); c.fillRect(x0, y0, x1 - x0, 7); c.fillRect(x0, y0 + 40, x1 - x0, 5); c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(x0, y0, x1 - x0, 1.2);
+      c.strokeStyle = rgbS(mixd(beam, dk, 0.2)); c.lineWidth = 2.2; c.beginPath(); const step = 40; for (let k = x0; k < x1 - step; k += step) { c.moveTo(k, y0 + 7); c.lineTo(k + step, y0 + 40); c.moveTo(k + step, y0 + 7); c.lineTo(k, y0 + 40); } c.stroke();
+    }
+    // ---- 3. pipe bundles: 3 parallel lines that bend through 90 degrees ----
+    const nb = Math.max(2, Math.round(tm.w / 22));
+    for (let b = 0; b < nb; b++) {
+      const y = (3 + ((R() * Math.max(1, tm.h - 8)) | 0)) * TS + 12, x0 = ((R() * tm.w) | 0) * TS, len = (8 + ((R() * 12) | 0)) * TS, down = R() < 0.5, drop = (3 + ((R() * 4) | 0)) * TS;
+      for (let k = 0; k < 3; k++) {
+        const off = k * 11, col = mixd(beam, st.acc, k === 1 ? 0.10 : 0.02);
+        c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 8; c.lineCap = 'round'; c.beginPath(); c.moveTo(x0, y + off + 2); c.lineTo(x0 + len - 14 - off, y + off + 2); c.quadraticCurveTo(x0 + len + 2 - off, y + off + 2, x0 + len - off + 2, y + off + 16 * (down ? 1 : -1)); c.lineTo(x0 + len - off + 2, y + off + drop * (down ? 1 : -1)); c.stroke();
+        c.strokeStyle = rgbS(col); c.lineWidth = 6; c.stroke(); c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x0, y + off - 1); c.lineTo(x0 + len - 14 - off, y + off - 1); c.stroke();
+      }
+      c.lineCap = 'butt';
+      for (let k = x0 + TS; k < x0 + len - 20; k += TS * 3) { c.fillStyle = rgbS(dk); c.fillRect(k, y - 6, 8, 40); c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(k, y - 6, 8, 1.2); rivet(c, k + 4, y, 1.1); rivet(c, k + 4, y + 26, 1.1); }
+    }
+    // ---- 4. mural machine, one per ~13 tiles, themed ----
+    const glows = [];
+    const nm = Math.max(2, Math.round(tm.w / 13));
+    for (let m = 0; m < nm; m++) {
+      const mx = (4 + R() * (tm.w - 8)) * TS, my = (3 + R() * Math.max(1, tm.h - 7)) * TS, r = 56 + R() * 70, a0 = R() * 6.28;
+      const gf = rgbS(mixd(beam, [255, 255, 255], 0.05)), hole = rgbS(dk), sig = R() < 0.6;   // signature machine 60 %, plain gear train otherwise (no copy-paste rows)
+      if (sig && theme === 'brass') {   // clock face with ticks and hands
+        c.fillStyle = rgbS(mixd(beam, [150, 120, 60], 0.35)); circ(c, mx, my, r); c.fillStyle = rgbS(mixd(wallB, [210, 190, 130], 0.18)); circ(c, mx, my, r - 7);
+        c.strokeStyle = 'rgba(40,28,10,0.55)'; c.lineWidth = 2; for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283; line(c, mx + Math.cos(a) * (r - 11), my + Math.sin(a) * (r - 11), mx + Math.cos(a) * (r - 22), my + Math.sin(a) * (r - 22)); }
+        c.lineWidth = 5; line(c, mx, my, mx + Math.cos(a0) * r * 0.5, my + Math.sin(a0) * r * 0.5); c.lineWidth = 3; line(c, mx, my, mx + Math.cos(a0 * 3) * r * 0.78, my + Math.sin(a0 * 3) * r * 0.78); c.fillStyle = 'rgba(40,28,10,0.6)'; circ(c, mx, my, 5);
+      } else if (sig && theme === 'fly') {   // flywheel: concentric rings + spokes
+        for (let k = r; k > 12; k -= 14) { c.strokeStyle = rgbS(mixd(beam, dk, k % 28 ? 0.2 : 0.5)); c.lineWidth = 7; c.beginPath(); c.arc(mx, my, k, 0, 7); c.stroke(); }
+        c.strokeStyle = rgbS(mixd(beam, dk, 0.3)); c.lineWidth = 6; for (let i = 0; i < 8; i++) { const a = a0 + i * 0.785; line(c, mx, my, mx + Math.cos(a) * r, my + Math.sin(a) * r); } c.fillStyle = gf; circ(c, mx, my, 14);
+      } else if (sig && (theme === 'furnace' || theme === 'heart')) {   // furnace mouth: arched opening with a glowing bed
+        const w = r * 1.5, h = r * 1.2; c.fillStyle = rgbS(dk); rr(c, mx - w / 2 - 8, my - h / 2 - 8, w + 16, h + 16, 16); c.fill();
+        const g = c.createLinearGradient(0, my - h / 2, 0, my + h / 2); g.addColorStop(0, 'rgba(60,18,8,1)'); g.addColorStop(0.5, 'rgba(190,70,20,1)'); g.addColorStop(1, 'rgba(255,170,70,1)'); c.fillStyle = g; rr(c, mx - w / 2, my - h / 2, w, h, 12); c.fill();
+        c.fillStyle = 'rgba(14,8,6,0.9)'; for (let i = 0; i < w; i += 14) c.fillRect(mx - w / 2 + i, my - h / 2, 5, h); stripes(c, mx - w / 2 - 8, my + h / 2 + 8, w + 16, 8, 8);
+        glows.push({x: mx, y: my, r: r * 1.8, a: 0.2, flick: 1, ph: R() * 6, rgb: rgbK(st.acc)});
+      } else if (sig && theme === 'arc') {   // coil tower: stacked insulator discs
+        c.fillStyle = rgbS(dk); c.fillRect(mx - 6, my - r, 12, r * 2);
+        for (let j = -r + 8; j < r; j += 16) { c.fillStyle = rgbS(mixd(beam, st.acc, 0.08)); c.beginPath(); c.ellipse(mx, my + j, 30 - Math.abs(j) * 0.12, 6, 0, 0, 7); c.fill(); c.fillStyle = rgbS(st.acc, 0.35); c.fillRect(mx - 28, my + j - 1, 56, 1.4); }
+        glows.push({x: mx, y: my, r: r * 1.4, a: 0.12, flick: 1, ph: R() * 6, rgb: rgbK(st.acc)});
+      } else if (sig && theme === 'cam') {   // eccentric cam with follower
+        c.save(); c.translate(mx, my); c.rotate(a0); c.fillStyle = gf; c.beginPath(); for (let i = 0; i <= 40; i++) { const a = i / 40 * 6.283, q = r * (0.55 + 0.45 * Math.max(0, Math.cos(a)) ** 2); i ? c.lineTo(Math.cos(a) * q, Math.sin(a) * q) : c.moveTo(q, 0); } c.closePath(); c.fill(); c.fillStyle = hole; circ(c, 0, 0, r * 0.16); c.restore();
+        c.fillStyle = rgbS(beam); c.fillRect(mx + r * 0.9, my - r - 40, 12, r * 1.3 + 40); c.fillStyle = rgbS(dk); c.fillRect(mx + r * 0.9 - 8, my - r - 46, 28, 10);
+      } else {   // blue / pipes: a pair of meshing gears
+        drawGear(c, mx, my, r, Math.round(r / 5.5), a0, gf, hole, 6);
+        drawGear(c, mx + Math.cos(-0.6) * (r * 1.58), my + Math.sin(-0.6) * (r * 1.58), r * 0.62, Math.round(r / 9), a0 + 0.3, rgbS(mixd(beam, dk, 0.35)), hole, 5);
+        c.strokeStyle = 'rgba(255,255,255,0.06)'; c.lineWidth = 2; c.beginPath(); c.arc(mx, my, r - 3, 0, 7); c.stroke();
+      }
+    }
+    // ---- 5. arched windows that open onto the parallax (punched through, then framed) ----
+    const nw = Math.max(2, Math.round(tm.w / 16));
+    for (let i = 0; i < nw; i++) {
+      const wx = (3 + R() * (tm.w - 6)) * TS, wy = (3 + R() * Math.max(1, tm.h - 9)) * TS, ww = 56 + R() * 30, wh = 110 + R() * 70;
+      c.save(); c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.moveTo(wx, wy + wh); c.lineTo(wx, wy + ww / 2); c.arc(wx + ww / 2, wy + ww / 2, ww / 2, Math.PI, 0); c.lineTo(wx + ww, wy + wh); c.closePath(); c.fill(); c.restore();
+      c.strokeStyle = rgbS(beam); c.lineWidth = 6; c.beginPath(); c.moveTo(wx, wy + wh); c.lineTo(wx, wy + ww / 2); c.arc(wx + ww / 2, wy + ww / 2, ww / 2, Math.PI, 0); c.lineTo(wx + ww, wy + wh); c.stroke();
+      c.strokeStyle = rgbS(dk); c.lineWidth = 3; line(c, wx + ww / 2, wy, wx + ww / 2, wy + wh); for (let y = wy + ww / 2; y < wy + wh; y += 36) line(c, wx, y, wx + ww, y);
+      c.fillStyle = rgbS(beam); c.fillRect(wx - 8, wy + wh, ww + 16, 8);
+    }
+    // ---- 6. enclosure mask: only where solid tiles surround the space ----
+    const r = 3, W_ = tm.w, H_ = tm.h, sol = new Uint8Array(W_ * H_);
+    for (let y = 0; y < H_; y++) for (let x = 0; x < W_; x++) sol[y * W_ + x] = tm.solid(x, y) ? 1 : 0;
+    const mk = mkCv(W_, H_), mx2 = mk.getContext('2d'), id = mx2.createImageData(W_, H_), A = def && def.arena ? def.arena : null;
+    for (let y = 0; y < H_; y++) for (let x = 0; x < W_; x++) {
+      let n = 0, tot = 0; for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const xx = x + i, yy = y + j; tot++; if (xx < 0 || yy < 0 || xx >= W_) n++; else if (yy < H_ && sol[yy * W_ + xx]) n++; }
+      let e = n / tot, a = Math.max(0, Math.min(1, (e - 0.10) / 0.30)); a = 0.30 + a * a * (3 - 2 * a) * 0.56;   // 0.30 floor: open halls keep a faint far wall, enclosed rooms get the full one
+      if (A && x * TS >= A.x0 - TS * 2) a = 0;
+      const o = (y * W_ + x) * 4; id.data[o] = id.data[o + 1] = id.data[o + 2] = 0; id.data[o + 3] = (a * 255) | 0;
+    }
+    mx2.putImageData(id, 0, 0);
+    c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'destination-in'; c.imageSmoothingEnabled = true; c.drawImage(mk, 0, 0, cv.width, cv.height); c.globalCompositeOperation = 'source-over';
+    tm.back = cv; tm.backGlows = glows;
+  }
+
+  let building = null;
+  const baseLights = buildLevelLights;
+  buildLevelLights = function (lv) { building = lv; return baseLights.apply(this, arguments); };   // called with the new Level right before buildCache
+  const baseBuild = Tilemap.prototype.buildCache;
+  Tilemap.prototype.buildCache = function (theme, lights) {
+    baseBuild.call(this, theme, lights);
+    this.back = null; this.backGlows = null;
+    if (this.theme === 'heart') return;                          // the final chamber paints its own backdrop
+    // buildCache runs inside the Level constructor, so game.level is still the previous one: use the level captured in buildLevelLights
+    try { buildBack(this, this.theme, {arena: building ? building.arena : null}); } catch (e) { console.error('stage back', e); }
+  };
+  const baseDraw = Background.prototype.draw;
+  Background.prototype.draw = function (S, g, theme, cx, cy) {
+    baseDraw.call(this, S, g, theme, cx, cy);
+    const L = g.level, tm = L && L.tm; if (!tm || !tm.back || g.state === 'title' || g.state === 'opening' || tm.theme !== theme) return;
+    const cam = g.camera, vw = W / cam.z, vh = H / cam.z, vx = Math.max(0, cam.cx - vw / 2 - 4), vy = Math.max(0, cam.cy - vh / 2 - 4);
+    const sw = Math.min(tm.w * TS - vx, vw + 8), sh = Math.min(tm.h * TS - vy, vh + 8); if (sw <= 0 || sh <= 0) return;
+    S.save(); cam.apply(S); S.imageSmoothingEnabled = true; S.globalAlpha = 1;
+    S.drawImage(tm.back, vx * SC, vy * SC, sw * SC, sh * SC, vx, vy, sw, sh);
+    S.restore();
+  };
+  const baseEmit = LightMap.prototype.emit;
+  LightMap.prototype.emit = function (ctx, view) {
+    baseEmit.call(this, ctx, view);
+    const g = typeof game !== 'undefined' ? game : null;
+    if (!g || this !== g.lm || !g.level || !g.level.tm.backGlows) return;
+    const t = g.time;
+    for (const w of g.level.tm.backGlows) {
+      if (w.x < view.x0 - w.r || w.x > view.x1 + w.r || w.y < view.y0 - w.r || w.y > view.y1 + w.r) continue;
+      blob(ctx, w.x, w.y, w.r, w.rgb, w.a * (0.8 + 0.2 * Math.sin(t * 6 + w.ph) * Math.sin(t * 1.9 + w.ph * 2)));
+    }
+    ctx.globalAlpha = 1;
+  };
+})();
+
+// ================= STAGE DETAIL PASS · C : dress the original chapters too =================
+// buildProps (crates, tanks, lamps, chains, cables, pipes, gauges, fans ...) only ran for the one-touch-death chapters, so chapters 1-3 and
+// the Governor's approach had bare floors and ceilings. Same system, same placement rules, plus: accent colours for the four original themes,
+// no floor stock in the training hall (stations and dummies must stay readable), and nothing inside the boss arena.
+(() => {
+  'use strict';
+  ACC.blue = {rgb: '63,246,255', hex: '#3ff6ff', dim: '#0d4a50'};
+  ACC.pipes = {rgb: '110,235,170', hex: '#6eebaa', dim: '#17543a'};
+  ACC.brass = {rgb: '255,206,120', hex: '#ffce78', dim: '#6a4a14'};
+  ACC.furnace = {rgb: '255,138,42', hex: '#ff8a2a', dim: '#7a3510'};
+  const TRAINING_FLOOR = new Set(['vent', 'lampstand', 'toolchest', 'panel']);
+  const FLOOR = new Set(['crate', 'barrel', 'tank', 'reel', 'vent', 'lampstand', 'panel', 'toolchest', 'scrap']);
+  const baseLoad = Game.prototype.loadLevel;
+  Game.prototype.loadLevel = function (n) {
+    baseLoad.call(this, n);
+    const L = this.level, d = L.def;
+    if (d.ohk || d.final) return;                                       // ohk chapters already got theirs
+    let ps = buildProps(this);
+    const A = L.arena;
+    if (A) ps = ps.filter(p => p.x < A.x0 - 96);
+    if (d.id === 1) ps = ps.filter(p => !FLOOR.has(p.kind) || TRAINING_FLOOR.has(p.kind));
+    L.entities.unshift(...ps);
+  };
+})();
+
 // ================= READABILITY PASS · actors keep a visible edge after the lightmap =================
 // Why: the ink outline (outlined()) is DARK and the rim light (drawWithRim) only exists next to a light source, so in the
 // dark zones Lin's navy trousers and the grey Welder / Turret / Mortar sink into the background (measured: ~41 % of Lin's
