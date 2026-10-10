@@ -8,7 +8,7 @@ export const SOUND_FILES = [
   'lion_roar', 'lion_roar2', 'lion_growl', 'lion_hurt', 'lion_death', 'lion_land', 'lion_wall', 'lion_bite',
   'lion_swipe', 'lion_warn', 'lion_pant', 'player_hurt', 'player_death', 'heal_drink', 'gate_rise', 'gate_drop',
   'crowd_loop', 'crowd_cheer', 'crowd_gasp', 'ui_click', 'ui_hover', 'music_calm', 'music_battle', 'music_phase2',
-  'sting_victory', 'sting_defeat',
+  'sting_victory', 'sting_defeat', 'lion_rise', 'lion_quake', 'lion_whirl', 'lion_dash', 'lion_hop', 'parry_ring', 'impact_boom', 'slowmo_whoosh',
 ] as const;
 export type SoundName = (typeof SOUND_FILES)[number];
 

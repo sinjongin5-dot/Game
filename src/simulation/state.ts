@@ -89,6 +89,7 @@ export interface LionAttackState {
   hold: number;
   slammed: boolean;
   lungeWin: number;
+  announced: number;
 }
 
 export interface LionState {
@@ -130,8 +131,8 @@ export interface LionState {
 
 export type SimEvent =
   | { type: 'playerSwing'; id: PlayerAttackId }
-  | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean }
-  | { type: 'playerBlocked'; strength: number; pos: V3; broke: boolean; attack: LionAttackId }
+  | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean; dir: V3; killing: boolean; combo: number }
+  | { type: 'playerBlocked'; strength: number; pos: V3; broke: boolean; attack: LionAttackId; perfect: boolean }
   | { type: 'playerHit'; dmg: number; pos: V3; heavy: boolean; attack: LionAttackId }
   | { type: 'playerDodge'; backstep: boolean }
   | { type: 'dodgeSuccess'; attack: LionAttackId }
@@ -144,7 +145,7 @@ export type SimEvent =
   | { type: 'lionWindup'; attack: LionAttackId; dur: number }
   | { type: 'lionAttack'; attack: LionAttackId }
   | { type: 'lionRoar'; phase2: boolean }
-  | { type: 'lionLand'; pos: V2 }
+  | { type: 'lionLand'; pos: V2; power?: number }
   | { type: 'lionSlam'; pos: V2 }
   | { type: 'lionHop'; pos: V2; to: V2 }
   | { type: 'lionWallHit'; pos: V2 }

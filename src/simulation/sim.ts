@@ -5,7 +5,7 @@ import { resolveLionAttack, resolvePlayerAttack } from './combat';
 import type { SimContext } from './context';
 import { createLion, setLionMode, updateLion } from './lion';
 import { Rng, clamp, v2 } from './math';
-import { createPlayer, setMode, updatePlayer } from './player';
+import { createPlayer, setMode, updatePlayer, bufferDuringHitstop } from './player';
 import { emptyInput, type InputFrame, type SimEvent, type Stats } from './state';
 import { TUNING } from './tuning';
 
@@ -170,6 +170,7 @@ export class GameSim {
 
     if (c.hitstop > 0) {
       c.hitstop = Math.max(0, c.hitstop - dt);
+      if (c.controlEnabled) bufferDuringHitstop(c.player, input);
       return;
     }
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { injectHitFlash } from './fx';
 import { NOISE_GLSL } from './glsl';
 
 export interface FurSettings {
@@ -90,6 +91,11 @@ export function createFurMaterial(shell: number, shells: number, s: FurSettings,
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.22, 1.16, 1.0), belly * 0.5);
         }`);
   };
+  const furCompile = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, r) => {
+    furCompile.call(mat, sh, r);
+    injectHitFlash(sh, 'lion', [0.95, 0.75, 0.5]);
+  };
   mat.customProgramCacheKey = () => `fur-${shell === 0 ? 'base' : 'shell'}`;
   return mat;
 }
@@ -139,6 +145,7 @@ export function createManeMaterial(shared: { time: { value: number } }, shake: {
           diffuseColor.rgb *= 0.75 + 0.5 * streak;
           if (a < 0.42) discard;
         }`);
+    injectHitFlash(sh, 'lion', [0.95, 0.75, 0.5]);
   };
   return mat;
 }

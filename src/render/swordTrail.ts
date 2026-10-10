@@ -9,8 +9,10 @@ export class SwordTrail {
   private alpha: Float32Array;
   private geo = new THREE.BufferGeometry();
   active = false;
+  private life: number;
 
-  constructor() {
+  constructor(color: [number, number, number] = [1.0, 0.92, 0.75], life = 0.16, alphaMul = 1) {
+    this.life = life;
     this.pos = new Float32Array(this.n * 2 * 3);
     this.alpha = new Float32Array(this.n * 2);
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -24,7 +26,7 @@ export class SwordTrail {
     const mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
       vertexShader: 'attribute float aA; varying float vA; void main(){ vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'varying float vA; void main(){ gl_FragColor = vec4(vec3(1.0, 0.92, 0.75) * vA, vA * 0.6); }',
+      fragmentShader: `varying float vA; void main(){ gl_FragColor = vec4(vec3(${color.map((c) => c.toFixed(3)).join(',')}) * vA, vA * ${(0.6 * alphaMul).toFixed(3)}); }`,
     });
     this.mesh = new THREE.Mesh(this.geo, mat);
     this.mesh.frustumCulled = false;
@@ -42,9 +44,9 @@ export class SwordTrail {
     for (let i = 0; i < this.n; i++) {
       const p = this.pts[i];
       if (p) p.age += dt;
-      const alive = p && p.age < 0.16;
+      const alive = p && p.age < this.life;
       const q = alive ? p : (this.pts[0] ?? null);
-      const a = alive ? 1 - p.age / 0.16 : 0;
+      const a = alive ? 1 - p.age / this.life : 0;
       const b = q ? q.b : new THREE.Vector3(), t = q ? q.t : new THREE.Vector3();
       this.pos.set([b.x, b.y, b.z, t.x, t.y, t.z], i * 6);
       this.alpha[i * 2] = a * 0.25;

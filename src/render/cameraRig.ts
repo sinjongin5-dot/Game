@@ -24,6 +24,9 @@ export class CameraRig {
   private lookOffset = 0;
   private lockBlend = 0;
   private trauma = 0;
+  private kickVec = new THREE.Vector3();
+  private fovKick = 0;
+  private rollKick = 0;
   private shakeT = 0;
   private fovCur = 58;
   private blend = 1; // 연출 → 게임플레이 블렌드 (1 = 게임플레이)
@@ -44,6 +47,26 @@ export class CameraRig {
     this.trauma = Math.min(1, this.trauma + t * this.settings.shake);
   }
 
+  /**
+   * 타격 방향으로 카메라를 순간적으로 밀어 넣는다 (스프링처럼 되돌아옴).
+   * dir 은 월드 방향(정규화 불필요), amount 는 미터.
+   */
+  kick(dir: THREE.Vector3, amount: number) {
+    const k = amount * this.settings.shake;
+    if (k <= 0) return;
+    const d = dir.clone().setY(0);
+    if (d.lengthSq() < 1e-6) return;
+    this.kickVec.addScaledVector(d.normalize(), k);
+    if (this.kickVec.length() > 0.55) this.kickVec.setLength(0.55);
+  }
+
+  /** 화면 확대(+) / 축소(-) 펀치 (도 단위). 빠르게 원래 FOV 로 복귀한다. */
+  punchFov(deg: number, roll = 0) {
+    const k = this.settings.shake;
+    this.fovKick = THREE.MathUtils.clamp(this.fovKick + deg * k, -9, 9);
+    this.rollKick = THREE.MathUtils.clamp(this.rollKick + roll * k, -0.08, 0.08);
+  }
+
   /** 씬 전환/재시작 시 카메라 상태 초기화 */
   reset(sim: GameSim) {
     this.yaw = 0;
@@ -52,6 +75,9 @@ export class CameraRig {
     this.lookOffset = 0;
     this.lockBlend = 0;
     this.trauma = 0;
+    this.kickVec.set(0, 0, 0);
+    this.fovKick = 0;
+    this.rollKick = 0;
     this.deathT = 0;
     this.victoryAng = 0;
     this.pivot.set(sim.player.pos.x, 1.5, sim.player.pos.z);
@@ -153,7 +179,8 @@ export class CameraRig {
 
     const f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     const right = new THREE.Vector3(-f.z, 0, f.x); // 카메라 오른쪽
-    const shoulder = 0.62 + 0.5 * this.lockBlend * clamp((6 - sep) / 4, 0, 1);
+    // 가까이 붙을수록 카메라를 오른쪽 어깨 너머로 빼서, 플레이어 몸에 사자의 준비 동작이 가려지지 않게 한다
+    const shoulder = 0.62 + 1.25 * this.lockBlend * clamp((6.5 - sep) / 4, 0, 1);
     const dir = new THREE.Vector3(-f.x * Math.cos(targetPitch), Math.sin(targetPitch), -f.z * Math.cos(targetPitch));
     const origin = this.pivot.clone().addScaledVector(right, shoulder * 0.55);
     // 벽 충돌: 피벗에서 목표 위치까지 레이캐스트
@@ -173,7 +200,7 @@ export class CameraRig {
     // 시선 목표
     const chest = new THREE.Vector3(p.pos.x, 1.45, p.pos.z);
     const lionChest = new THREE.Vector3(l.pos.x, 1.0 + l.y * 0.6, l.pos.z);
-    const lookT = chest.clone().lerp(lionChest, 0.5 * this.lockBlend);
+    const lookT = chest.clone().lerp(lionChest, 0.62 * this.lockBlend);
     lookT.addScaledVector(right, 0.5 * (1 - this.lockBlend));
     lookT.y += (1 - this.lockBlend) * 0.1;
     this.tmpLook.copy(lookT);
@@ -228,10 +255,16 @@ export class CameraRig {
     c.position.copy(pos);
     c.position.x += sx * tr * 0.12;
     c.position.y += sy * tr * 0.1;
+    // 타격 킥: 스프링처럼 빠르게 복귀
+    c.position.add(this.kickVec);
+    this.kickVec.multiplyScalar(Math.exp(-11 * dt));
+    this.fovKick *= Math.exp(-9 * dt);
+    this.rollKick *= Math.exp(-8 * dt);
     c.lookAt(look);
-    c.rotateZ(sx * tr * 0.025);
-    if (Math.abs(c.fov - fov) > 0.01) {
-      c.fov = fov;
+    c.rotateZ(sx * tr * 0.025 + this.rollKick);
+    const fovOut = fov - this.fovKick;
+    if (Math.abs(c.fov - fovOut) > 0.01) {
+      c.fov = fovOut;
       c.updateProjectionMatrix();
     }
   }

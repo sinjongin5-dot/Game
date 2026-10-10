@@ -15,6 +15,15 @@ export type GameState = 'boot' | 'loading' | 'title' | 'intro' | 'fight' | 'paus
 const AUDIO_UNIT = 30000;
 
 /** 게임 전체 흐름: 로딩 → 타이틀 → 입장 → 결투 → 사망/승리 → 재도전 */
+/** 새 패턴이 처음 나올 때 한 번만 보여 주는 짧은 대처 힌트 */
+const PATTERN_HINTS: Record<string, string> = {
+  flurry: '연타 할퀴기 — 방패로 막거나 크게 물러나세요',
+  dashBite: '돌진 물기 — 달려드는 순간 옆으로 구르세요',
+  backHop: '사자가 물러났다가 덮칩니다 — 도약 직전에 회피하세요',
+  quake: '충격파 — 링이 몸에 닿는 순간 회피하거나 방패로 막으세요',
+  whirl: '회전 꼬리치기 — 가까이 있다면 멀리 구르세요',
+};
+
 export class Game {
   settings: Settings = loadSettings();
   state: GameState = 'boot';
@@ -33,6 +42,7 @@ export class Game {
   private rafId = 0;
   private hints = { move: false, lock: false, windup: false, attack: false, stamina: false, heal: false, dodge: false };
   private hintQueue: string[] = [];
+  private seenPatterns = new Set<string>();
   private fightClock = 0;
   private resultShown = false;
   private initDone = false;
@@ -41,6 +51,8 @@ export class Game {
   private ctxErrorShown = false;
   /** 진단/테스트용 */
   timeScale = 1;
+  private slowT = 0;
+  private slowScale = 1;
   /** 자동화 테스트 전용: 값이 있으면 키보드/마우스 대신 이 입력을 사용 */
   inputOverride: (() => import('./simulation/state').InputFrame) | null = null;
   frames = 0;
@@ -111,6 +123,13 @@ export class Game {
       await new Promise((r) => setTimeout(r, 30));
       this.scene = new GameScene(this.canvas, this.assets, { sensitivity: this.settings.sensitivity, shake: this.settings.shake, invertY: this.settings.invertY }, this.settings.quality);
       this.scene.hooks.onDamageFlash = (s) => this.ui.flashDamage(s);
+      // 연출 효과(슬로모/전체 화면 번쩍임)는 '카메라 흔들림' 설정이 0 이면 끈다 (접근성)
+      this.scene.hooks.onScreenFlash = (c, s) => { if (this.settings.shake > 0) this.ui.screenFlash(c, s); };
+      this.scene.hooks.onSlowmo = (scale, dur) => {
+        if (this.settings.shake <= 0) return;
+        this.slowScale = this.slowT > 0 ? Math.min(this.slowScale, scale) : scale;
+        this.slowT = Math.max(this.slowT, dur);
+      };
       this.scene.resize(window.innerWidth, window.innerHeight);
       this.sim = new GameSim(physics, { skipIntro: false });
       this.scene.resetForNewAttempt(this.sim);
@@ -153,6 +172,7 @@ export class Game {
     void this.audio.resume();
     this.sim.reset({ skipIntro: false, attempts: 1 });
     this.director.reset();
+    this.slowT = 0;
     this.scene.resetForNewAttempt(this.sim);
     this.scene.setMode('game');
     this.ui.resetHud();
@@ -189,6 +209,7 @@ export class Game {
     this.ui.closeAllPanels();
     this.sim.reset({ skipIntro: true });
     this.director.reset();
+    this.slowT = 0;
     this.scene.resetForNewAttempt(this.sim);
     this.scene.cam.reset(this.sim);
     this.scene.setMode('game');
@@ -211,6 +232,7 @@ export class Game {
     this.ui.closeAllPanels();
     this.sim.reset({ skipIntro: false, attempts: 1 });
     this.director.reset();
+    this.slowT = 0;
     this.scene.resetForNewAttempt(this.sim);
     this.scene.setMode('title');
     this.ui.resetHud();
@@ -301,7 +323,9 @@ export class Game {
     const rawDt = Math.min((now - this.last) / 1000, 0.25);
     this.last = now;
     this.frames++;
-    const dt = rawDt * this.timeScale;
+    // 순간 슬로모션: 지속 시간은 실제 시간 기준으로 줄어든다
+    if (this.slowT > 0) this.slowT = Math.max(0, this.slowT - rawDt);
+    const dt = rawDt * this.timeScale * (this.slowT > 0 ? this.slowScale : 1);
     if (this.state === 'error' || this.state === 'loading' || this.state === 'boot') return;
     const sim = this.sim;
     const sc = this.scene;
@@ -385,6 +409,10 @@ export class Game {
         this.ui.hint('사자의 준비 동작을 읽으세요 — Space 로 회피하거나, 우클릭을 유지해 방패로 막습니다.', 5200);
       }
       if (e.type === 'phase2') this.ui.hint('사자가 더욱 사나워졌다', 3200);
+      if (e.type === 'lionWindup' && PATTERN_HINTS[e.attack] && !this.seenPatterns.has(e.attack) && !this.ui.hintVisible) {
+        this.seenPatterns.add(e.attack);
+        this.ui.hint(PATTERN_HINTS[e.attack], 3600);
+      }
       if (e.type === 'fightStart') { this.ui.showHud(true); this.ui.showIntroHint(false); }
     }
   }

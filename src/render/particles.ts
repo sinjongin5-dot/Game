@@ -149,6 +149,36 @@ export class Particles {
     }
   }
 
+  /** 위로 떠오르는 불씨 (2페이즈 사자 주변 등) */
+  ember(pos: THREE.Vector3, count: number, spread = 0.8, color = new THREE.Color(1.0, 0.42, 0.1)) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * spread;
+      const p = pos.clone().add(new THREE.Vector3(Math.cos(a) * r, Math.random() * 0.9, Math.sin(a) * r));
+      const v = new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.6 + Math.random() * 1.1, (Math.random() - 0.5) * 0.6);
+      this.spawn('spark', p, v, 0.7 + Math.random() * 0.9, 0.05 + Math.random() * 0.05, -0.03, color, 0.9, 0.6, -0.8);
+    }
+  }
+
+  /** 제자리 회전 공격의 모래 소용돌이 (center 둘레를 회전) */
+  swirl(center: THREE.Vector3, radius: number, count: number, spin: number) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = radius * (0.7 + Math.random() * 0.5);
+      const p = center.clone().add(new THREE.Vector3(Math.cos(a) * r, 0.05 + Math.random() * 0.3, Math.sin(a) * r));
+      const tang = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(spin * (4 + Math.random() * 3));
+      tang.y = 0.6 + Math.random() * 1.2;
+      this.spawn('dust', p, tang, 0.6 + Math.random() * 0.6, 0.45 + Math.random() * 0.4, 0.9, Math.random() < 0.5 ? Particles.sand : Particles.sandL, 0.18, 1.4, -0.2);
+    }
+  }
+
+  /** 방사형 불꽃 터짐 (큰 충격) */
+  burst(pos: THREE.Vector3, count: number, speed: number, color = new THREE.Color(1.0, 0.8, 0.5)) {
+    for (let i = 0; i < count; i++) {
+      const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.5 + Math.random()));
+      this.spawn('spark', pos, v, 0.2 + Math.random() * 0.3, 0.08 + Math.random() * 0.06, -0.05, color, 1.0, 1.4, 9);
+    }
+  }
+
   /** 모래를 끌며 일으키는 연속 먼지 */
   trail(pos: THREE.Vector3, vel: THREE.Vector3, strength: number) {
     this.puff(pos, strength, vel.clone().multiplyScalar(-0.3), 2);

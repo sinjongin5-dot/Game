@@ -39,7 +39,7 @@ export class UI {
   private lastBossFrac = -1;
   private el = {
     loading: $('loading'), loadfill: $('loadfill'), loadtext: $('loadtext'), loaderr: $('loaderr'), loaderrMsg: $('loaderr-msg'),
-    title: $('title'), hud: $('hud'), vignette: $('vignette'), fade: $('fade'), hint: $('hint'), reticle: $('reticle'), fps: $('fps'),
+    title: $('title'), hud: $('hud'), vignette: $('vignette'), screenFlash: $('screenflash'), fade: $('fade'), hint: $('hint'), reticle: $('reticle'), fps: $('fps'),
     hpFill: document.querySelector('#bar-hp .fill') as HTMLElement, hpGhost: document.querySelector('#bar-hp .ghost') as HTMLElement,
     hpNum: $('num-hp'), stBar: $('bar-st'), stFill: document.querySelector('#bar-st .fill') as HTMLElement, flasks: $('flasks'),
     boss: $('boss'), bossBar: document.querySelector('#boss .boss-bar') as HTMLElement,
@@ -220,6 +220,16 @@ export class UI {
     this.el.vignette.style.opacity = '';
     this.el.vignette.classList.add('flash');
     this.flashTimer = 0.09 + strength * 0.08;
+  }
+  /** 전체 화면 색 번쩍임 (패링/처치/포효). color 는 'r,g,b' */
+  screenFlash(color: string, strength: number) {
+    const el = this.el.screenFlash;
+    el.style.transition = 'none';
+    el.style.background = `radial-gradient(ellipse at center, rgba(${color},${(strength * 0.35).toFixed(3)}) 0%, rgba(${color},${strength.toFixed(3)}) 100%)`;
+    el.style.opacity = '1';
+    void el.offsetWidth;
+    el.style.transition = 'opacity 0.38s ease-out';
+    el.style.opacity = '0';
   }
   flashStamina() {
     this.el.stBar.classList.remove('flash');

@@ -43,16 +43,23 @@ export class AudioDirector {
         case 'playerHitLion': {
           if (e.invuln) { a.play('block_light', { volume: 0.5, rate: 1.4, pos: e.pos }); break; }
           a.play(e.heavy ? 'hit_flesh_heavy' : 'hit_flesh', { volume: 0.95, rate: rr(0.94, 1.06), pos: e.pos });
+          // 저음 충격을 겹쳐 묵직하게 (강타/머리/연계 마지막 타일수록 크게)
+          if (e.heavy || e.head || e.combo >= 2) a.play('impact_boom', { volume: e.heavy ? 0.7 : 0.4, rate: rr(0.95, 1.1), pos: e.pos });
+          if (e.killing || e.stunned) a.play('slowmo_whoosh', { volume: 0.5, bus: 'sfx', reverb: 0.2 });
+          if (e.killing) a.duck(0.7, 1.6);
           if (e.heavy || Math.random() < 0.4) a.play('lion_hurt', { volume: 0.55, rate: rr(0.9, 1.1), pos: this.lionPos(sim), key: 'lionHurt' });
           if (e.heavy) this.cheer(0.5);
           break;
         }
         case 'playerBlocked':
-          if (e.broke) a.play('guard_break', { volume: 1, pos: this.playerPos(sim) });
+          if (e.perfect && !e.broke) a.play('parry_ring', { volume: 0.85, pos: e.pos });
+          if (e.broke) { a.play('guard_break', { volume: 1, pos: this.playerPos(sim) }); a.play('impact_boom', { volume: 0.8, pos: this.playerPos(sim) }); }
           else a.play(e.strength > 0.7 ? 'block_heavy' : 'block_light', { volume: 0.55 + 0.45 * e.strength, rate: rr(0.95, 1.05), pos: e.pos });
           break;
         case 'playerHit':
           a.play('hit_flesh', { volume: 0.9, rate: 0.85, pos: this.playerPos(sim) });
+          a.play('impact_boom', { volume: e.heavy ? 0.85 : 0.5, rate: rr(0.9, 1.05), pos: this.playerPos(sim) });
+          a.duck(0.25, 0.5);
           a.play('player_hurt', { volume: 0.9, rate: rr(0.92, 1.05), pos: this.playerPos(sim), delay: 0.03 });
           a.play('crowd_gasp', { volume: 0.5, bus: 'crowd', reverb: 0.1 });
           break;
@@ -60,6 +67,7 @@ export class AudioDirector {
           a.play('dodge_roll', { volume: e.backstep ? 0.45 : 0.8, rate: e.backstep ? 1.25 : 1, pos: this.playerPos(sim) });
           break;
         case 'dodgeSuccess':
+          a.play('slowmo_whoosh', { volume: 0.3, bus: 'sfx' });
           if (this.t - this.lastCheer > 2) a.play('crowd_gasp', { volume: 0.35, bus: 'crowd', reverb: 0.1 });
           break;
         case 'healStart':
@@ -74,6 +82,10 @@ export class AudioDirector {
         case 'lionWindup': {
           const p = this.lionPos(sim);
           if (e.attack === 'charge') { a.play('lion_roar2', { volume: 0.95, pos: p, rate: 1.05 }); a.duck(0.5, 2.2); }
+          else if (e.attack === 'quake') { a.play('lion_rise', { volume: 0.95, pos: p, rate: 1.0 }); a.duck(0.35, 1.1); }
+          else if (e.attack === 'whirl') { a.play('lion_growl', { volume: 0.8, pos: p, rate: 0.9 }); a.duck(0.3, 0.9); }
+          else if (e.attack === 'dashBite') { a.play('lion_growl', { volume: 0.7, pos: p, rate: 1.25 }); a.duck(0.3, 0.8); }
+          else if (e.attack === 'backHop') { /* 도약 동작으로 바로 이어지므로 별도 경고음 없음 */ }
           else if (e.attack === 'pounce') { a.play('lion_growl', { volume: 0.85, pos: p, rate: 1.1 }); a.duck(0.4, 1.4); }
           else if (e.attack === 'swipeBite' || e.attack === 'pounceSwat') { /* 연계 동작은 별도 경고음 없이 몸짓으로 */ }
           else { a.play('lion_warn', { volume: 0.7, pos: p, rate: rr(0.95, 1.1) }); a.duck(0.3, 1.0); }
@@ -84,10 +96,23 @@ export class AudioDirector {
           if (e.attack === 'bite' || e.attack === 'swipeBite') a.play('lion_bite', { volume: 0.9, pos: p });
           else if (e.attack === 'swipe' || e.attack === 'rear' || e.attack === 'pounceSwat') a.play('lion_swipe', { volume: 0.9, pos: p, rate: rr(0.95, 1.05) });
           else if (e.attack === 'pounce') a.play('lion_swipe', { volume: 0.9, pos: p, rate: 0.7 });
+          else if (e.attack === 'flurry') a.play('lion_swipe', { volume: 0.85, pos: p, rate: rr(0.92, 1.15) });
+          else if (e.attack === 'dashBite') { a.play('lion_dash', { volume: 0.95, pos: p }); a.play('lion_bite', { volume: 0.8, pos: p, delay: 0.1 }); }
+          else if (e.attack === 'backHop') a.play('lion_hop', { volume: 0.7, pos: p });
+          else if (e.attack === 'whirl') a.play('lion_whirl', { volume: 0.95, pos: p });
+          break;
+        }
+        case 'lionSlam': {
+          const p = { x: e.pos.x, y: 0.3, z: e.pos.z };
+          a.play('lion_quake', { volume: 1, pos: p, reverb: 0.35 });
+          a.play('impact_boom', { volume: 1, pos: p, rate: 0.85 });
+          a.duck(0.55, 1.8);
+          this.cheer(0.8);
           break;
         }
         case 'lionLand':
-          a.play('lion_land', { volume: 1, pos: { x: e.pos.x, y: 0.2, z: e.pos.z } });
+          if ((e.power ?? 1) < 0.8) a.play('lion_hop', { volume: 0.8, pos: { x: e.pos.x, y: 0.2, z: e.pos.z } });
+          else a.play('lion_land', { volume: 1, pos: { x: e.pos.x, y: 0.2, z: e.pos.z } });
           break;
         case 'lionWallHit':
           a.play('lion_wall', { volume: 1, pos: { x: e.pos.x, y: 1, z: e.pos.z } });

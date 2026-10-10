@@ -164,7 +164,7 @@ export function startLionAttack(ctx: SimContext, id: LionAttackId, chained = fal
   const holdable = id === 'swipe' || id === 'bite' || id === 'dashBite' || id === 'flurry';
   const hold = holdable && ctx.rng.next() < (phase2 ? 0.45 : 0.22) ? 0.28 + ctx.rng.next() * 0.34 : 0;
   l.attack = {
-    id, t: startT, serial: l.attackSerial, win: -1, hold, slammed: false, lungeWin: -1,
+    id, t: startT, serial: l.attackSerial, win: -1, hold, slammed: false, lungeWin: -1, announced: -1,
     mirror: rel > 0, // 플레이어가 왼쪽(+)에 있으면 왼발
     hitDone: false, dodged: false, lockDir: toP, lockDist: 0, lunge: 0, leapFrom: null, leapTo: null,
     chargeDist: 0, chargeMax: 0, chargeSpeed: 0, wallHit: false, combo, prevVol: null, phase: 'windup', braking: false, blockedBy: false, fired: false, wasActive: false,
@@ -460,6 +460,12 @@ function updateAttack(ctx: SimContext, dt: number) {
     a.fired = true;
     ctx.events.push({ type: 'lionAttack', attack: a.id });
   }
+  // 연타 공격: 둘째 타부터는 구간마다 다시 알린다 (효과음/이펙트)
+  if (def.windows) {
+    for (let i = a.announced + 1; i < def.windows.length; i++) {
+      if (t >= def.windows[i][0] - 0.05) { a.announced = i; if (i > 0) ctx.events.push({ type: 'lionAttack', attack: a.id }); } else break;
+    }
+  }
   if (a.t < def.windup) a.phase = 'windup';
   else if (t <= def.activeEnd) a.phase = 'active';
   else a.phase = 'recover';
@@ -551,7 +557,7 @@ function updateAttack(ctx: SimContext, dt: number) {
         const sp = Math.hypot(a.leapTo!.x - a.leapFrom.x, a.leapTo!.z - a.leapFrom.z) / (H1 - H0);
         applyMove(ctx, sp, dt, yawOf(a.lockDir));
       } else {
-        if (t > H1 && l.y > 0) { l.y = 0; l.landed = 0.6; ctx.events.push({ type: 'lionLand', pos: { ...l.pos } }); }
+        if (t > H1 && l.y > 0) { l.y = 0; l.landed = 0.6; ctx.events.push({ type: 'lionLand', pos: { ...l.pos }, power: 0.45 }); }
         l.speed = approach(l.speed, 0, 14 * dt);
         if (l.speed > 0.1) applyMove(ctx, l.speed, dt); else l.vel = v2();
       }

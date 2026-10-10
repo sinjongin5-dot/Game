@@ -108,7 +108,8 @@ _gl.load(`/assets/models/${model}.glb`, (g) => {
       lookYaw: parseFloat(q.get('look') ?? '0'), flinch: 0, flinchDirLocal: { x: 0, z: -1 }, landed: 0, deadT: T, time: 1, phase: 1,
       chargeBraking: false, chargeSpeed: 0, hpFrac: 1,
     };
-    const atk = ['swipe', 'bite', 'pounce', 'charge', 'rear', 'swipeBite', 'pounceSwat'];
+    const atk = ['swipe', 'bite', 'pounce', 'charge', 'rear', 'swipeBite', 'pounceSwat', 'flurry', 'dashBite', 'backHop', 'quake', 'whirl'];
+    if (pose === 'backHop') v.y = 0.75 * 4 * ((T - 0.08) / 0.52) * (1 - (T - 0.08) / 0.52);
     if (atk.includes(pose)) { v.mode = 'attack'; v.attackId = pose as any; if (pose === 'charge' && T > 1.2) { v.chargeSpeed = 8; v.speed = 8; v.moveLocal = { x: 0, z: 8 }; } }
     if (pose === 'walk') { v.mode = 'circle'; v.speed = 2.3; v.moveLocal = { x: 0, z: 2.3 }; }
     if (pose === 'run') { v.mode = 'approach'; v.speed = 5.2; v.moveLocal = { x: 0, z: 5.2 }; }

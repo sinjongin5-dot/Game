@@ -52,6 +52,15 @@ function spend(ctx: SimContext, p: PlayerState, cost: number): boolean {
   return true;
 }
 
+/** 히트스톱 중에도 눌린 행동 입력을 잃지 않도록 버퍼에 쌓는다 */
+export function bufferDuringHitstop(p: PlayerState, input: InputFrame) {
+  if (p.mode === 'dead' || p.mode === 'scripted' || p.mode === 'victory') return;
+  if (input.pressed.light) bufferAction(p, 'light');
+  if (input.pressed.heavy) bufferAction(p, 'heavy');
+  if (input.pressed.dodge) bufferAction(p, 'dodge');
+  if (input.pressed.heal) bufferAction(p, 'heal');
+}
+
 function bufferAction(p: PlayerState, a: 'light' | 'heavy' | 'dodge' | 'heal') {
   p.buffer.action = a;
   p.buffer.t = T.inputBuffer;

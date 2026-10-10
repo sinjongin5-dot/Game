@@ -6,6 +6,7 @@ import { bladeActive, isDodgeInvulnerable, isGuardUp, playerBladeSegment, setMod
 import { TUNING } from './tuning';
 
 const T = TUNING.player;
+const norm3 = (v: V3): V3 => { const l = Math.hypot(v.x, v.y, v.z) || 1; return { x: v.x / l, y: v.y / l, z: v.z / l }; };
 const lerp3 = (a: V3, b: V3, t: number): V3 => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t });
 
 /** 플레이어 검 → 사자 */
@@ -38,6 +39,7 @@ export function resolvePlayerAttack(ctx: SimContext) {
       }
     }
   }
+  const swingDir = norm3({ x: cur.b.x - prev.b.x, y: cur.b.y - prev.b.y, z: cur.b.z - prev.b.z });
   p.prevBlade = cur;
   if (!best) return;
   p.attackHitDone = true;
@@ -45,18 +47,20 @@ export function resolvePlayerAttack(ctx: SimContext) {
   const stunned = l.mode === 'stagger' || l.mode === 'stunned';
   let dmg = def.damage * (head ? 1.2 : 1) * (stunned ? 1.35 : 1);
   if (l.invuln) {
-    ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg: 0, heavy: def.id === 'heavy', head, stunned: false, invuln: true });
+    ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg: 0, heavy: def.id === 'heavy', head, stunned: false, invuln: true, dir: swingDir, killing: false, combo: p.attackChain });
     ctx.hitstop = Math.max(ctx.hitstop, 0.04);
     return;
   }
   dmg = Math.round(dmg);
   l.hp = Math.max(0, l.hp - dmg);
   ctx.stats.hitsLanded++;
-  ctx.hitstop = Math.max(ctx.hitstop, def.hitstop);
+  const staggeredNow = l.poise + def.poise * (l.staggerImmune > 0 ? TUNING.lion.staggerImmuneGain : 1) >= TUNING.lion.poiseMax;
+  // 타격 정지: 기본 + 머리 가격/경직 유발/처치 시 더 길게
+  ctx.hitstop = Math.max(ctx.hitstop, def.hitstop + (head ? 0.02 : 0) + (staggeredNow ? 0.06 : 0) + (l.hp <= 0 ? 0.22 : 0));
   l.flinch = def.id === 'heavy' ? 1 : 0.55;
   l.flinchDir = norm2({ x: l.pos.x - p.pos.x, z: l.pos.z - p.pos.z });
   const staggered = addLionPoise(ctx, def.poise);
-  ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg, heavy: def.id === 'heavy', head, stunned: stunned || staggered, invuln: false });
+  ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg, heavy: def.id === 'heavy', head, stunned: stunned || staggered, invuln: false, dir: swingDir, killing: l.hp <= 0, combo: p.attackChain });
 }
 
 function playerCapsule(ctx: SimContext) {
@@ -146,7 +150,8 @@ export function resolveLionAttack(ctx: SimContext) {
       p.staminaDelay = 1.5;
       p.guardImpact = 1;
       p.knock = { x: away.x * 6.5, z: away.z * 6.5 };
-      ctx.events.push({ type: 'playerBlocked', strength: 1, pos: contact, broke: true, attack: a.id });
+      ctx.events.push({ type: 'playerBlocked', strength: 1, pos: contact, broke: true, attack: a.id, perfect: false });
+      ctx.hitstop = Math.max(ctx.hitstop, 0.12);
       setMode(p, 'guardBreak');
       p.attackId = null;
       p.invulnT = 0.4;
@@ -160,7 +165,8 @@ export function resolveLionAttack(ctx: SimContext) {
     p.knock = { x: away.x * kb, z: away.z * kb };
     p.invulnT = 0.2;
     a.blockedBy = true;
-    ctx.events.push({ type: 'playerBlocked', strength: p.guardImpact, pos: contact, broke: false, attack: a.id });
+    ctx.events.push({ type: 'playerBlocked', strength: p.guardImpact, pos: contact, broke: false, attack: a.id, perfect });
+    ctx.hitstop = Math.max(ctx.hitstop, perfect ? 0.1 : def.heavyHit ? 0.07 : 0.045);
     return;
   }
   const kb = def.heavyHit ? 7 : 3.6;
@@ -181,6 +187,7 @@ function applyPlayerDamage(ctx: SimContext, dmg: number, pos: V3, heavy: boolean
     p.invulnT = 0.35;
     p.buffer.action = null;
   }
+  ctx.hitstop = Math.max(ctx.hitstop, heavy ? 0.11 : 0.07);
   ctx.events.push({ type: 'playerHit', dmg, pos, heavy, attack });
   if (p.hp <= 0) {
     p.hp = 0;

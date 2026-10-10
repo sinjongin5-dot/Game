@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { injectHitFlash } from './fx';
 import { NOISE_GLSL } from './glsl';
 
 export type MatKind = 'skin' | 'bronze' | 'iron' | 'steel' | 'leather' | 'cloth' | 'wood' | 'shield_face' | 'glass';
@@ -78,6 +79,7 @@ export function createCharMaterial(kind: string, src?: THREE.MeshStandardMateria
           vec2 dH = vec2(dFdx(hh), dFdy(hh));
           normal = perturbN(-vViewPosition, normal, dH, faceDirection);
         }` : ''}`);
+    injectHitFlash(sh, 'player', [1.0, 0.2, 0.12]);
   };
   mat.customProgramCacheKey = () => `char-${kind}`;
   return mat;

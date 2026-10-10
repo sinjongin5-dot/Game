@@ -52,6 +52,7 @@ export class GladiatorAnimator {
   private footWasStance = { L: true, R: true };
   private footPos = { L: V(0.13, 0.1, 0.12), R: V(-0.13, 0.1, -0.1) };
   private footPosFrozen = { L: V(0.13, 0.1, 0.12), R: V(-0.13, 0.1, -0.1) };
+  private atk = { active: false, id: '' as string, lastT: 0, travel: 0, snapL: V(), snapR: V(), crouch: 0, planted: false };
   private smoothLean = 0;
   private smoothSide = 0;
   private breath = 0;
@@ -209,6 +210,57 @@ export class GladiatorAnimator {
     this.lastSpeed = speed;
   }
 
+  /**
+   * 공격 중 발놀림: 방패 쪽(왼발)이 먼저 크게 내딛고, 몸이 그 위로 미끄러져 들어가며, 오른발이 끌려 따라온다.
+   * 몸이 실제로 움직인 거리(travel)만큼 앞발을 뒤로 밀어 지면에 고정된 것처럼 보이게 한다.
+   */
+  private attackFeet(dt: number, v: PlayerView) {
+    const def = PLAYER_ATTACKS[v.attackId!];
+    const a = this.atk;
+    if (!a.active || a.id !== v.attackId || v.modeT < a.lastT - 1e-4) {
+      a.active = true; a.id = v.attackId!; a.travel = 0; a.planted = false;
+      a.snapL.copy(this.footPos.L); a.snapR.copy(this.footPos.R);
+    }
+    a.lastT = v.modeT;
+    a.travel += Math.max(0, v.moveLocal.z) * dt;
+    const t = v.modeT;
+    const ls = def.lunge.start, le = def.lunge.end;
+    const reach = clamp(def.lunge.distance * 0.8, 0.18, 0.5);
+    const idleL = V(0.16, 0.1, 0.14), idleR = V(-0.2, 0.1, -0.12);
+    const swing = smooth(0, Math.max(0.06, ls), t); // 앞발을 내딛는 구간
+    const rec = smooth(le, def.duration, t);          // 회복: 제자리로 복귀
+    // 왼발(앞): 내딛기 → 착지(지면 고정) → 복귀
+    const planted = t >= ls;
+    // 몸이 앞발을 지나치면 발이 뒤로 빠져 보이지 않게 일정 위치에서 몸과 함께 미끄러진다
+    const zPlanted = Math.max(idleL.z + reach - a.travel, idleL.z - 0.1);
+    const zSwing = idleL.z + reach * swing;
+    let zL = planted ? zPlanted : zSwing;
+    zL = lerp(zL, idleL.z, rec);
+    const yL = 0.1 + (planted ? 0 : 0.14 * Math.sin(Math.PI * swing));
+    // 오른발(뒤): 끌려 따라온다 (살짝 들림)
+    const follow = smooth(ls, le + 0.08, t);
+    const zR = lerp(idleR.z + 0.12 * follow, idleR.z, rec);
+    const yR = 0.1 + 0.05 * Math.sin(Math.PI * follow) * (1 - rec);
+    const L = this.footPos.L, R = this.footPos.R;
+    L.set(idleL.x, yL, zL); R.set(idleR.x, yR, zR);
+    // 시작 순간에는 직전 보행 자세에서 부드럽게 이어 받는다
+    const blend = smooth(0, 0.07, t);
+    if (blend < 1) { L.lerpVectors(a.snapL, L, blend); R.lerpVectors(a.snapR, R, blend); }
+    (L as any)._pitch = planted ? -0.05 : 0.25 * Math.sin(Math.PI * swing);
+    (R as any)._pitch = 0.1;
+    (L as any)._stance = planted; (R as any)._stance = true;
+    // 착지 순간 발소리/먼지
+    this.footEvents.length = 0;
+    if (planted && !a.planted) {
+      a.planted = true;
+      this.footEvents.push({ side: 'L', kind: 'plant', x: L.x, z: L.z, strength: clamp(0.35 + def.lunge.distance * 0.45, 0.3, 0.8) });
+    }
+    this.footWasStance.L = true; this.footWasStance.R = true;
+    this.footPosFrozen.L.copy(L); this.footPosFrozen.R.copy(R);
+    this.restBlend = 0; // 공격이 끝나면 frozen 자세에서 기본 자세로 부드럽게 복귀
+    a.crouch = smooth(ls - 0.05, le, t) * (1 - rec);
+  }
+
   private legs(hipsY: number) {
     const r = this.rig;
     const g = this.ids;
@@ -275,10 +327,14 @@ export class GladiatorAnimator {
     const guarding = v.guardHeld || v.mode === 'attack';
     const wide = guarding ? 0.03 : 0.0;
     // 보행 위상 갱신 및 발 목표
-    this.computeFeet(dt, v.moveLocal.x, v.moveLocal.z, gaitSpeed, 0, wide);
+    if (v.mode === 'attack' && v.attackId) this.attackFeet(dt, v);
+    else {
+      this.atk.active = false;
+      this.computeFeet(dt, v.moveLocal.x, v.moveLocal.z, gaitSpeed, 0, wide);
+    }
     const bobA = 0.018 + 0.011 * gaitSpeed;
     const bob = gaitSpeed > 0.12 ? bobA * (1 - Math.cos(this.phase * Math.PI * 4)) * 0.5 : 0;
-    hipsY = 0.98 - tall - 0.02 * (guarding ? 1 : 0) - bob + breath * 0.003;
+    hipsY = 0.98 - tall - 0.02 * (guarding ? 1 : 0) - bob + breath * 0.003 - (v.mode === 'attack' ? 0.055 * this.atk.crouch : 0);
     // 지지 발이 지면 위 높이를 유지하도록 골반 높이 보정 없이 IK 가 처리
     let leanF = 0.045 + 0.016 * Math.min(gaitSpeed, 6);
     let twist = 0;
