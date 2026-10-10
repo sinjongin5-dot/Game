@@ -11,6 +11,7 @@ export class DebugDraw {
   private capsule: THREE.Mesh;
   private blade: THREE.Line;
   private playerCap: THREE.Mesh;
+  private ringMesh: THREE.Mesh;
   private sphGeo = new THREE.SphereGeometry(1, 12, 8);
 
   constructor() {
@@ -25,6 +26,10 @@ export class DebugDraw {
     this.capsule = new THREE.Mesh(new THREE.CapsuleGeometry(1, 1, 4, 10), mk(0xff3344));
     this.capsule.visible = false;
     this.group.add(this.capsule);
+    this.ringMesh = new THREE.Mesh(new THREE.TorusGeometry(1, 0.04, 6, 48), mk(0xff3344));
+    this.ringMesh.rotation.x = Math.PI / 2;
+    this.ringMesh.visible = false;
+    this.group.add(this.ringMesh);
     this.playerCap = new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.84, 4, 10), mk(0x44aaff));
     this.group.add(this.playerCap);
     const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, 1)]);
@@ -49,8 +54,14 @@ export class DebugDraw {
     const act = vol && attackIsActive(sim.lion);
     const sp = this.spheres[5];
     this.capsule.visible = false;
+    this.ringMesh.visible = false;
     sp.visible = false;
-    if (vol && vol.kind === 'sphere') {
+    if (vol && vol.kind === 'ring') {
+      this.ringMesh.visible = true;
+      this.ringMesh.position.set(vol.c.x, 0.1, vol.c.z);
+      this.ringMesh.scale.set(vol.r, vol.r, 1);
+      (this.ringMesh.material as THREE.MeshBasicMaterial).color.setHex(act ? 0xff2222 : 0x884444);
+    } else if (vol && vol.kind === 'sphere') {
       sp.visible = true;
       sp.position.set(vol.c.x, vol.c.y, vol.c.z);
       sp.scale.setScalar(vol.r);

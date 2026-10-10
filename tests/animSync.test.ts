@@ -35,7 +35,7 @@ describe('애니메이션과 판정의 동기화 (같은 궤적 데이터를 IK 
   it('사자 앞발/머리: 그려지는 위치가 판정 경로와 일치한다 (활성 구간)', () => {
     const rows: string[] = [];
     let worst = 0;
-    for (const id of ['swipe', 'bite', 'rear', 'pounceSwat', 'swipeBite'] as LionAttackId[]) {
+    for (const id of ['swipe', 'bite', 'rear', 'pounceSwat', 'swipeBite', 'dashBite'] as LionAttackId[]) {
       const def = LION_ATTACKS[id];
       const anim = new LionAnimator();
       let maxErr = 0;
@@ -59,5 +59,31 @@ describe('애니메이션과 판정의 동기화 (같은 궤적 데이터를 IK 
     // eslint-disable-next-line no-console
     console.log(rows.join('\n'));
     expect(worst).toBeLessThan(0.2);
+  });
+
+  it('연타 할퀴기: 타마다 번갈아 휘두르는 앞발이 판정 경로와 일치한다', () => {
+    const def = LION_ATTACKS.flurry;
+    const rows: string[] = [];
+    for (const mirror of [false, true]) {
+      const anim = new LionAnimator();
+      let maxErr = 0;
+      def.windows!.forEach(([ws, we], idx) => {
+        for (let t = ws; t <= we; t += 0.01) {
+          const v: LionView = {
+            mode: 'attack', modeT: t, attackId: 'flurry', attackT: t, mirror, speed: 0, moveLocal: { x: 0, z: 0 }, turnRate: 0, y: 0, lookYaw: 0, flinch: 0,
+            flinchDirLocal: { x: 0, z: -1 }, landed: 0, deadT: 0, time: 1, phase: 1, chargeBraking: false, chargeSpeed: 0, hpFrac: 1,
+          };
+          for (let k = 0; k < 2; k++) anim.update(1 / 60, v);
+          const want = sampleLionPath(def, t, mirror);
+          const rightPaw = (idx % 2 === 0) !== mirror;
+          const toe = anim.rig.worldP[anim.rig.id(rightPaw ? 'toe_R' : 'toe_L')];
+          maxErr = Math.max(maxErr, toe.distanceTo(new THREE.Vector3(want.x, want.y, want.z)));
+        }
+      });
+      rows.push(`flurry mirror=${mirror}: 최대 오차 ${(maxErr * 100).toFixed(1)}cm`);
+      expect(maxErr).toBeLessThan(0.2);
+    }
+    // eslint-disable-next-line no-console
+    console.log(rows.join('\n'));
   });
 });

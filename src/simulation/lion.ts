@@ -14,7 +14,7 @@ export function createLion(): LionState {
     pos: { x: ARENA.lionStart.x, z: ARENA.lionStart.z }, y: 0, yaw: Math.PI, vel: v2(), speed: 0,
     hp: L.hp, hpMax: L.hp, poise: 0, poiseDelay: 0, staggerImmune: 0, phase: 1, pendingPhase2: false, invuln: false,
     mode: 'idle', modeT: 0, modeDur: 1, attack: null, attackSerial: 0, circleDir: 1, circleT: 0, approachRange: 2.6,
-    cooldown: { swipe: 0, bite: 0, pounce: 2, charge: 4, rear: 0 }, history: [], behindT: 0, sinceAttack: 0, postDelay: 0,
+    cooldown: { swipe: 0, bite: 0, pounce: 2, charge: 4, rear: 0, flurry: 3, dashBite: 2.5, backHop: 5, quake: 6, whirl: 3 }, history: [], behindT: 0, sinceAttack: 0, postDelay: 0,
     flinch: 0, flinchDir: v2(), turnRate: 0, lookYaw: 0, deadT: 0, roarT: 0, landed: 0, thinkT: 0.6,
   };
 }
@@ -35,25 +35,43 @@ export function phaseTimeScale(l: LionState): number {
   return l.phase === 2 ? 0.9 : 1;
 }
 
-export function attackIsActive(l: LionState): boolean {
+/** 현재 유효 구간 번호. 연타 공격은 여러 구간을 가진다. 유효하지 않으면 -1 */
+export function activeWindowIndex(l: LionState): number {
   const a = l.attack;
-  if (!a) return false;
+  if (!a) return -1;
   const def = LION_ATTACKS[a.id];
-  if (def.id === 'charge') return a.t >= def.activeStart && l.speed > 4.5 && !a.braking;
-  return a.t >= def.activeStart && a.t <= def.activeEnd;
+  if (def.kind === 'none') return -1;
+  if (def.windows) return def.windows.findIndex(([s, e]) => a.t >= s && a.t <= e);
+  if (def.id === 'charge') return a.t >= def.activeStart && l.speed > 4.5 && !a.braking ? 0 : -1;
+  return a.t >= def.activeStart && a.t <= def.activeEnd ? 0 : -1;
 }
 
+export function attackIsActive(l: LionState): boolean {
+  return activeWindowIndex(l) >= 0;
+}
+
+export type LionVolume =
+  | { kind: 'sphere'; c: V3; r: number }
+  | { kind: 'capsule'; a: V3; b: V3; r: number }
+  | { kind: 'ring'; c: V3; r: number; w: number };
+
 /** 현재 공격의 판정 볼륨 (월드 좌표) */
-export function lionAttackVolume(l: LionState): { kind: 'sphere'; c: V3; r: number } | { kind: 'capsule'; a: V3; b: V3; r: number } | null {
+export function lionAttackVolume(l: LionState): LionVolume | null {
   const a = l.attack;
   if (!a) return null;
   const def = LION_ATTACKS[a.id];
+  if (def.kind === 'none') return null;
+  if (def.kind === 'ring' && def.ring) {
+    const u = clamp((a.t - def.activeStart) / (def.activeEnd - def.activeStart), 0, 1);
+    return { kind: 'ring', c: { x: l.pos.x, y: 0, z: l.pos.z }, r: def.ring.r0 + (def.ring.r1 - def.ring.r0) * u, w: def.ring.width };
+  }
   if (def.kind === 'body') {
+    const cap = def.bodyCap ?? { z0: -0.6, z1: 0.8, r: def.radius };
     return {
       kind: 'capsule',
-      a: lionLocalToWorld(l, { x: 0, y: 0.95, z: -0.6 }),
-      b: lionLocalToWorld(l, { x: 0, y: 0.95, z: 0.8 }),
-      r: def.radius,
+      a: lionLocalToWorld(l, { x: 0, y: 0.95, z: cap.z0 }),
+      b: lionLocalToWorld(l, { x: 0, y: 0.95, z: cap.z1 }),
+      r: cap.r,
     };
   }
   const p = sampleLionPath(def, a.t, a.mirror);
@@ -83,28 +101,40 @@ function bearingAbs(ctx: SimContext): number {
   return Math.abs(angleDiff(toP, ctx.lion.yaw));
 }
 
+const PICKABLE: LionAttackId[] = ['swipe', 'bite', 'pounce', 'charge', 'flurry', 'dashBite', 'backHop', 'quake', 'whirl'];
+const BASE_WEIGHT: Record<string, number> = { swipe: 3.0, bite: 2.2, pounce: 2.4, charge: 2.0, flurry: 2.2, dashBite: 2.4, backHop: 1.8, quake: 1.4, whirl: 1.2 };
+
 function pickAttack(ctx: SimContext): LionAttackId | null {
   const l = ctx.lion;
   const d = dist2(ctx.player.pos, l.pos);
   const bearing = bearingAbs(ctx);
   const cands: { id: LionAttackId; w: number }[] = [];
-  const base: Record<string, number> = { swipe: 3.0, bite: 2.2, pounce: 2.6, charge: 2.0 };
-  for (const id of ['swipe', 'bite', 'pounce', 'charge'] as LionAttackId[]) {
+  const p2 = l.phase === 2;
+  for (const id of PICKABLE) {
     const def = LION_ATTACKS[id];
     if (l.cooldown[id] > 0) continue;
     if (d < def.range[0] || d > def.range[1]) continue;
     if (bearing > def.bearingMax) continue;
-    let w = base[id];
+    let w = BASE_WEIGHT[id];
     if (id === 'charge' && d < 8.5 && ctx.rng.next() < 0.5) continue;
     const last = l.history[l.history.length - 1];
     const prev = l.history[l.history.length - 2];
     if (last === id) w *= 0.15;
     else if (prev === id) w *= 0.6;
     if (last === id && prev === id) w = 0;
-    if (l.phase === 2 && (id === 'swipe' || id === 'pounce')) w *= 1.25;
-    // 근접할수록 앞발/물기 선호, 중거리일수록 도약
+    if (p2 && (id === 'swipe' || id === 'pounce')) w *= 1.25;
+    // 같은 계열(할퀴기/물기)이 연속되지 않게 다른 패턴에 가중
+    if (last && last !== id && ((last === 'swipe' || last === 'flurry') && (id === 'swipe' || id === 'flurry'))) w *= 0.5;
+    if (last && ((last === 'bite' || last === 'dashBite') && (id === 'bite' || id === 'dashBite'))) w *= 0.5;
+    // 근접할수록 앞발/물기 선호, 중거리일수록 도약/돌진 물기
     if (id === 'swipe' && d < 2.3) w *= 1.3;
     if (id === 'bite' && d < 1.9) w *= 1.3;
+    if (id === 'whirl') w *= d < 2.1 ? 2.2 : 0.7;
+    if (id === 'whirl' && bearing > 1.6) w *= 1.8; // 등 뒤에 선 상대를 쓸어낸다
+    if (id === 'quake') { w *= p2 ? 1.8 : l.hp < l.hpMax * 0.85 ? 0.8 : 0.25; if (d > 4.5) w *= 0.6; }
+    if (id === 'flurry') w *= p2 ? 1.5 : 0.8;
+    if (id === 'backHop') w *= p2 ? 1.5 : 0.8;
+    if (id === 'dashBite' && d > 5.5) w *= 1.2;
     if (w > 0) cands.push({ id, w });
   }
   if (!cands.length) return null;
@@ -117,7 +147,7 @@ function pickAttack(ctx: SimContext): LionAttackId | null {
   return cands[cands.length - 1].id;
 }
 
-export function startLionAttack(ctx: SimContext, id: LionAttackId, chained = false) {
+export function startLionAttack(ctx: SimContext, id: LionAttackId, chained = false, startT = 0) {
   const l = ctx.lion;
   const def = LION_ATTACKS[id];
   l.attackSerial++;
@@ -129,8 +159,12 @@ export function startLionAttack(ctx: SimContext, id: LionAttackId, chained = fal
     if (id === 'swipe' && ctx.rng.next() < 0.5) combo = 'swipeBite';
     if (id === 'pounce' && ctx.rng.next() < 0.55) combo = 'pounceSwat';
   }
+  if (id === 'backHop') combo = 'pounce';
+  // 전조 정지(페인트): 박자를 읽고 구르면 빗나가게 만든다. 가끔만, 2페이즈에서 더 자주.
+  const holdable = id === 'swipe' || id === 'bite' || id === 'dashBite' || id === 'flurry';
+  const hold = holdable && ctx.rng.next() < (phase2 ? 0.45 : 0.22) ? 0.28 + ctx.rng.next() * 0.34 : 0;
   l.attack = {
-    id, t: 0, serial: l.attackSerial,
+    id, t: startT, serial: l.attackSerial, win: -1, hold, slammed: false, lungeWin: -1,
     mirror: rel > 0, // 플레이어가 왼쪽(+)에 있으면 왼발
     hitDone: false, dodged: false, lockDir: toP, lockDist: 0, lunge: 0, leapFrom: null, leapTo: null,
     chargeDist: 0, chargeMax: 0, chargeSpeed: 0, wallHit: false, combo, prevVol: null, phase: 'windup', braking: false, blockedBy: false, fired: false, wasActive: false,
@@ -153,7 +187,9 @@ function endAttack(ctx: SimContext) {
   l.cooldown[a.id] = def.cooldown * (l.phase === 2 ? 0.8 : 1);
   l.attack = null;
   l.y = 0;
-  setLionMode(l, 'recover', l.phase === 2 ? 0.2 + ctx.rng.next() * 0.2 : 0.35 + ctx.rng.next() * 0.3);
+  // 큰 기술은 끝난 뒤 빈틈이 길다 (반격 기회)
+  const extra = a.id === 'quake' ? 0.55 : a.id === 'whirl' ? 0.5 : a.id === 'dashBite' ? 0.35 : a.id === 'flurry' ? 0.3 : 0;
+  setLionMode(l, 'recover', (l.phase === 2 ? 0.2 + ctx.rng.next() * 0.2 : 0.35 + ctx.rng.next() * 0.3) + extra);
 }
 
 function beginPhase2(ctx: SimContext) {
@@ -412,14 +448,15 @@ function updateAttack(ctx: SimContext, dt: number) {
   const def = LION_ATTACKS[a.id];
   const ts = phaseTimeScale(l);
   // 2페이즈는 준비 동작 단축: 시간 진행을 가속 (windup 구간만)
-  const adv = a.t < def.windup ? dt / ts : dt;
+  let adv = a.t < def.windup ? dt / ts : dt;
+  if (a.hold > 0 && a.t >= def.windup - 0.14 && a.t < def.windup) { a.hold -= dt; adv = 0; }
   a.t += adv;
   const t = a.t;
   const p = ctx.player;
   const toP = lionTrackedDir(ctx);
   const dP = dist2(p.pos, l.pos);
 
-  if (!a.fired && def.kind !== 'body' && t >= def.activeStart - 0.05) {
+  if (!a.fired && def.kind !== 'body' && def.kind !== 'ring' && def.kind !== 'none' && t >= def.activeStart - 0.05) {
     a.fired = true;
     ctx.events.push({ type: 'lionAttack', attack: a.id });
   }
@@ -465,6 +502,79 @@ function updateAttack(ctx: SimContext, dt: number) {
       l.speed = sp;
       if (sp > 0) applyMove(ctx, sp, dt);
       else l.vel = v2();
+      break;
+    }
+    case 'flurry': {
+      // 구간마다 짧게 앞으로 파고들며 다시 조준한다 (마지막 타는 더 깊게)
+      const wins = def.windows!;
+      const idx = wins.findIndex(([ws, we]) => t >= ws - 0.2 && t <= we);
+      let sp = 0;
+      if (idx >= 0) {
+        if (a.lungeWin !== idx) { a.lungeWin = idx; a.lunge = clamp(dP - 1.35, 0, idx === 2 ? 1.0 : 0.65); }
+        const ws = wins[idx][0] - 0.2, we = wins[idx][1];
+        sp = a.lunge / (we - ws);
+      }
+      // 타격 사이에 플레이어를 다시 향한다
+      if (idx < 0 && t > wins[0][1] && t < wins[2][0] - 0.2) turnToward(l, yawOf(toP), 3.2, dt);
+      l.speed = sp;
+      if (sp > 0) applyMove(ctx, sp, dt); else l.vel = v2();
+      break;
+    }
+    case 'dashBite': {
+      if (a.lunge === 0 && t >= def.trackUntil) a.lunge = clamp(dP - 1.15, 1.6, 5.4);
+      const w0 = 0.5, w1 = def.activeEnd - 0.02;
+      let sp = 0;
+      if (a.lunge > 0 && t >= w0 && t <= w1) sp = a.lunge / (w1 - w0);
+      else if (t < w0) sp = 0;
+      l.speed = sp;
+      if (sp > 0) applyMove(ctx, sp, dt); else l.vel = v2();
+      break;
+    }
+    case 'backHop': {
+      const H0 = 0.08, H1 = 0.6;
+      turnToward(l, yawOf(toP), 3.4, dt);
+      if (t >= H0 && t <= H1) {
+        if (!a.leapFrom) {
+          a.leapFrom = { ...l.pos };
+          const away = norm2({ x: l.pos.x - p.pos.x, z: l.pos.z - p.pos.z });
+          let dist = 3.6;
+          // 벽/기둥에 막히지 않게 도착 지점이 경기장 안쪽이 되도록 줄인다
+          while (dist > 1.2 && (wallDistance({ x: l.pos.x + away.x * dist, z: l.pos.z + away.z * dist }) < 1.8
+            || ARENA.pillars.some((c) => Math.hypot(c.x - (l.pos.x + away.x * dist), c.z - (l.pos.z + away.z * dist)) < c.r + 1.4))) dist -= 0.4;
+          a.leapTo = { x: l.pos.x + away.x * dist, z: l.pos.z + away.z * dist };
+          a.lockDir = away;
+          ctx.events.push({ type: 'lionHop', pos: { ...l.pos }, to: { ...a.leapTo } });
+          ctx.events.push({ type: 'lionAttack', attack: 'backHop' });
+        }
+        const u = (t - H0) / (H1 - H0);
+        l.y = 0.75 * 4 * u * (1 - u);
+        const sp = Math.hypot(a.leapTo!.x - a.leapFrom.x, a.leapTo!.z - a.leapFrom.z) / (H1 - H0);
+        applyMove(ctx, sp, dt, yawOf(a.lockDir));
+      } else {
+        if (t > H1 && l.y > 0) { l.y = 0; l.landed = 0.6; ctx.events.push({ type: 'lionLand', pos: { ...l.pos } }); }
+        l.speed = approach(l.speed, 0, 14 * dt);
+        if (l.speed > 0.1) applyMove(ctx, l.speed, dt); else l.vel = v2();
+      }
+      break;
+    }
+    case 'quake': {
+      l.speed = 0;
+      l.vel = v2();
+      if (!a.slammed && t >= def.activeStart) {
+        a.slammed = true;
+        ctx.events.push({ type: 'lionSlam', pos: { ...l.pos } });
+        ctx.events.push({ type: 'lionAttack', attack: 'quake' });
+      }
+      break;
+    }
+    case 'whirl': {
+      l.speed = 0;
+      l.vel = v2();
+      const sign = a.mirror ? 1 : -1;
+      const ANT = 0.5; // 반대 방향으로 몸을 감는 예비 동작(rad)
+      if (t >= 0.3 && t < def.activeStart) l.yaw -= sign * ANT * (dt / (def.activeStart - 0.3));
+      else if (t >= def.activeStart && t <= def.activeEnd) l.yaw += sign * (Math.PI * 2 + ANT) * (dt / (def.activeEnd - def.activeStart));
+      if (!a.fired && t >= def.activeStart - 0.05) { a.fired = true; ctx.events.push({ type: 'lionAttack', attack: 'whirl' }); }
       break;
     }
     case 'pounceSwat': {
@@ -553,9 +663,11 @@ function updateAttack(ctx: SimContext, dt: number) {
   }
 
   // 콤보 연계 (2페이즈)
-  if (a.combo && t >= def.activeEnd + (a.id === 'swipe' ? 0.32 : 0.55)) {
+  if (a.combo && t >= (def.comboAt ?? def.activeEnd + (a.id === 'swipe' ? 0.32 : 0.55))) {
     const next = a.combo;
-    startLionAttack(ctx, next, true);
+    l.cooldown[a.id] = def.cooldown * (l.phase === 2 ? 0.8 : 1);
+    // 뒷걸음 도약에서 이어지는 덮치기는 이미 웅크린 상태로 시작한다 (준비 구간 일부 생략)
+    startLionAttack(ctx, next, true, a.id === 'backHop' ? 0.32 : 0);
     return;
   }
   if (t >= def.duration) endAttack(ctx);

@@ -9,11 +9,11 @@ export const TUNING = {
   player: {
     hp: 100,
     stamina: 100,
-    walkSpeed: 3.0,
+    walkSpeed: 3.2,
     runSpeed: 5.6,
     guardMoveSpeed: 1.9,
-    accel: 22,
-    turnRate: 12, // rad/s (락온/이동 방향 정렬)
+    accel: 36,
+    turnRate: 15, // rad/s (락온/이동 방향 정렬)
     staminaRegen: 30, // /s
     staminaRegenDelay: 0.7,
     guardRegenMul: 0.25,

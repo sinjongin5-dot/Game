@@ -82,8 +82,10 @@ describe('약공격 연계/강공격', () => {
       expect(d.keys[d.keys.length - 1].t).toBeCloseTo(d.duration, 2);
     }
     for (const d of Object.values(LION_ATTACKS)) {
+      if (d.kind === 'none') { expect(d.comboAt).toBeDefined(); continue; }
       expect(d.activeEnd).toBeLessThanOrEqual(d.duration + 0.01);
       expect(d.windup).toBeGreaterThanOrEqual(0.4);
+      for (const [ws, we] of d.windows ?? []) { expect(ws).toBeGreaterThanOrEqual(d.activeStart - 1e-6); expect(we).toBeLessThanOrEqual(d.activeEnd + 1e-6); }
     }
   });
 });
@@ -99,6 +101,7 @@ describe('사자 AI', () => {
     const s = makeSim();
     place(s, 6);
     startLionAttack(s.ctx, 'pounce');
+    s.ctx.lion.attack!.hold = 0;
     s.ctx.lion.attack!.t = 0.0;
     const hp0 = s.player.hp;
     // 확정 시점(0.7s) 이후 옆으로 이동
@@ -115,6 +118,7 @@ describe('사자 AI', () => {
     s.lion.hp = 1;
     s.ctx.lion.mode = 'idle';
     startLionAttack(s.ctx, 'bite');
+    s.ctx.lion.attack!.hold = 0;
     s.lion.hp = 0;
     s.step();
     expect(s.lion.mode).toBe('dying');

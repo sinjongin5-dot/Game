@@ -103,13 +103,32 @@ export const PLAYER_ATTACKS: Record<PlayerAttackId, PlayerAttackDef> = {
   },
 };
 
+/**
+ * 조작감 보정: 선딜/후딜을 줄이고 돌진 거리를 늘린다. 타임라인 전체를 같은 비율로 압축하므로
+ * 애니메이션 키와 판정 구간이 계속 일치한다.
+ */
+function retime(def: PlayerAttackDef, f: number, lungeMul: number) {
+  def.duration *= f;
+  def.activeStart *= f; def.activeEnd *= f;
+  if (def.comboAt < 5) def.comboAt *= f;
+  def.cancelAt *= f;
+  def.trackUntil *= f;
+  def.swingSound *= f;
+  def.lunge = { start: def.lunge.start * f, end: def.lunge.end * f, distance: def.lunge.distance * lungeMul };
+  for (const k of def.keys) k.t *= f;
+}
+retime(PLAYER_ATTACKS.light1, 0.78, 1.45);
+retime(PLAYER_ATTACKS.light2, 0.78, 1.45);
+retime(PLAYER_ATTACKS.light3, 0.84, 1.3);
+retime(PLAYER_ATTACKS.heavy, 0.88, 1.3);
+
 export const LIGHT_CHAIN: PlayerAttackId[] = ['light1', 'light2', 'light3'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 사자 공격
 
-export type LionAttackId = 'swipe' | 'bite' | 'pounce' | 'charge' | 'rear' | 'swipeBite' | 'pounceSwat';
-export type LionHitKind = 'paw' | 'bite' | 'body';
+export type LionAttackId = 'swipe' | 'bite' | 'pounce' | 'charge' | 'rear' | 'swipeBite' | 'pounceSwat' | 'flurry' | 'dashBite' | 'backHop' | 'quake' | 'whirl';
+export type LionHitKind = 'paw' | 'bite' | 'body' | 'ring' | 'none';
 
 export interface LionVolumeKey { t: number; p: [number, number, number] }
 
@@ -139,6 +158,14 @@ export interface LionAttackDef {
   path?: LionVolumeKey[];
   /** 반격 가능 구간 (표시/AI 튜닝 용) */
   counterWindow: [number, number];
+  /** 한 번의 동작 안에 여러 번의 유효 구간(연타). 각 구간마다 한 번씩 피해를 줄 수 있다 */
+  windows?: [number, number][];
+  /** 충격파 링 판정: 시간에 따라 반경이 퍼진다 */
+  ring?: { r0: number; r1: number; width: number };
+  /** 몸통 캡슐(사자 로컬 z 범위, 반경) — body 종류의 기본값을 덮어쓴다 (꼬리 포함 회전 공격 등) */
+  bodyCap?: { z0: number; z1: number; r: number };
+  /** 이 시간이 지나면 combo 로 이어진다 (기본: 유효 구간 끝 + 0.55) */
+  comboAt?: number;
 }
 
 export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
@@ -230,6 +257,76 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
       { t: 1.0, p: [-0.22, 0.2, 0.55] },
     ],
     counterWindow: [0.6, 1.0],
+  },
+
+  // ── 패턴 다각화 ────────────────────────────────────────────────────────────
+  // 연타 할퀴기: 오른발 → 왼발 → 오른발. 첫 타 전조가 길고 이후 타는 박자가 빠르다.
+  flurry: {
+    id: 'flurry', kind: 'paw', duration: 2.5, windup: 0.7, activeStart: 0.7, activeEnd: 1.78,
+    windows: [[0.7, 0.84], [1.12, 1.26], [1.62, 1.78]],
+    trackUntil: 0.42, trackRate: 2.2, damage: 16, blockCost: 20, poiseHit: true, heavyHit: false,
+    range: [0.5, 3.1], bearingMax: 0.9, cooldown: 6.5, radius: 0.32,
+    path: [
+      { t: 0.0, p: [-0.22, 0.2, 0.55] },
+      { t: 0.4, p: [-0.3, 1.1, 0.85] },
+      { t: 0.62, p: [-0.3, 1.38, 0.92] },
+      { t: 0.7, p: [-0.28, 1.4, 0.95] },
+      { t: 0.77, p: [-0.05, 1.0, 1.45] },
+      { t: 0.84, p: [0.28, 0.6, 1.35] },
+      { t: 0.95, p: [0.24, 0.55, 1.0] },
+      { t: 1.02, p: [0.3, 1.1, 0.85] },
+      { t: 1.07, p: [0.3, 1.38, 0.92] },
+      { t: 1.12, p: [0.28, 1.4, 0.95] },
+      { t: 1.19, p: [0.05, 1.0, 1.45] },
+      { t: 1.26, p: [-0.28, 0.6, 1.35] },
+      { t: 1.4, p: [-0.24, 0.5, 1.0] },
+      { t: 1.52, p: [-0.3, 1.2, 0.9] },
+      { t: 1.6, p: [-0.3, 1.42, 0.94] },
+      { t: 1.62, p: [-0.28, 1.45, 0.95] },
+      { t: 1.7, p: [0.0, 0.95, 1.5] },
+      { t: 1.78, p: [0.3, 0.55, 1.4] },
+      { t: 2.0, p: [0.1, 0.35, 1.0] },
+      { t: 2.5, p: [-0.22, 0.2, 0.55] },
+    ],
+    counterWindow: [1.9, 2.4],
+  },
+  // 돌진 물기: 몸을 낮췄다가 한 번에 파고들어 문다. 중거리에서 거리를 확 줄인다.
+  dashBite: {
+    id: 'dashBite', kind: 'bite', duration: 1.75, windup: 0.78, activeStart: 0.78, activeEnd: 0.98,
+    trackUntil: 0.5, trackRate: 2.4, damage: 30, blockCost: 34, poiseHit: true, heavyHit: false,
+    range: [3.2, 7.5], bearingMax: 0.45, cooldown: 7.0, radius: 0.34,
+    path: [
+      { t: 0.0, p: [0, 1.1, 1.4] },
+      { t: 0.45, p: [0, 0.85, 1.3] },
+      { t: 0.7, p: [0, 0.82, 1.3] },
+      { t: 0.78, p: [0, 0.92, 1.46] },
+      { t: 0.88, p: [0, 0.98, 1.54] },
+      { t: 0.98, p: [0, 0.98, 1.52] },
+      { t: 1.25, p: [0, 1.05, 1.46] },
+      { t: 1.75, p: [0, 1.15, 1.4] },
+    ],
+    counterWindow: [1.2, 1.7],
+  },
+  // 뒷걸음 도약: 뒤로 크게 물러났다가(거리 벌림) 곧바로 도약 덮치기로 이어진다.
+  backHop: {
+    id: 'backHop', kind: 'none', duration: 0.7, windup: 0.7, activeStart: 99, activeEnd: 99,
+    trackUntil: 0.7, trackRate: 3.0, damage: 0, blockCost: 0, poiseHit: false, heavyHit: false,
+    range: [2.2, 5.5], bearingMax: 0.9, cooldown: 8.0, radius: 0,
+    counterWindow: [0, 0], comboAt: 0.62,
+  },
+  // 충격파 강타: 뒷다리로 일어서서 땅을 내리찍으면 바닥을 따라 링이 퍼진다. 방어/회피, 또는 멀리서 피한다.
+  quake: {
+    id: 'quake', kind: 'ring', duration: 2.4, windup: 1.0, activeStart: 1.0, activeEnd: 1.7,
+    trackUntil: 0.55, trackRate: 2.0, damage: 28, blockCost: 50, poiseHit: true, heavyHit: true,
+    range: [0.0, 6.5], bearingMax: Math.PI, cooldown: 9.0, radius: 0,
+    ring: { r0: 0.9, r1: 8.2, width: 1.15 }, counterWindow: [1.8, 2.3],
+  },
+  // 회전 꼬리치기: 제자리에서 한 바퀴 몸을 돌려 주변을 전부 쓸어낸다. 붙어 있거나 등 뒤에 선 상대를 벌한다.
+  whirl: {
+    id: 'whirl', kind: 'body', duration: 2.0, windup: 0.85, activeStart: 0.85, activeEnd: 1.4,
+    trackUntil: 0.3, trackRate: 1.6, damage: 24, blockCost: 40, poiseHit: true, heavyHit: true,
+    range: [0.4, 3.0], bearingMax: Math.PI, cooldown: 8.0, radius: 0.5,
+    bodyCap: { z0: -1.9, z1: 1.0, r: 0.5 }, counterWindow: [1.6, 1.95],
   },
 };
 

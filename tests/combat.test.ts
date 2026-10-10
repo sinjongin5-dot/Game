@@ -134,6 +134,7 @@ describe('사자 → 플레이어 공격', () => {
     const s = makeSim();
     place(s, 2.2);
     startLionAttack(s.ctx, 'swipe');
+    s.ctx.lion.attack!.hold = 0;
     const hp0 = s.player.hp;
     run(s, 1.6);
     expect(hp0 - s.player.hp).toBe(LION_ATTACKS.swipe.damage);
@@ -145,6 +146,7 @@ describe('사자 → 플레이어 공격', () => {
     const inside = makeSim();
     place(inside, 1.6);
     startLionAttack(inside.ctx, 'bite');
+    inside.ctx.lion.attack!.hold = 0;
     // 공격이 유효해지는 순간에 회피 무적 구간(0.1~0.34s) 안에 있도록 맞춘다
     inside.ctx.lion.attack!.t = 0.6;
     setMode(inside.player, 'dodge');
@@ -166,6 +168,7 @@ describe('사자 → 플레이어 공격', () => {
     const outside = makeSim();
     place(outside, 1.6);
     startLionAttack(outside.ctx, 'bite');
+    outside.ctx.lion.attack!.hold = 0;
     outside.ctx.lion.attack!.t = 0.6;
     setMode(outside.player, 'dodge');
     outside.player.dodge = { dir: { x: 0, z: 0 }, backstep: true, dodgedSet: 0 };
@@ -177,6 +180,7 @@ describe('사자 → 플레이어 공격', () => {
     const front = makeSim();
     place(front, 2.2);
     startLionAttack(front.ctx, 'swipe');
+    front.ctx.lion.attack!.hold = 0;
     const hp0 = front.player.hp, st0 = front.player.stamina;
     run(front, 1.7, input({ guard: true }));
     expect(front.player.hp).toBe(hp0);
@@ -188,6 +192,7 @@ describe('사자 → 플레이어 공격', () => {
     back.player.yaw = Math.PI; // 사자를 등지고 있다
     back.physics.teleport('player', back.player.pos, Math.PI);
     startLionAttack(back.ctx, 'swipe');
+    back.ctx.lion.attack!.hold = 0;
     run(back, 1.7, input({ guard: true, cameraYaw: Math.PI }));
     expect(back.player.hp).toBeLessThan(100);
   });
@@ -198,6 +203,7 @@ describe('사자 → 플레이어 공격', () => {
     s.player.stamina = 5;
     s.player.staminaDelay = 5;
     startLionAttack(s.ctx, 'swipe');
+    s.ctx.lion.attack!.hold = 0;
     run(s, 1.2, input({ guard: true }));
     const ev = s.drainEvents();
     expect(ev.some((e) => e.type === 'playerBlocked' && e.broke)).toBe(true);
@@ -209,6 +215,7 @@ describe('사자 → 플레이어 공격', () => {
     place(s, 2.2);
     s.player.hp = 5;
     startLionAttack(s.ctx, 'swipe');
+    s.ctx.lion.attack!.hold = 0;
     run(s, 1.2);
     expect(s.player.mode).toBe('dead');
     expect(s.lion.attack).toBeNull();
@@ -240,6 +247,7 @@ describe('회복', () => {
     s.player.hp = 60;
     s.step(input({ pressed: { heal: true } }));
     startLionAttack(s.ctx, 'swipe');
+    s.ctx.lion.attack!.hold = 0;
     s.ctx.lion.attack!.t = 0.7;
     run(s, 0.6);
     expect(s.player.heals).toBe(1);

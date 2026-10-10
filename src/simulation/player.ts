@@ -68,9 +68,31 @@ function inputDir(input: InputFrame): V2 {
   return { x: (x / l) * m, z: (z / l) * m };
 }
 
-function startAttack(ctx: SimContext, p: PlayerState, id: PlayerAttackId, chain: number): boolean {
+/**
+ * 공격 시작 시 방향 보정(자동 조준). 락온 중이거나 사자가 가까이 있고 입력 방향이 크게 다르지 않으면
+ * 사자를 향해 몸을 즉시 돌린다 — 조금 빗나간 입력으로 허공을 가르는 일을 줄인다.
+ */
+function aimAssist(ctx: SimContext, p: PlayerState, input: InputFrame) {
+  const lion = ctx.lion;
+  if (lion.mode === 'dying' || lion.mode === 'dead') return;
+  const d = dist2(p.pos, lion.pos);
+  if (d > 6.5) return;
+  const toLion = yawOf(norm2({ x: lion.pos.x - p.pos.x, z: lion.pos.z - p.pos.z }));
+  const wish = inputDir(input);
+  if (p.lockOn) { p.yaw = toLion; return; }
+  if (len2(wish) > 0.2) {
+    // 입력 방향이 사자 쪽(±80°)이면 사자 방향으로, 아니면 입력 방향으로
+    const wy = yawOf(wish);
+    p.yaw = Math.abs(wrapAngle(wy - toLion)) < 1.4 ? toLion : wy;
+    return;
+  }
+  if (Math.abs(wrapAngle(p.yaw - toLion)) < 1.5) p.yaw = toLion;
+}
+
+function startAttack(ctx: SimContext, p: PlayerState, id: PlayerAttackId, chain: number, input?: InputFrame): boolean {
   const def = PLAYER_ATTACKS[id];
   if (!spend(ctx, p, def.cost)) return false;
+  if (input) aimAssist(ctx, p, input);
   p.mode = 'attack';
   p.modeT = 0;
   p.attackId = id;
@@ -176,12 +198,12 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       const a = p.buffer.action;
       if (a === 'dodge' && startDodge(ctx, p, input)) break;
       if (a === 'heal') { if (!startHeal(ctx, p)) p.buffer.action = null; else break; }
-      if (a === 'heavy' && startAttack(ctx, p, 'heavy', 0)) break;
+      if (a === 'heavy' && startAttack(ctx, p, 'heavy', 0, input)) break;
       if (a === 'light') {
         // 직전 공격 직후 짧은 시간 안이면 연계 이어감 (마지막 타 이후엔 처음부터)
         const chainContinue = ctx.time - p.lastAttackEnd < 0.0;
         void chainContinue;
-        if (startAttack(ctx, p, 'light1', 0)) break;
+        if (startAttack(ctx, p, 'light1', 0, input)) break;
         p.buffer.action = null;
       }
       // 이동
@@ -196,7 +218,7 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
         if (p.stamina <= 0) { p.exhausted = true; p.staminaDelay = 1.0; }
       }
       const target = { x: wish.x * maxSpeed, z: wish.z * maxSpeed };
-      const acc = T.accel * dt * (len2(wish) > 0.05 ? 1 : 1.6);
+      const acc = T.accel * dt * (len2(wish) > 0.05 ? 1 : 2.0);
       p.vel = { x: approach(p.vel.x, target.x, acc), z: approach(p.vel.z, target.z, acc) };
       delta = { x: (p.vel.x + p.knock.x) * dt, z: (p.vel.z + p.knock.z) * dt };
       // 방향
@@ -211,7 +233,7 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       // 추적 회전
       if (t < def.trackUntil) {
         const desired = p.lockOn ? toLionYaw : len2(wish) > 0.1 ? yawOf(wish) : (dist2(p.pos, lion.pos) < 5 ? toLionYaw : p.yaw);
-        p.yaw = approachAngle(p.yaw, desired, 7 * dt);
+        p.yaw = approachAngle(p.yaw, desired, 12 * dt);
       }
       // 돌진 이동 (루트 모션)
       const f = forward(p.yaw);
@@ -231,8 +253,15 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       if (p.buffer.action === 'light' && def.next && t >= def.comboAt - T.inputBuffer) {
         if (t >= def.comboAt) {
           p.lastAttackEnd = ctx.time;
-          if (startAttack(ctx, p, def.next, p.attackChain + 1)) break;
+          if (startAttack(ctx, p, def.next, p.attackChain + 1, input)) break;
         }
+      }
+      // 후딜 이동 취소: 유효 구간이 끝난 뒤 이동 입력을 하면 바로 걸어 나간다 (끈적임 방지)
+      if (t >= Math.max(def.activeEnd + 0.1, def.cancelAt - 0.08) && len2(wish) > 0.5 && !p.buffer.action) {
+        p.lastAttackEnd = ctx.time;
+        p.attackId = null;
+        setMode(p, 'free');
+        break;
       }
       // 취소 (회피)
       if (t >= def.cancelAt) {
@@ -258,8 +287,8 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       delta = { x: p.dodge.dir.x * step + p.knock.x * dt, z: p.dodge.dir.z * step + p.knock.z * dt };
       p.vel = { x: delta.x / dt, z: delta.z / dt };
       if (t >= dd.cancelAt) {
-        if (p.buffer.action === 'light' && startAttack(ctx, p, 'light1', 0)) break;
-        if (p.buffer.action === 'heavy' && startAttack(ctx, p, 'heavy', 0)) break;
+        if (p.buffer.action === 'light' && startAttack(ctx, p, 'light1', 0, input)) break;
+        if (p.buffer.action === 'heavy' && startAttack(ctx, p, 'heavy', 0, input)) break;
       }
       if (t >= dd.duration) setMode(p, 'free');
       break;

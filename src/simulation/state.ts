@@ -83,6 +83,12 @@ export interface LionAttackState {
   blockedBy: boolean;
   fired: boolean;
   wasActive: boolean;
+  /** 현재 유효 구간 번호(연타 공격), 없으면 -1 */
+  win: number;
+  /** 전조 정지(페인트) 남은 시간 */
+  hold: number;
+  slammed: boolean;
+  lungeWin: number;
 }
 
 export interface LionState {
@@ -139,6 +145,8 @@ export type SimEvent =
   | { type: 'lionAttack'; attack: LionAttackId }
   | { type: 'lionRoar'; phase2: boolean }
   | { type: 'lionLand'; pos: V2 }
+  | { type: 'lionSlam'; pos: V2 }
+  | { type: 'lionHop'; pos: V2; to: V2 }
   | { type: 'lionWallHit'; pos: V2 }
   | { type: 'lionStagger' }
   | { type: 'lionDeath' }

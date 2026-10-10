@@ -63,6 +63,7 @@ export class LionAnimator {
   private breath = 0;
   footEvents: LionFootEvent[] = [];
   private gaitSpeed = 0;
+  private prevSkip: { foot: FootKey; target: THREE.Vector3; age: number } | null = null;
   /** 머리 위치(월드 전 모델 공간) — 디버그/판정 비교용 */
   headPos = V();
   pawPos = V();
@@ -240,9 +241,10 @@ export class LionAnimator {
     this.rig.localQ[this.b.earR].setFromEuler(E(-0.1 + back * 0.55 - tw, -0.35 * back, 0.15 * back));
   }
 
-  private applyFeetDefault(skip?: FootKey) {
+  private applyFeetDefault(skip?: FootKey | FootKey[]) {
+    const skips = Array.isArray(skip) ? skip : skip ? [skip] : [];
     for (const k of FEET) {
-      if (k === skip) continue;
+      if (skips.includes(k)) continue;
       const f = this.feet[k];
       if (k === 'LF' || k === 'RF') this.foreLeg(k, f.p, f.pitch);
       else this.hindLeg(k, f.p, f.swing * (0.6 + 0.4 * f.pitch));
@@ -279,10 +281,13 @@ export class LionAnimator {
     let scapLift = 0;
     let airborne = false;
     let rootY = 0;
+    let front: { LF: THREE.Vector3; RF: THREE.Vector3; pitch: number; lift: number } | null = null;
+    let airReach = 1;
+    let airU = 0;
 
     // 보행/휴식 (공중이 아니면)
     const mv = v.moveLocal;
-    const inLeap = v.mode === 'attack' && v.attackId === 'pounce' && v.attackT >= 0.95 && v.attackT < 1.5;
+    const inLeap = v.mode === 'attack' && ((v.attackId === 'pounce' && v.attackT >= 0.95 && v.attackT < 1.5) || (v.attackId === 'backHop' && v.attackT >= 0.08 && v.attackT < 0.6));
     if (!inLeap) this.gait(dt, mv.x, mv.z, v.speed, v.turnRate);
     else this.footEvents.length = 0;
     const spd = this.gaitSpeed;
@@ -362,6 +367,9 @@ export class LionAnimator {
         scapLift = res.scapLift;
         airborne = res.airborne;
         rootY = res.rootY;
+        front = res.front;
+        airReach = res.airReach;
+        airU = res.airU;
         if (res.tailRaise) tail.raise = res.tailRaise;
         this.maneShake = res.mane;
         if (res.headTarget) { this.headIK(res.headTarget, res.headBlend); }
@@ -391,14 +399,31 @@ export class LionAnimator {
     r.fk();
     // 다리
     if (airborne) {
-      this.airLegs(v);
+      this.airLegs(airU, airReach);
+    } else if (front) {
+      this.applyFeetDefault(['LF', 'RF']);
+      this.foreLeg('LF', front.LF, front.pitch, front.lift);
+      this.foreLeg('RF', front.RF, front.pitch, front.lift);
     } else {
       this.applyFeetDefault(skipFoot ?? undefined);
+      // 앞발이 바뀌는 순간 이전 앞발이 튀지 않도록 짧게 원위치로 풀어 준다
+      if (this.prevSkip && this.prevSkip.foot !== skipFoot) {
+        const ps = this.prevSkip;
+        ps.age += dt;
+        if (ps.age < 0.16) {
+          const u = easeInOut(clamp01(ps.age / 0.16));
+          const rest = this.feet[ps.foot].p;
+          this.foreLeg(ps.foot as 'LF' | 'RF', ps.target.clone().lerp(rest, u), 0.3, 0.2 * (1 - u));
+        } else this.prevSkip = null;
+      }
       if (skipFoot && skipFootTarget) {
         const hind = skipFoot === 'LH' || skipFoot === 'RH';
         if (hind) this.hindLeg(skipFoot as 'LH' | 'RH', skipFootTarget, 0.8);
-        else this.foreLeg(skipFoot as 'LF' | 'RF', skipFootTarget, skipFootPitch, scapLift);
-      }
+        else {
+          this.foreLeg(skipFoot as 'LF' | 'RF', skipFootTarget, skipFootPitch, scapLift);
+          if (!this.prevSkip || this.prevSkip.foot === skipFoot) this.prevSkip = { foot: skipFoot, target: skipFootTarget.clone(), age: 0 };
+        }
+      } else if (this.prevSkip && this.prevSkip.age >= 0.16) this.prevSkip = null;
     }
     r.fk();
     this.headPos.copy(r.worldP[this.b.head]);
@@ -427,10 +452,8 @@ export class LionAnimator {
     r.twoBone(b.neck1, b.neck2, b.head, target.clone().lerp(r.worldP[b.head], 1 - blend), V(0, 1, 0.1));
   }
 
-  private airLegs(v: LionView) {
-    const t = v.attackT;
-    const u = clamp01((t - 0.95) / 0.55);
-    const reach = Math.sin(Math.PI * Math.min(1, u * 1.1));
+  private airLegs(u: number, reachScale = 1) {
+    const reach = Math.sin(Math.PI * Math.min(1, clamp01(u) * 1.1)) * reachScale;
     const fz = lerp(0.65, 1.1, reach), fy = lerp(0.08, 0.5, reach * 0.9);
     const hz = lerp(-0.7, -1.0, reach), hy = lerp(0.08, 0.38, reach * 0.9);
     this.foreLeg('LF', V(0.2, fy, fz), 0.4, 0.2 * reach);
@@ -448,9 +471,116 @@ export class LionAnimator {
       skipFoot: null as FootKey | null, skipTarget: null as THREE.Vector3 | null, skipPitch: 0.4, scapLift: 0,
       airborne: false, rootY: 0, drop: undefined as number | undefined, tailRaise: 0, mane: 0,
       headTarget: null as THREE.Vector3 | null, headBlend: 1,
+      front: null as null | { LF: THREE.Vector3; RF: THREE.Vector3; pitch: number; lift: number }, airReach: 1, airU: 0,
     };
     const wind = clamp01(t / def.windup);
     switch (id) {
+      case 'flurry': {
+        // 오른발 → 왼발 → 오른발. 타마다 앞발을 번갈아 휘두르고 몸통을 반대로 비튼다
+        const m = v.mirror;
+        const wins = def.windows!;
+        let idx = wins.findIndex(([, we]) => t < we + 0.12);
+        if (idx < 0) idx = wins.length - 1;
+        const sideR = (idx % 2 === 0) !== m;
+        const paw = sampleLionPath(def, t, m);
+        out.skipFoot = sideR ? 'RF' : 'LF';
+        out.skipTarget = V(paw.x + (sideR ? -0.02 : 0.02), Math.max(0.055, paw.y), paw.z);
+        out.skipPitch = 0.25;
+        const [ws, we] = wins[idx];
+        const prep = sm(Math.max(0, ws - 0.5), ws - 0.05, t);
+        const strike = sm(ws - 0.05, we, t);
+        const rec = sm(we, we + 0.2, t);
+        const lift = prep * (1 - rec * 0.8);
+        const sg = sideR ? 1 : -1;
+        const fin = sm(wins[wins.length - 1][1], def.duration, t); // 마지막 타 이후 자세 복귀
+        out.pelvisPitch = 0.06 * lift;
+        out.s1 = -0.12 * lift; out.s2 = -0.2 * lift + 0.2 * strike * (1 - rec);
+        out.n1 = 0.1 * lift - 0.1 * strike; out.n2 = 0.08 * lift; out.head = 0.1 * lift;
+        out.twist = sg * -(0.3 * prep - 0.55 * strike * (1 - rec * 0.7)) * (1 - fin);
+        out.roll = sg * -0.09 * lift;
+        out.scapLift = 0.28 * lift;
+        out.ears = 0.85;
+        out.jaw = 0.35 * prep * (1 - strike) + 0.15;
+        out.drop = 0.045 + 0.07 * lift;
+        out.mane = 0.45;
+        break;
+      }
+      case 'dashBite': {
+        const hp = sampleLionPath(def, t, false);
+        const coil = sm(0.05, 0.45, t);
+        const strike = sm(def.activeStart - 0.3, def.activeStart - 0.02, t);
+        const rec = sm(def.activeEnd + 0.05, def.duration - 0.2, t);
+        out.headTarget = V(0, hp.y + 0.1, hp.z - 0.36);
+        out.headBlend = 1;
+        // 몸을 땅에 붙이듯 낮췄다가(웅크림) 쏘아 나가며 길게 늘어난다
+        out.drop = 0.045 + 0.17 * coil * (1 - strike) + 0.02 * strike * (1 - rec);
+        out.pelvisPitch = -0.14 * coil * (1 - strike);
+        out.s1 = 0.1 * coil * (1 - strike); out.s2 = 0.12 * coil * (1 - strike) + 0.06 * strike * (1 - rec);
+        out.n1 = 0.1 * coil;
+        const open = sm(def.activeStart - 0.12, def.activeStart + 0.04, t) * (1 - sm(def.activeEnd - 0.05, def.activeEnd + 0.1, t));
+        out.jaw = 0.15 * coil + 0.7 * open;
+        out.ears = 0.95;
+        out.lookW = 0.2;
+        out.mane = 0.5;
+        out.tailRaise = 0.15 * coil;
+        break;
+      }
+      case 'backHop': {
+        const pre = sm(0.0, 0.08, t) * (1 - sm(0.08, 0.16, t));
+        const air = t >= 0.08 && t < 0.6;
+        const u = clamp01((t - 0.08) / 0.52);
+        const arc = Math.sin(Math.PI * u);
+        const land = sm(0.6, 0.66, t);
+        out.drop = 0.045 + 0.12 * pre + 0.1 * land;
+        out.pelvisPitch = air ? -0.28 * arc : 0;
+        out.s1 = 0.1 * pre + (air ? 0.12 * arc : 0);
+        out.s2 = 0.1 * pre + 0.1 * land;
+        out.n1 = (air ? 0.12 * arc : 0) + 0.15 * land; out.head = 0.1 * land;
+        out.ears = 0.9;
+        out.jaw = air ? 0.25 * arc : 0.1;
+        out.airborne = air;
+        out.airU = u; out.airReach = 0.55;
+        out.lookW = 0.8;
+        out.tailRaise = 0.3 * arc;
+        out.mane = 0.35;
+        break;
+      }
+      case 'quake': {
+        // 뒷다리로 일어서서(상승) 앞발을 높이 들었다가 땅을 찍는다
+        const k = sm(0.1, 0.88, t) * (1 - sm(0.97, 1.04, t));
+        const slam = sm(0.97, 1.05, t) * (1 - sm(1.25, 2.2, t));
+        const wob = Math.sin(t * 26) * 0.015 * k;
+        out.drop = 0.045 + 0.04 * k + 0.12 * slam;
+        out.pelvisPitch = -0.62 * k + 0.1 * slam;
+        out.s1 = -0.28 * k + wob; out.s2 = -0.3 * k + 0.22 * slam;
+        out.n1 = 0.3 * k - 0.3 * slam; out.n2 = 0.2 * k; out.head = 0.1 * k;
+        out.jaw = 0.8 * k * (1 - slam) + 0.1;
+        out.ears = 0.95;
+        out.lookW = 0.3;
+        out.mane = 0.9 * k + 0.6 * slam;
+        out.tailRaise = 0.3 * k;
+        const lx = 0.3 - 0.08 * slam;
+        const upY = 0.055 + 1.15 * k, upZ = 0.64 + 0.15 * k - 0.1 * k;
+        const dnY = 0.055, dnZ = 1.0;
+        const y = lerp(upY, dnY, slam), z = lerp(upZ, dnZ, slam);
+        out.front = { LF: V(lx, y, z), RF: V(-lx, y, z), pitch: 0.2 + 0.4 * k, lift: 0.45 * k };
+        break;
+      }
+      case 'whirl': {
+        const coil = sm(0.1, 0.8, t) * (1 - sm(0.84, 0.92, t));
+        const spin = sm(0.84, 0.92, t) * (1 - sm(1.4, 1.6, t));
+        out.drop = 0.045 + 0.14 * coil + 0.08 * spin;
+        out.pelvisPitch = -0.05 * coil;
+        out.s1 = 0.1 * coil; out.s2 = 0.12 * coil;
+        out.n1 = 0.22 * coil + 0.1 * spin; out.head = 0.1 * coil;
+        out.roll = (v.mirror ? 1 : -1) * 0.22 * spin;
+        out.jaw = 0.25 * coil + 0.6 * spin;
+        out.ears = 0.95;
+        out.lookW = 0.3;
+        out.mane = 0.9 * spin + 0.3 * coil;
+        out.tailRaise = 0.4 * coil + 0.7 * spin;
+        break;
+      }
       case 'swipe':
       case 'rear':
       case 'pounceSwat': {
@@ -516,6 +646,7 @@ export class LionAnimator {
         out.jaw = air ? 0.4 : 0.1 * crouch + 0.2 * land;
         out.lookW = air ? 0.0 : 0.8;
         out.airborne = air;
+        out.airU = leap;
         out.rootY = 0;
         out.tailRaise = 0.25 * crouch + (air ? 0.3 : 0);
         out.mane = air ? 0.5 : 0.1;

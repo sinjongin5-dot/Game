@@ -5,7 +5,7 @@ import { LION_ATTACKS, type LionAttackId } from '../src/combat/attackData';
 
 export interface BotOpts { skill: number; aggression: number }
 
-const DODGE_AT: Record<LionAttackId, number> = { swipe: 0.57, bite: 0.42, pounce: 0.8, charge: 1.55, rear: 0.65, swipeBite: 0.2, pounceSwat: 0.2 };
+const DODGE_AT: Record<LionAttackId, number> = { swipe: 0.57, bite: 0.42, pounce: 0.8, charge: 1.55, rear: 0.65, swipeBite: 0.2, pounceSwat: 0.2, flurry: 0.4, dashBite: 0.6, backHop: 9, quake: 0.9, whirl: 0.72 };
 
 /** 규칙 기반 플레이어 봇 (균형/막힘/승리 경로 검증용). 사람이 하듯 "읽고, 피하고, 반격" 한다. */
 export class Bot {
@@ -26,16 +26,18 @@ export class Bot {
     if (a && this.plan.serial !== a.serial) {
       const def = LION_ATTACKS[a.id];
       const sloppy = this.rnd() > this.opts.skill;
-      const useGuard = (a.id === 'swipe' || a.id === 'bite') && this.rnd() < 0.3 && p.stamina > 55;
+      const useGuard = ((a.id === 'swipe' || a.id === 'bite') && this.rnd() < 0.3 || a.id === 'flurry' && this.rnd() < 0.8) && p.stamina > 55;
       this.plan = { serial: a.serial, lateral: this.rnd() < 0.5 ? 1 : -1, mode: sloppy ? 'none' : useGuard ? 'guard' : 'dodge', at: DODGE_AT[a.id] + (this.rnd() - 0.3) * 0.25 * (1 - this.opts.skill + 0.2) };
       void def;
+      if (a.id === 'quake') this.plan.at = 1.0 + Math.max(0, d - 0.9) / 10.4 - 0.2 + (this.rnd() - 0.3) * 0.06; // 링이 닿는 순간에 무적 구간이 겹치도록
+      if (a.id === 'backHop') this.plan.mode = 'none';
     }
     const attackDone = !a || a.t > LION_ATTACKS[a.id].activeEnd + 0.05 || (a.id === 'charge' && a.braking);
     if (a && !attackDone && p.mode === 'free') {
       if (this.plan.mode === 'dodge' && a.t >= this.plan.at && a.t < this.plan.at + 0.12 && p.stamina >= 25) {
         inp.pressed.dodge = true;
         inp.moveX = this.plan.lateral;
-        inp.moveY = a.id === 'pounce' ? 0 : -0.3;
+        inp.moveY = a.id === 'pounce' ? 0 : a.id === 'flurry' ? -0.7 : -0.3;
       } else if (this.plan.mode === 'guard' && a.t >= 0.15) inp.guard = true;
       else if (a.id === 'charge' && a.t > 1.1) inp.moveX = this.plan.lateral;
     }

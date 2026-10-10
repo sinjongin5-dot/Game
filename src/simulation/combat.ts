@@ -1,6 +1,6 @@
 import { LION_ATTACKS, PLAYER_ATTACKS, SWORD } from '../combat/attackData';
 import type { SimContext } from './context';
-import { attackIsActive, addLionPoise, lionAttackVolume, lionHurtSpheres } from './lion';
+import { activeWindowIndex, attackIsActive, addLionPoise, lionAttackVolume, lionHurtSpheres } from './lion';
 import { angleDiff, clamp, forward, norm2, segPointDist, segSegDist2, v2, yawOf, type V3 } from './math';
 import { bladeActive, isDodgeInvulnerable, isGuardUp, playerBladeSegment, setMode } from './player';
 import { TUNING } from './tuning';
@@ -73,6 +73,12 @@ export function resolveLionAttack(ctx: SimContext) {
     if (a) a.prevVol = null;
     return;
   }
+  // 연타 공격: 새 유효 구간에 들어서면 판정 상태를 되돌려 구간마다 한 번씩 맞을 수 있게 한다
+  const win = activeWindowIndex(l);
+  if (win >= 0 && win !== a.win) {
+    if (a.win >= 0 || a.hitDone || a.dodged) { a.hitDone = false; a.dodged = false; a.blockedBy = false; a.prevVol = null; a.wasActive = false; }
+    a.win = win;
+  }
   const active = attackIsActive(l);
   if (a.wasActive && !active && !a.hitDone && !a.dodged && !a.blockedBy && ctx.time - p.lastDodgeStart < 1.0) {
     // 공격이 유효 구간을 끝낼 때까지 맞지 않았고 직전에 회피했다면 회피 성공
@@ -88,7 +94,15 @@ export function resolveLionAttack(ctx: SimContext) {
   if (!vol) return;
   const cap = playerCapsule(ctx);
   let contact: V3 | null = null;
-  if (vol.kind === 'sphere') {
+  if (vol.kind === 'ring') {
+    // 충격파: 중심에서 플레이어까지의 거리가 링 두께 안에 들어오면 명중
+    const dx = p.pos.x - vol.c.x, dz = p.pos.z - vol.c.z;
+    const d = Math.hypot(dx, dz);
+    if (Math.abs(d - vol.r) <= vol.w / 2 + cap.r) {
+      const n = d > 1e-4 ? { x: dx / d, z: dz / d } : { x: 0, z: 1 };
+      contact = { x: vol.c.x + n.x * vol.r, y: 0.6, z: vol.c.z + n.z * vol.r };
+    }
+  } else if (vol.kind === 'sphere') {
     const prev = a.prevVol ?? vol.c;
     const N = 3;
     for (let i = 1; i <= N && !contact; i++) {
