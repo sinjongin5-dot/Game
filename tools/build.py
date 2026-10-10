@@ -14,6 +14,9 @@ for src in sorted((root / 'src').glob('*.js')):
     if not pat.search(html):
         print('skip (no markers):', src.name); continue
     body = src.read_text(encoding='utf8')
+    pre = root / 'src' / (src.stem + '_pre.json')
+    if pre.exists():
+        body = re.sub(r'/\*@PRE_BEGIN\*/.*?/\*@PRE_END\*/', lambda m: '/*@PRE_BEGIN*/' + pre.read_text(encoding='utf8').strip() + '/*@PRE_END*/', body, count=1, flags=re.S)
     if not body.endswith('\n'): body += '\n'
     html = pat.sub(lambda m: m.group(1) + body + m.group(2), html, count=1)
     print('injected', src.name, len(body), 'bytes')
