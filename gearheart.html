@@ -9660,6 +9660,55 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   };
 })();
 
+// ================= COMBAT FAIRNESS · the Welder winds up before it burns =================
+// Why: Welder.update flipped walk -> flame the instant Lin came within 100 px, and the flame box (12..80 px ahead) is already
+// live on the next frame. Measured: 1 frame between ignition and damage, so anyone running at it was burnt with no chance
+// to react (Turret blinks 0.5 s before it fires, the Roller revs for 0.75 s). Now: walk -> warn (0.55 s) -> flame -> cool.
+// During the warning the Welder plants itself, faces Lin, the nozzle pilot flare grows and the exact flame box is marked on
+// the (additive, lightmap-proof) emissive pass. Landing a hit on it during the warning snuffs the jet and opens the same
+// cool-down window it already had, so stepping in to strike is a real, rewarded choice. Flame length / cool-down unchanged.
+(() => {
+  'use strict';
+  const WARN = 0.55;
+  const REACH = {from: 12, to: 80, top: -26, bot: -6};           // identical to the flame box in Welder.update
+  const baseUpdate = Welder.prototype.update;
+  Welder.prototype.update = function (dt) {
+    if (this.dead) return;
+    const g = this.g, p = g.player;
+    const airborne = this._combatLaunch || this._combatDrop;
+    if (!airborne && this.stun <= 0 && this.st === 'walk' && !p.dead && Math.abs(p.x - this.x) < 101 && Math.abs(p.y - this.y) < 40) {   // 101: the base walk step (0.63 px) runs before its own 100 px test
+      this.dir = Math.sign(p.x - this.x) || 1; this.st = 'warn'; this.st_t = 0; g.audio.play('hiss');
+    }
+    if (this.st !== 'warn' || airborne) return baseUpdate.call(this, dt);
+    if (this.stun > 0) { this.st = 'cool'; this.st_t = 0; return baseUpdate.call(this, dt); }   // interrupted by a hit
+    this.t += dt; this.st_t += dt;
+    if (Math.random() < 0.35) g.particles.sparks(this.x + this.dir * 18, this.y - 16, 1, C.fireL, 0.35);
+    if (this.st_t >= WARN) { this.st = 'flame'; this.st_t = 0; g.audio.play('flame'); }
+    enemyContact(g, this);
+  };
+  const baseGlow = Welder.prototype.glow;
+  Welder.prototype.glow = function (ctx) {
+    baseGlow.call(this, ctx);
+    if (this.st !== 'warn') return;
+    const k = clamp(this.st_t / WARN, 0, 1), d = this.dir, xa = this.x + d * REACH.from, xb = this.x + d * REACH.to;
+    const l = Math.min(xa, xb), w = Math.abs(xb - xa), y = this.y + REACH.top, h = REACH.bot - REACH.top;
+    const pulse = 0.5 + 0.5 * Math.sin(this.st_t * 34);
+    ctx.fillStyle = `rgba(255,110,40,${0.07 + 0.20 * k * (0.6 + 0.4 * pulse)})`; ctx.fillRect(l, y, w, h);
+    ctx.strokeStyle = `rgba(255,150,70,${0.35 + 0.5 * k})`; ctx.lineWidth = 1; ctx.strokeRect(l + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = `rgba(255,190,110,${0.45 + 0.4 * k})`;
+    for (let i = 0; i < 4; i++) {                                   // chevrons marching the way the jet will go
+      const cx = xa + (xb - xa) * ((i + (this.st_t * 3) % 1) / 4);
+      ctx.beginPath(); ctx.moveTo(cx, y + 4); ctx.lineTo(cx + d * 5, y + h / 2); ctx.lineTo(cx, y + h - 4); ctx.lineTo(cx - d * 1.5, y + h / 2); ctx.fill();
+    }
+    glow(ctx, this.x + d * 19.6, this.y - 16, 10 + 22 * k, FI, 0.35 + 0.5 * k);
+  };
+  Welder.prototype.lights = function (add, CYC, ORG) {              // entityLights hook: same three cases as before + the warning
+    if (this.st === 'flame') add(this.x + this.dir * 40, this.y - 16, 160, ORG, 1.15);
+    else if (this.st === 'warn') { const k = clamp(this.st_t / WARN, 0, 1); add(this.x + this.dir * 40, this.y - 16, 60 + 60 * k, ORG, 0.45 + 0.6 * k); }
+    else add(this.x + this.dir * 9, this.y - 21, 34, ORG, 0.4);
+  };
+})();
+
 // ================= BOOT / FIXED TIMESTEP LOOP =================
 const game=new Game();
 window.GH_FEEDBACK.bindGame(game);
