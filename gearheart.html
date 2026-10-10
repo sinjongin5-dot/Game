@@ -7151,6 +7151,8 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       if (name === 'transform' && d.stage === 'heartbeat') name = 'core-beat';
       else if (name === 'transform' && d.stage === 'complete') name = 'transform-complete';
       if (name === 'charge-stop' || name === 'focus-stop') { this.cancel(name.split('-')[0]); return true; }
+      // Everyday actions stay silent: jumping and collecting scrap / gears / coins carry no vibration (it drowned out real impacts).
+      if (name === 'jump' || name === 'pickup') return false;
       if (!this.available()) return false;
       const at = this.now(), ui = name === 'ui';
       if (this.paused() && !ui && !d.preview) return false;
