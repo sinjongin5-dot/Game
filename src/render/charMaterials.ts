@@ -18,7 +18,7 @@ const PARAMS: Record<string, KindParams> = {
   skin: { scale: 55, colorVar: 0.12, roughVar: 0.15, bump: 0.0012, rough: 0.58, metal: 0 },
   bronze: { scale: 70, colorVar: 0.25, roughVar: 0.3, bump: 0.002, rough: 0.34, metal: 0.92, patina: 0.55 },
   iron: { scale: 60, colorVar: 0.3, roughVar: 0.35, bump: 0.003, rough: 0.5, metal: 0.85, patina: 0.7 },
-  steel: { scale: 90, colorVar: 0.15, roughVar: 0.3, bump: 0.0008, rough: 0.26, metal: 1.0 },
+  steel: { scale: 90, colorVar: 0.15, roughVar: 0.3, bump: 0.0008, rough: 0.38, metal: 0.9 },
   leather: { scale: 140, colorVar: 0.3, roughVar: 0.2, bump: 0.004, rough: 0.76, metal: 0 },
   cloth: { scale: 200, colorVar: 0.22, roughVar: 0.1, bump: 0.003, rough: 0.95, metal: 0, weave: 1 },
   wood: { scale: 120, colorVar: 0.3, roughVar: 0.2, bump: 0.002, rough: 0.72, metal: 0 },
@@ -36,6 +36,7 @@ export function createCharMaterial(kind: string, src?: THREE.MeshStandardMateria
     map: opts.map ?? null,
   });
   mat.name = kind;
+  if (p.metal > 0.5) mat.envMapIntensity = 0.7;
   if (kind === 'glass') {
     mat.transparent = true;
     mat.opacity = 0.82;

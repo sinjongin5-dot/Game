@@ -144,6 +144,7 @@ export class LionActor {
     };
     this.animator.update(hold ? 0 : dt, view);
     this.animator.rig.applyTo(this.bones);
+    this.bones[this.animator.rig.id('head')].scale.setScalar(1.16); // 머리를 약간 키워 갈기와 균형을 맞춘다
     this.shake.value = this.animator.maneShake;
     this.jawOpen = this.animator.jawOpen;
     this.roar = this.animator.roarIntensity;

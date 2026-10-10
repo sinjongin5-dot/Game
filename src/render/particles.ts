@@ -92,8 +92,8 @@ export class Particles {
     s.grav[i] = grav;
   }
 
-  private static sand = new THREE.Color(0.62, 0.5, 0.34);
-  private static sandL = new THREE.Color(0.78, 0.66, 0.48);
+  private static sand = new THREE.Color(0.7, 0.57, 0.38);
+  private static sandL = new THREE.Color(0.82, 0.7, 0.5);
 
   /** 발걸음/착지 먼지. strength 0..1 */
   puff(pos: THREE.Vector3, strength: number, dir?: THREE.Vector3, count = 0) {
@@ -103,7 +103,7 @@ export class Particles {
       const sp = (0.3 + Math.random() * 1.1) * (0.5 + strength);
       const v = new THREE.Vector3(Math.cos(a) * sp * 0.6 + (dir ? dir.x * 0.6 : 0), 0.25 + Math.random() * 0.7 * strength, Math.sin(a) * sp * 0.6 + (dir ? dir.z * 0.6 : 0));
       this.spawn('dust', pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.2, 0.05, (Math.random() - 0.5) * 0.2)), v,
-        0.7 + Math.random() * 0.9, 0.5 + strength * 0.9 + Math.random() * 0.3, 0.9 + strength, Math.random() < 0.5 ? Particles.sand : Particles.sandL, 0.34 * (0.5 + strength), 1.9, -0.25);
+        0.7 + Math.random() * 0.9, 0.35 + strength * 0.6 + Math.random() * 0.25, 0.7 + strength * 0.8, Math.random() < 0.5 ? Particles.sand : Particles.sandL, 0.2 * (0.5 + strength), 1.9, -0.25);
     }
   }
 
@@ -113,7 +113,7 @@ export class Particles {
       const a = (i / count) * Math.PI * 2 + Math.random() * 0.1;
       const sp = 2.4 + Math.random() * 2.2;
       this.spawn('dust', pos.clone().add(new THREE.Vector3(Math.cos(a) * radius * 0.3, 0.08, Math.sin(a) * radius * 0.3)),
-        new THREE.Vector3(Math.cos(a) * sp, 1.0 + Math.random() * 1.6, Math.sin(a) * sp), 0.9 + Math.random() * 0.8, 0.7 + Math.random() * 0.6, 1.4, Particles.sand, 0.26, 2.4, -0.5);
+        new THREE.Vector3(Math.cos(a) * sp, 1.0 + Math.random() * 1.6, Math.sin(a) * sp), 0.9 + Math.random() * 0.8, 0.5 + Math.random() * 0.4, 1.2, Particles.sand, 0.16, 2.4, -0.5);
     }
     for (let i = 0; i < 18; i++) {
       const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 4;

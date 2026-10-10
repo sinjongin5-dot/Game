@@ -178,10 +178,12 @@ export class UI {
 
   // ── 결과 ──
   showDeath(sub: string) {
+    this.hideHint();
     $('death-sub').textContent = sub;
     this.openPanel('death');
   }
   showVictory(stats: { time: number; damageTaken: number; dodges: number; blocks: number; hitsLanded: number; heals: number; attempts: number }) {
+    this.hideHint();
     const dl = $('victory-stats');
     const rows: [string, string][] = [
       ['전투 시간', fmtTime(stats.time)], ['받은 피해', `${Math.round(stats.damageTaken)}`], ['회피 성공', `${stats.dodges}`],

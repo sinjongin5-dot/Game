@@ -81,10 +81,10 @@ kbd { font-family: var(--font); font-size: 13px; letter-spacing: 0.08em; padding
 code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--bronze-hi); }
 
 /* 결과 화면 */
-.screen.result { align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(8,6,4,0.55), rgba(2,1,1,0.9)); animation: resultIn 1.1s ease both; }
+.screen.result { align-items: center; justify-content: center; overflow-y: auto; background: radial-gradient(ellipse at center, rgba(8,6,4,0.55), rgba(2,1,1,0.9)); animation: resultIn 1.1s ease both; }
 @keyframes resultIn { from { opacity: 0; } to { opacity: 1; } }
-.result-body { text-align: center; padding: 20px; max-width: 760px; }
-.result-title { font-size: clamp(30px, 5.5vw, 62px); letter-spacing: 0.4em; font-weight: 700; margin: 0; padding-left: 0.4em; text-shadow: 0 2px 0 #000; }
+.result-body { text-align: center; padding: 20px; max-width: 760px; margin: auto; }
+.result-title { font-size: clamp(28px, 4.8vw, 56px); letter-spacing: 0.24em; font-weight: 700; margin: 0; padding-left: 0.24em; text-shadow: 0 2px 0 #000; white-space: nowrap; }
 .result-title.lose { color: #b5352a; }
 .result-title.win { color: var(--bronze-hi); }
 .result-sub { margin: 12px 0 0; color: #cfc3a9; font-size: 15px; letter-spacing: 0.1em; line-height: 1.8; }
@@ -142,3 +142,14 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; c
 }
 @media (max-height: 520px) { .logo.big { font-size: 40px; } .sub.big { font-size: 13px; } }
 @media (prefers-reduced-motion: reduce) { #vignette.low { animation: none; } .screen.result { animation: none; } }
+
+@media (max-height: 640px) {
+  .result-title { font-size: clamp(26px, 5vh, 44px); letter-spacing: 0.3em; }
+  .result-sub { margin-top: 6px; font-size: 13px; line-height: 1.5; }
+  .stats { grid-template-columns: repeat(4, 1fr); gap: 8px 14px; margin-top: 12px; padding: 10px 0; }
+  .stats dd { font-size: 17px; }
+  .stats dt { font-size: 11px; }
+  .stack.row { margin-top: 12px; gap: 8px; }
+  .stack.row .btn { min-width: 150px; padding: 8px 18px; font-size: 14px; }
+  .result-body { padding: 8px; }
+}

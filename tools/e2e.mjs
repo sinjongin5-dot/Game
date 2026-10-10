@@ -124,7 +124,7 @@ if (section === 'fight' || section === 'all') {
     const { Bot } = await import('/tests/bot.ts');
     if (fresh) { g.sim.reset({ skipIntro: true, seed }); g.scene.resetForNewAttempt(g.sim); g.director.reset(); g.state = 'fight'; g.ui.showHud(true); }
     window.__bot = new Bot(g.sim, { skill, aggression });
-    g.inputOverride = null;
+    g.inputOverride = () => window.__bot.next();
     return true;
   }, { seed, skill, aggression, fresh });
   const runUntilEnd = async (maxSimSec) => {

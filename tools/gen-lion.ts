@@ -251,7 +251,7 @@ function buildMane(): PartOut {
     const root = v3.add(axisP(Math.max(s, -0.1)), v3.mul(dirN, rr));
     if (s < 0) root[2] += s * 0.22; // 얼굴 쪽으로 약간 앞으로
     // 얼굴 앞으로 튀어나오지 않게
-    const L = (0.3 + 0.28 * rnd() + 0.2 * Math.max(0, s)) * (1.0 + 0.35 * Math.max(0, -Math.sin(phi))); // 가슴 쪽 더 길게
+    const L = (0.26 + 0.24 * rnd() + 0.14 * Math.max(0, s)) * (1.0 + 0.1 * Math.max(0, -Math.sin(phi))); // 가슴 쪽도 앞다리를 가리지 않을 만큼만
     const outW = 0.45 + 0.9 * (1 - Math.min(1, Math.max(0, (s + 0.1) / 0.55)));
     let d = v3.norm(v3.add(v3.add(v3.mul(dirN, outW), v3.mul(axisT, 0.9)), [(rnd() - 0.5) * 0.5, (rnd() - 0.5) * 0.4, (rnd() - 0.5) * 0.3]));
     const segs = 6;

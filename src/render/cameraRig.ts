@@ -140,9 +140,9 @@ export class CameraRig {
     const sep = Math.hypot(l.pos.x - p.pos.x, l.pos.z - p.pos.z);
     // 목표 거리/피치: 락온 시 사자와 함께 프레임에 들어오게
     const close = clamp((7 - sep) / 4.5, 0, 1); // 가까울수록 높이 들어 올려 사자가 플레이어에 가려지지 않게
-    const lockDist = clamp(5.0 + 0.3 * Math.max(0, sep - 2), 5.0, 9.6) + 0.9 * close;
-    const lockPitch = clamp(0.22 + 0.2 * close + 0.006 * sep, 0.2, 0.5);
-    const targetDist = lerp(5.3, lockDist, this.lockBlend);
+    const lockDist = clamp(4.6 + 0.28 * Math.max(0, sep - 3), 4.6, 8.2) + 0.5 * close;
+    const lockPitch = clamp(0.15 + 0.11 * close + 0.004 * sep, 0.15, 0.4);
+    const targetDist = lerp(5.0, lockDist, this.lockBlend);
     const targetPitch = lerp(this.pitch, lockPitch, this.lockBlend);
 
     // 피벗 (플레이어 가슴 높이), 약간의 지연
@@ -153,7 +153,7 @@ export class CameraRig {
 
     const f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
     const right = new THREE.Vector3(-f.z, 0, f.x); // 카메라 오른쪽
-    const shoulder = 0.62 + 0.9 * this.lockBlend * clamp((6 - sep) / 4, 0, 1);
+    const shoulder = 0.62 + 0.5 * this.lockBlend * clamp((6 - sep) / 4, 0, 1);
     const dir = new THREE.Vector3(-f.x * Math.cos(targetPitch), Math.sin(targetPitch), -f.z * Math.cos(targetPitch));
     const origin = this.pivot.clone().addScaledVector(right, shoulder * 0.55);
     // 벽 충돌: 피벗에서 목표 위치까지 레이캐스트
@@ -174,7 +174,7 @@ export class CameraRig {
     const chest = new THREE.Vector3(p.pos.x, 1.45, p.pos.z);
     const lionChest = new THREE.Vector3(l.pos.x, 1.0 + l.y * 0.6, l.pos.z);
     const lookT = chest.clone().lerp(lionChest, 0.5 * this.lockBlend);
-    lookT.addScaledVector(right, 0.5 * (1 - this.lockBlend * 0.4));
+    lookT.addScaledVector(right, 0.5 * (1 - this.lockBlend));
     lookT.y += (1 - this.lockBlend) * 0.1;
     this.tmpLook.copy(lookT);
     this.tmpPos.copy(pos);
@@ -186,12 +186,16 @@ export class CameraRig {
       this.tmpPos.addScaledVector(dir, -0.6 * u);
       this.tmpLook.y = lerp(this.tmpLook.y, 0.6, u);
     } else this.deathT = 0;
-    let fov = 58 + (p.running ? 2.5 * (s.shake > 0 ? 1 : 0) : 0) - this.lockBlend * 3;
+    let fov = 54 + (p.running ? 2.5 * (s.shake > 0 ? 1 : 0) : 0) - this.lockBlend * 2;
     if (sim.phase === 'victory') {
       this.victoryAng += dt * 0.18;
       const r = 6.2;
       const c = new THREE.Vector3(p.pos.x, 0, p.pos.z);
       this.tmpPos.set(c.x + Math.sin(this.yaw + this.victoryAng + Math.PI) * r, 1.9 + 0.5 * Math.sin(this.victoryAng * 2), c.z + Math.cos(this.yaw + this.victoryAng + Math.PI) * r);
+      // 항상 경기장 안쪽에서 바라보게 한다 (벽/터널 뒤로 넘어가지 않도록)
+      const qx = this.tmpPos.x / (ARENA.a - 2.2), qz = this.tmpPos.z / (ARENA.b - 2.2);
+      const q = Math.hypot(qx, qz);
+      if (q > 1) { this.tmpPos.x /= q; this.tmpPos.z /= q; }
       this.tmpLook.set(c.x, 1.3, c.z);
       fov = 50;
     }

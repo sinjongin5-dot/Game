@@ -38,6 +38,7 @@ export class Game {
   private initDone = false;
   private diagTimer = 0;
   private lastPhase2 = false;
+  private ctxErrorShown = false;
   /** 진단/테스트용 */
   timeScale = 1;
   /** 자동화 테스트 전용: 값이 있으면 키보드/마우스 대신 이 입력을 사용 */
@@ -305,7 +306,13 @@ export class Game {
     const sim = this.sim;
     const sc = this.scene;
 
+    if (!sc.contextLost && this.ctxErrorShown) {
+      this.ctxErrorShown = false;
+      this.ui.closeAllPanels();
+      if (this.state === 'fight' || this.state === 'intro') this.pause();
+    }
     if (sc.contextLost) {
+      this.ctxErrorShown = true;
       this.ui.showError('그래픽 컨텍스트가 손실되었습니다', '브라우저가 GPU 연결을 잃었습니다. 잠시 기다리면 자동으로 복구될 수 있습니다. 복구되지 않으면 페이지를 새로고침하세요.');
       return;
     }

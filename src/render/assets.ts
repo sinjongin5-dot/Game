@@ -7,6 +7,8 @@ export interface AssetManifestEntry {
   url: string;
   kind: 'gltf' | 'texture';
   label: string;
+  /** 응답 헤더가 오기 전 진행률 계산에 쓰는 예상 크기(바이트) */
+  size: number;
 }
 
 export interface LoadedAssets {
@@ -25,9 +27,9 @@ export interface LoadProgress {
 const BASE = import.meta.env.BASE_URL ?? '/';
 
 export const MANIFEST: AssetManifestEntry[] = [
-  { key: 'lion', url: `${BASE}assets/models/lion.glb`, kind: 'gltf', label: '숫사자 모델' },
-  { key: 'gladiator', url: `${BASE}assets/models/gladiator.glb`, kind: 'gltf', label: '검투사 모델' },
-  { key: 'shield', url: `${BASE}assets/textures/shield_face.png`, kind: 'texture', label: '방패 문양' },
+  { key: 'lion', url: `${BASE}assets/models/lion.glb`, kind: 'gltf', label: '숫사자 모델', size: 2120000 },
+  { key: 'gladiator', url: `${BASE}assets/models/gladiator.glb`, kind: 'gltf', label: '검투사 모델', size: 1380000 },
+  { key: 'shield', url: `${BASE}assets/textures/shield_face.png`, kind: 'texture', label: '방패 문양', size: 250000 },
 ];
 
 /** 실제 바이트 수 기반 진행률. 실패 시 원인을 기록하고 계속 시도한다. */
@@ -47,14 +49,7 @@ export async function loadAssets(
     onProgress({ ...progress, failed: [...progress.failed] });
   };
 
-  // HEAD 로 용량 확인 → 가능하면 정확한 전체 바이트 수를 먼저 구한다
-  await Promise.all(manifest.map(async (m) => {
-    per[m.key] = { loaded: 0, total: 0 };
-    try {
-      const r = await fetch(m.url, { method: 'HEAD' });
-      if (r.ok) per[m.key].total = Number(r.headers.get('content-length') ?? 0);
-    } catch { /* GET 에서 오류 처리 */ }
-  }));
+  for (const m of manifest) per[m.key] = { loaded: 0, total: m.size };
   emit();
 
   const gl = new GLTFLoader();
