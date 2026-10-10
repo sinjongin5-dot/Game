@@ -9642,6 +9642,24 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   };
 })();
 
+// ================= FEEL FIX · buffered commands survive hit-stop =================
+// Why: hit-stop (0.04-0.095 s per hit, 0.18 s when Lin is hurt, 0.15-0.28 s on a boss hit) skips Player.update, but the
+// combat queue is filled in Input.poll and its attack/dash buffers (0.12 / 0.10 s) keep ticking on the wall clock. A dash
+// or attack tapped during the freeze therefore expired before Lin could act (measured: a 50 ms dash tap is lost at 0.08 s of
+// hit-stop, an attack tap at 0.18 s; with no hit-stop both register). The buffer clock now stands still while the world does.
+(() => {
+  'use strict';
+  const poll = Input.prototype.poll;
+  Input.prototype.poll = function () {
+    poll.call(this);
+    const g = typeof game !== 'undefined' ? game : null, p = g && g.player;
+    if (!g || g.state !== 'play' || !(g.hitstop > 0) || !p || p.dead) return;
+    const q = p._combatQueue;
+    if (q) for (const k in q) if (q[k] && Number.isFinite(q[k].expires)) q[k].expires += STEP;
+    if (p._combatTransformBuf) p._combatTransformBuf.expires += STEP;
+  };
+})();
+
 // ================= BOOT / FIXED TIMESTEP LOOP =================
 const game=new Game();
 window.GH_FEEDBACK.bindGame(game);
