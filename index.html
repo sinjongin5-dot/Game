@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d0b09" />
+  <title>ARENA — 모래와 송곳니</title>
+  <meta name="description" content="고대 콜로세움에서 거대한 숫사자와 벌이는 3D 소울라이크 보스 결투 액션" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230d0b09'/%3E%3Cpath d='M4 24 Q16 4 28 24' fill='none' stroke='%23c9a04d' stroke-width='3'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="view" tabindex="0" aria-label="게임 화면"></canvas>
+    <div id="vignette"></div>
+
+    <!-- 전투 HUD -->
+    <div id="hud" class="hidden" aria-hidden="true">
+      <div class="hud-tl">
+        <div class="bar hp" id="bar-hp"><div class="ghost"></div><div class="fill"></div><span class="num" id="num-hp"></span></div>
+        <div class="bar st" id="bar-st"><div class="fill"></div></div>
+        <div class="flasks" id="flasks"></div>
+      </div>
+      <div class="hud-boss" id="boss">
+        <div class="boss-name">황금갈기 · 콜로세움의 숫사자</div>
+        <div class="bar boss-bar"><div class="ghost"></div><div class="fill"></div><i class="tick" style="left:55%"></i></div>
+      </div>
+      <div id="reticle"></div>
+      <div id="hint"></div>
+      <div id="fps"></div>
+    </div>
+
+    <div id="intro-hint" class="hidden">Enter · Space · 클릭 : 건너뛰기</div>
+    <div id="fade"></div>
+
+    <!-- 로딩 -->
+    <section id="loading" class="screen center">
+      <h1 class="logo">ARENA</h1>
+      <p class="sub">모래와 송곳니</p>
+      <div class="loadbar"><div id="loadfill"></div></div>
+      <p id="loadtext" class="loadtext">불러오는 중…</p>
+      <div id="loaderr" class="loaderr hidden">
+        <p id="loaderr-msg"></p>
+        <button id="btn-retry-load" class="btn">다시 시도</button>
+      </div>
+    </section>
+
+    <!-- 타이틀 -->
+    <section id="title" class="screen hidden">
+      <div class="title-block">
+        <h1 class="logo big">ARENA</h1>
+        <p class="sub big">모래와 송곳니</p>
+      </div>
+      <nav class="menu" id="menu-main">
+        <button class="btn primary" id="btn-start">결투 시작</button>
+        <button class="btn" id="btn-settings">설정</button>
+        <button class="btn" id="btn-controls">조작법</button>
+        <button class="btn" id="btn-credits">크레딧</button>
+      </nav>
+      <p class="foot">권장 환경: 데스크톱 · 키보드와 마우스 · 이어폰 권장</p>
+    </section>
+
+    <!-- 설정 -->
+    <section id="panel-settings" class="screen modal hidden">
+      <div class="panel">
+        <h2>설정</h2>
+        <div class="row"><label>그래픽 품질</label>
+          <div class="seg" id="seg-quality">
+            <button data-v="low">낮음</button><button data-v="medium">보통</button><button data-v="high">높음</button>
+          </div></div>
+        <div class="row"><label for="rng-sens">마우스 감도</label><input type="range" id="rng-sens" min="0.3" max="2.5" step="0.05" /><output id="out-sens"></output></div>
+        <div class="row"><label for="rng-shake">카메라 흔들림</label><input type="range" id="rng-shake" min="0" max="1" step="0.05" /><output id="out-shake"></output></div>
+        <div class="row"><label for="rng-master">마스터 음량</label><input type="range" id="rng-master" min="0" max="1" step="0.05" /><output id="out-master"></output></div>
+        <div class="row"><label for="rng-sfx">효과음 음량</label><input type="range" id="rng-sfx" min="0" max="1" step="0.05" /><output id="out-sfx"></output></div>
+        <div class="row"><label for="rng-music">음악 음량</label><input type="range" id="rng-music" min="0" max="1" step="0.05" /><output id="out-music"></output></div>
+        <div class="row"><label for="chk-invert">시점 상하 반전</label><input type="checkbox" id="chk-invert" /></div>
+        <div class="row"><label for="chk-fps">FPS 표시</label><input type="checkbox" id="chk-fps" /></div>
+        <div class="actions"><button class="btn" id="btn-settings-back">뒤로</button></div>
+      </div>
+    </section>
+
+    <!-- 조작법 -->
+    <section id="panel-controls" class="screen modal hidden">
+      <div class="panel wide">
+        <h2>조작법</h2>
+        <div class="keys">
+          <div><kbd>W A S D</kbd><span>카메라 기준 이동</span></div>
+          <div><kbd>마우스</kbd><span>카메라 회전</span></div>
+          <div><kbd>좌클릭</kbd><span>약공격 (3연계)</span></div>
+          <div><kbd>Q</kbd><span>강공격 (느리지만 큰 피해·경직)</span></div>
+          <div><kbd>우클릭 유지</kbd><span>방패 방어 (전방만 막음)</span></div>
+          <div><kbd>Space</kbd><span>회피 (입력 방향, 무입력 시 뒤로)</span></div>
+          <div><kbd>Shift 유지</kbd><span>달리기 (스태미나 소모)</span></div>
+          <div><kbd>E</kbd><span>회복 (2회 · 시간이 걸리며 피격 시 끊김)</span></div>
+          <div><kbd>F / 휠 클릭</kbd><span>사자 락온 전환</span></div>
+          <div><kbd>Esc</kbd><span>일시정지</span></div>
+        </div>
+        <h3>규칙</h3>
+        <ul class="rules">
+          <li>모든 행동은 스태미나가 부족하면 실행되지 않습니다. 소비 후 약 0.7초 뒤 회복이 시작됩니다.</li>
+          <li>회피는 시작 후 아주 짧은 순간에만 무적입니다. 그 구간 밖에서는 피해를 입습니다.</li>
+          <li>방패는 몸 앞쪽 각도의 공격만 막습니다. 막을 때마다 스태미나가 줄고, 바닥나면 방어가 깨집니다.</li>
+          <li>방패를 든 동안에는 스태미나 회복이 느려집니다.</li>
+          <li>사자는 준비 동작을 보인 뒤 공격합니다. 공격이 끝난 직후가 반격의 기회입니다.</li>
+        </ul>
+        <div class="actions"><button class="btn" id="btn-controls-back">뒤로</button></div>
+      </div>
+    </section>
+
+    <!-- 크레딧 -->
+    <section id="panel-credits" class="screen modal hidden">
+      <div class="panel wide">
+        <h2>크레딧</h2>
+        <p class="cred">ARENA — 모래와 송곳니<br />기획 · 프로그래밍 · 모델링 · 애니메이션 · 오디오 합성: Claude Code</p>
+        <p class="cred small">모든 3D 모델(사자, 검투사, 방패, 검), 텍스처, 효과음, 음악은 이 프로젝트의 생성 스크립트(<code>tools/</code>)가 직접 만들어 낸 원본입니다.<br />
+        사용한 오픈소스: three.js (MIT) · Rapier (Apache-2.0) · Vite (MIT) · Cinzel / Noto Serif KR (SIL OFL 1.1)<br />
+        자세한 내용은 <code>ASSET_LICENSES.md</code> 를 참조하세요.</p>
+        <div class="actions"><button class="btn" id="btn-credits-back">뒤로</button></div>
+      </div>
+    </section>
+
+    <!-- 일시정지 -->
+    <section id="panel-pause" class="screen modal hidden">
+      <div class="panel narrow">
+        <h2>일시정지</h2>
+        <div class="stack">
+          <button class="btn primary" id="btn-resume">계속하기</button>
+          <button class="btn" id="btn-pause-settings">설정</button>
+          <button class="btn" id="btn-pause-controls">조작법</button>
+          <button class="btn" id="btn-pause-title">타이틀로</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 사망 -->
+    <section id="panel-death" class="screen result hidden">
+      <div class="result-body">
+        <h2 class="result-title lose">검투사는 쓰러졌다</h2>
+        <p class="result-sub" id="death-sub"></p>
+        <div class="stack row">
+          <button class="btn primary" id="btn-retry">재도전</button>
+          <button class="btn" id="btn-death-title">타이틀로</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 승리 -->
+    <section id="panel-victory" class="screen result hidden">
+      <div class="result-body">
+        <h2 class="result-title win">승리</h2>
+        <p class="result-sub">숫사자는 모래 위에 쓰러졌고, 관중은 당신의 이름을 외친다.</p>
+        <dl class="stats" id="victory-stats"></dl>
+        <div class="stack row">
+          <button class="btn primary" id="btn-again">다시 도전</button>
+          <button class="btn" id="btn-victory-title">타이틀로</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 오류 -->
+    <section id="panel-error" class="screen modal hidden">
+      <div class="panel">
+        <h2 id="err-title">문제가 발생했습니다</h2>
+        <p id="err-msg" class="cred"></p>
+        <div class="actions"><button class="btn" id="btn-err-reload">페이지 새로고침</button></div>
+      </div>
+    </section>
+
+    <div id="clickcatch" class="hidden">클릭하여 전투로 돌아가기</div>
+    <div id="diag" class="hidden"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
