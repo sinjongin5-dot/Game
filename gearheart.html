@@ -4428,7 +4428,7 @@ Object.assign(UI.prototype,{
       {id:'back',label:'뒤로',kind:'btn'}];
     if(this.screen==='confirm')return [{id:'no',label:'취소'},{id:'yes',label:'모든 기록 삭제'}];
     return [];},
-  back(){const g=this.g;g.audio.play('click');const inp=g.input;inp.cur.pause=false;
+  back(){const g=this.g;g.audio.play('click');const inp=g.input;inp.prev.pause=inp.cur.pause;   // swallow this key's 'pause' edge (Esc = back + pause) for THIS and the next frame; clearing cur.pause made the held key re-fire next frame and resume the game
     if(this.screen==='pause'){g.state='play';return;}
     if(this.screen==='settings'||this.screen==='controls'){if(this.from==='pause')this.go('pause',this.screen==='controls'?2:3);else this.go('main',this.mainSel||0);return;}
     this.go('main',this.mainSel||0);},
@@ -5232,7 +5232,7 @@ function makeFinalIntro(g){const b=g.final,A=g.audio;const S={};return {duration
   {t:3.4,fn:()=>{b.state='waking';A.play('roar');A.bsfx('gong');g.camera.shake(0.9);g.flash=Math.max(g.flash,SET2.flash?0.4:0.15);g.particles.ring(480,176,'rgba(255,90,60,0.9)',460,0.8);g.bossCard2={t:0};}},
   {t:5.2,fn:()=>{g.camera.focus=null;g.dialogue.show(FIN_INTRO);}}],
   update:(g,cs,dt)=>{b.update(dt);},
-  end:()=>{g.lbT=0;g.camera.focus=null;g.bossActive=true;b.start();A.setMusic('boss');g.toast('날아오는 톱니에 대시로 부딪혀 되받아쳐라!');}};}
+  end:()=>{g.lbT=0;g.camera.focus=null;g.bossActive=true;b.start();A.setMusic('boss');g.toast('톱니는 대시로 튕겨낼 수 있다 — 심장이 열리면 타이탄 ↓ + X!');}};}
 function makeFinalPhase(g,k){const b=g.final,A=g.audio;return {duration:3.4,skippable:true,playerPhysics:true,keys:[
   {t:0,fn:()=>{g.lbT=1;b.state='stagger';g.camera.focus={x:480,y:240};g.player.invuln=4;}},
   {t:0.4,fn:()=>{b.vph=k;A.play('roar');A.bsfx('gong');g.camera.shake(1);g.flash=Math.max(g.flash,SET2.flash?0.55:0.2);g.post&&g.post.kick(12);g.particles.ring(480,176,'rgba(255,90,60,0.9)',500,0.9);g.particles.sparks(480,176,60,C.fireL,1.6);
@@ -5305,8 +5305,8 @@ FinalBoss.prototype.drawBackdrop=function(ctx,t){const x0=this.x0,x1=this.x1,fl=
 
 ACH.push({id:'grand',n:'다시 감는 태엽',d:'최종장 — 태엽 감는 자를 멈춘다'},{id:'grand1',n:'첫 박자에',d:'태엽 감는 자를 3번 이내의 시도로 쓰러뜨린다'});
 
-const FIN_TIPS={hands_lo:'낮은 시계바늘 — 경고가 끝나는 순간 점프',hands_hi:'높은 시계바늘 — 바닥에 붙어 흘려보내라',hands_both:'바늘 두 개 — 아래는 점프, 위는 착지해서 흘려보내라',gears:'톱니 — 닿기 직전에 대시하면 심장으로 되받아친다',pistons:'피스톤 파도 — 양쪽 발판 위는 안전하다',
-  valves:'압력 밸브 — 위에서 밟으면 심장이 상처 입는다',chains:'사슬 — 붉은 점선의 높이를 보고 점프 / 대기',springs:'용수철 폭탄 — 세 번 튀고 터진다. 멀리',waves:'충격파 — 두 번씩 온다. 리듬으로 점프',
+const FIN_TIPS={hands_lo:'낮은 시계바늘 — 경고가 끝나는 순간 점프',hands_hi:'높은 시계바늘 — 바닥에 붙어 흘려보내라',hands_both:'바늘 두 개 — 아래는 점프, 위는 착지해서 흘려보내라',gears:'톱니 — 닿기 직전에 대시하면 튕겨낼 수 있다 (심장 피해는 없다)',pistons:'피스톤 파도 — 양쪽 발판 위는 안전하다',
+  valves:'압력 밸브 — 위에서 밟으면 부서지며 높이 튕겨 오른다 (심장 피해는 없다)',chains:'사슬 — 붉은 점선의 높이를 보고 점프 / 대기',springs:'용수철 폭탄 — 세 번 튀고 터진다. 멀리',waves:'충격파 — 두 번씩 온다. 리듬으로 점프',
   lullaby:'자장가 — 악보를 읽어라. 같은 노래는 같은 순서로 떨어진다',lullabyM:'거꾸로 된 자장가 — 같은 노래, 거울에 비친 기둥',expose:'심장이 내려오면 — 타이탄 ↓ + X'};
 {const _ov=UI.prototype.drawOverlays;UI.prototype.drawOverlays=function(ctx){_ov.call(this,ctx);const g=this.g,b=g.final;if(!b||!g.diedBanner||!b.lastAct)return;const tip=FIN_TIPS[b.lastAct];if(!tip)return;
   const t=g.diedBanner.t,a=sstep(0.9,1.6,t)*(1-sstep(2.6,3.2,t));if(a<0.01)return;ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';ctx.font='13px '+FONT;ctx.fillStyle='#e8c890';ctx.fillText('— '+tip+' —',W/2,H/2+62);ctx.restore();ctx.textAlign='left';};}
