@@ -61,12 +61,27 @@ await freeze('shot_10_death_anim', 8000);
 await page.evaluate(() => { window.__arena.sim.ctx.hitstop = 0; });
 await until('dead', 30); await sleep(6000); await page.screenshot({ path: 'captures/shot_11_death_screen.png' });
 if (await page.isVisible('#btn-retry')) { await page.click('#btn-retry'); await sleep(1500); }
-await bot(4, 0.9, 0.8);
-// 사자 사망 직후 장면
-for (let t = 0; t < 400; t += 2) { await page.evaluate(() => window.__arena.simAdvance(2, () => window.__bot.next())); if (await page.evaluate(() => window.__arena.sim.lion.mode === 'dying')) break; }
-await page.evaluate(() => window.__arena.simAdvance(1.2, () => window.__bot.next()));
-await freeze('shot_12_lion_dying', 8000);
-await page.evaluate(() => { window.__arena.sim.ctx.hitstop = 0; });
-await until('victory', 40); await sleep(6000); await page.screenshot({ path: 'captures/shot_13_victory.png' });
+// 승리 장면: 봇이 정상 전투로 이길 때까지 시드를 바꿔 가며 시도한다 (브라우저에서는 프레임 루프가 섞여 결과가 시드마다 달라질 수 있다)
+const WIN_SEEDS = [15, 17, 30, 32, 12, 23, 10, 11];
+let won = false;
+for (const seed of WIN_SEEDS) {
+  if (await page.isVisible('#btn-retry')) { await page.click('#btn-retry'); await sleep(1500); }
+  await bot(seed, 0.97, 0.9);
+  let dying = false;
+  for (let t = 0; t < 400 && !dying; t += 2) {
+    await page.evaluate(() => window.__arena.simAdvance(2, () => window.__bot.next()));
+    const st = await page.evaluate(() => ({ mode: window.__arena.sim.lion.mode, pm: window.__arena.sim.player.mode }));
+    if (st.mode === 'dying') dying = true;
+    if (st.pm === 'dead') break;
+  }
+  if (!dying) { console.log('seed', seed, '패배 → 다음 시드'); await until('dead', 20); continue; }
+  await page.evaluate(() => window.__arena.simAdvance(1.2, () => window.__bot.next()));
+  await freeze('shot_12_lion_dying', 8000);
+  await page.evaluate(() => { window.__arena.sim.ctx.hitstop = 0; });
+  won = await until('victory', 40);
+  await sleep(6000); await page.screenshot({ path: 'captures/shot_13_victory.png' });
+  console.log('victory with seed', seed, won);
+  break;
+}
 console.log(logs.filter((l) => !/KHR/.test(l)).join('\n'));
 await browser.close();

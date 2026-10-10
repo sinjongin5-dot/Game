@@ -157,8 +157,15 @@ if (section === 'fight' || section === 'all') {
   // 첫 시도에서만 지연 생성되는 GPU 리소스(파티클/데칼 등)가 있으므로 2→3번째 시도 사이 증가가 없는지 본다
   check('재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음', objCounts.every((o) => o.objects === objCounts[0].objects) && objCounts[2].geometries === objCounts[1].geometries && objCounts[2].textures === objCounts[1].textures, JSON.stringify(objCounts));
   check('오디오 소스가 누적되지 않음', objCounts[2].audioActive <= objCounts[0].audioActive + 6, JSON.stringify(objCounts.map((o) => o.audioActive)));
-  await setupBot(15, 0.97, 0.9, true);
-  const res = await runUntilEnd(400);
+  // 브라우저에서는 프레임 루프가 섞여 같은 시드라도 결과가 달라질 수 있으므로, 이길 때까지 최대 5개 시드를 시도한다 (모두 정상 전투)
+  let res = null;
+  for (const seed of [15, 17, 30, 32, 12]) {
+    await setupBot(seed, 0.97, 0.9, true);
+    res = await runUntilEnd(400);
+    report.notes.push({ victoryAttempt: { seed, result: res } });
+    if (res === 'victory') break;
+    if (await page.isVisible('#btn-retry')) { await page.click('#btn-retry'); await sleep(900); }
+  }
   await sleep(2500);
   await shot('11_end');
   check('봇 전투가 승리 또는 사망으로 종료', !!res, String(res));
