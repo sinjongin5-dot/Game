@@ -146,14 +146,6 @@ function leatherPrims(): Prim[] {
   const lc = C.leather;
   // 벨트
   P.push({ sd: scaled(ring([0, 1.02, 0], [0, 1, 0], 0.158, 0.024), [0, 1.02, 0], [1, 1, 0.8]), boneA: bone('hips'), color: lc, bb: [-0.2, 0.97, -0.17, 0.2, 1.07, 0.17] });
-  // 가슴 대각 끈 (몸통 표면에 밀착하는 얇은 껍질)
-  const torso = skinSDF();
-  const strapAlong = (a: V3, b: V3, w: number, th: number): SD => {
-    const line = capsule(a, b, w, w);
-    return (x, y, z) => Math.max(Math.abs(torso(x, y, z) - 0.012) - (th + 0.004), line(x, y, z) - 0.0) ;
-  };
-  P.push({ sd: strapAlong([0.16, 1.52, 0.1], [-0.13, 1.16, 0.12], 0.02, 0.007), boneA: bone('chest'), boneB: bone('spine1'), tfn: segT([0.16, 1.52, 0.1], [-0.13, 1.16, 0.12]), color: C.leatherLight, bb: [-0.3, 1.1, -0.2, 0.3, 1.6, 0.25], sharp: 2 });
-  P.push({ sd: strapAlong([-0.16, 1.52, 0.1], [0.13, 1.16, 0.12], 0.014, 0.006), boneA: bone('chest'), boneB: bone('spine1'), tfn: segT([-0.16, 1.52, 0.1], [0.13, 1.16, 0.12]), color: lc, bb: [-0.3, 1.1, -0.2, 0.3, 1.6, 0.25], sharp: 2 });
   // 손목/정강이 끈
   for (const s of [1, -1]) {
     const Sx = S_(s);
@@ -375,42 +367,42 @@ async function main() {
   const t0 = Date.now();
   const parts: PartOut[] = [];
   const skin: PartSpec = { name: 'skin', material: 'skin', prims: skinPrims(), T: 0.02 };
-  const skinMesh = meshField(skin, [{ bb: [-0.5, -0.02, -0.2, 0.5, 1.95, 0.24], h: 0.0125 }]);
+  const skinMesh = meshField(skin, [{ bb: [-0.5, -0.02, -0.2, 0.5, 1.95, 0.24], h: 0.0135 }]);
   parts.push(skinPart('skin', 'skin', skin, skinMesh, { role: 'skin' }));
   console.log('skin', skinMesh.positions.length / 3, 'verts', Date.now() - t0, 'ms');
 
   const bronze: PartSpec = { name: 'bronze', material: 'bronze', prims: bronzePrims(), T: 0.006 };
   const bronzeMesh = meshField(bronze, [
-    { bb: [-0.24, 0.08, -0.08, 0.24, 0.58, 0.12], h: 0.008 },
-    { bb: [0.08, 1.4, -0.16, 0.36, 1.6, 0.16], h: 0.008 },
-    { bb: [-0.12, 0.96, 0.08, 0.12, 1.1, 0.16], h: 0.005 },
-    { bb: [-0.14, 1.32, 0.08, 0.14, 1.45, 0.16], h: 0.005 },
+    { bb: [-0.24, 0.08, -0.08, 0.24, 0.58, 0.12], h: 0.011 },
+    { bb: [0.08, 1.4, -0.16, 0.36, 1.6, 0.16], h: 0.011 },
+    { bb: [-0.12, 0.96, 0.08, 0.12, 1.1, 0.16], h: 0.007 },
+    { bb: [-0.14, 1.32, 0.08, 0.14, 1.45, 0.16], h: 0.007 },
   ]);
   parts.push(skinPart('bronze', 'bronze', bronze, bronzeMesh, { role: 'bronze' }, true));
 
   const helmet: PartSpec = { name: 'helmet', material: 'bronze', prims: helmetPrims(), carves: helmetCarves(), T: 0.012 };
-  const helmetMesh = meshField(helmet, [{ bb: [-0.17, 1.62, -0.19, 0.17, 1.9, 0.21], h: 0.0055 }]);
+  const helmetMesh = meshField(helmet, [{ bb: [-0.17, 1.62, -0.19, 0.17, 1.9, 0.21], h: 0.0075 }]);
   parts.push(skinPart('helmet', 'bronze', helmet, helmetMesh, { role: 'bronze' }, true));
 
   const iron: PartSpec = { name: 'iron', material: 'iron', prims: ironPrims(), T: 0.004 };
-  const ironMesh = meshField(iron, [{ bb: [-0.42, 0.9, -0.16, -0.1, 1.55, 0.16], h: 0.0065 }]);
+  const ironMesh = meshField(iron, [{ bb: [-0.42, 0.9, -0.16, -0.1, 1.55, 0.16], h: 0.009 }]);
   parts.push(skinPart('iron', 'iron', iron, ironMesh, { role: 'iron' }, true));
 
   const leather: PartSpec = { name: 'leather', material: 'leather', prims: leatherPrims(), T: 0.008 };
   const leatherMesh = meshField(leather, [
-    { bb: [-0.22, 0.95, -0.19, 0.22, 1.1, 0.19], h: 0.008 },
-    { bb: [-0.2, 1.15, 0.04, 0.2, 1.55, 0.14], h: 0.007 },
-    { bb: [-0.24, -0.04, -0.12, 0.24, 0.5, 0.3], h: 0.008 },
-    { bb: [-0.42, 0.85, -0.06, 0.42, 1.06, 0.16], h: 0.008 },
+    { bb: [-0.22, 0.95, -0.19, 0.22, 1.1, 0.19], h: 0.011 },
+    { bb: [-0.2, 1.15, 0.04, 0.2, 1.55, 0.14], h: 0.009 },
+    { bb: [-0.24, -0.04, -0.12, 0.24, 0.5, 0.3], h: 0.011 },
+    { bb: [-0.42, 0.85, -0.06, 0.42, 1.06, 0.16], h: 0.011 },
   ]);
   parts.push(skinPart('leather', 'leather', leather, leatherMesh, { role: 'leather' }, true));
 
   const cloth: PartSpec = { name: 'cloth', material: 'cloth', prims: clothPrims(), T: 0.004 };
-  const clothMesh = meshField(cloth, [{ bb: [-0.25, 0.64, -0.2, 0.25, 1.06, 0.2], h: 0.0075 }]);
+  const clothMesh = meshField(cloth, [{ bb: [-0.25, 0.64, -0.2, 0.25, 1.06, 0.2], h: 0.011 }]);
   parts.push(skinPart('cloth', 'cloth', cloth, clothMesh, { role: 'cloth' }));
 
   const crest: PartSpec = { name: 'crest', material: 'cloth', prims: crestPrims(), T: 0.004 };
-  const crestMesh = meshField(crest, [{ bb: [-0.06, 1.8, -0.2, 0.06, 1.99, 0.17], h: 0.006 }]);
+  const crestMesh = meshField(crest, [{ bb: [-0.06, 1.8, -0.2, 0.06, 1.99, 0.17], h: 0.0085 }]);
   parts.push(skinPart('crest', 'cloth', crest, crestMesh, { role: 'cloth' }, true));
 
   // 검 (오른손 주먹 중심 기준)
@@ -445,7 +437,7 @@ async function main() {
     glass: mat(srgb(0xb9702a), 0.12, 0, { extras: { kind: 'glass' } }),
   };
   const res = await writeGlb({
-    bones: HUMAN_BONES, materials, parts, path: 'public/assets/models/gladiator.glb', compress: false,
+    bones: HUMAN_BONES, materials, parts, path: 'public/assets/models/gladiator.glb', compress: true,
     extras: { generator: 'tools/gen-gladiator.ts', license: 'original work for this project (see ASSET_LICENSES.md)' },
   });
   console.log(`gladiator.glb ${(res.bytes / 1024).toFixed(0)} KB in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

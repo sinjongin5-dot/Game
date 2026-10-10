@@ -131,9 +131,9 @@ export function startLionAttack(ctx: SimContext, id: LionAttackId, chained = fal
   }
   l.attack = {
     id, t: 0, serial: l.attackSerial,
-    mirror: id === 'pounceSwat' ? true : rel > 0, // 플레이어가 왼쪽(+)에 있으면 왼발
+    mirror: rel > 0, // 플레이어가 왼쪽(+)에 있으면 왼발
     hitDone: false, dodged: false, lockDir: toP, lockDist: 0, lunge: 0, leapFrom: null, leapTo: null,
-    chargeDist: 0, chargeMax: 0, chargeSpeed: 0, wallHit: false, combo, prevVol: null, phase: 'windup', braking: false, blockedBy: false, fired: false,
+    chargeDist: 0, chargeMax: 0, chargeSpeed: 0, wallHit: false, combo, prevVol: null, phase: 'windup', braking: false, blockedBy: false, fired: false, wasActive: false,
   };
   l.mode = 'attack';
   l.modeT = 0;

@@ -485,7 +485,8 @@ export class LionAnimator {
         const prep = sm(0.05, def.windup, t);
         const strike = sm(def.activeStart - 0.04, def.activeStart + 0.1, t);
         const rec = sm(def.activeEnd + 0.05, def.duration, t);
-        out.headTarget = V(0, hp.y + 0.06, hp.z - 0.03);
+        // 판정 구체(입 앞쪽)와 일치하도록: 머리 본 원점 = 입 중심 - (0, -0.1, 0.36)
+        out.headTarget = V(0, hp.y + 0.1, hp.z - 0.36);
         out.headBlend = 1;
         // 머리를 뒤로 빼며 몸을 낮춘다 → 앞으로 튀어나가며 입을 벌리고 닫는다
         out.drop = 0.045 + 0.09 * prep * (1 - strike) + 0.03 * strike * (1 - rec);

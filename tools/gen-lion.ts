@@ -342,10 +342,10 @@ async function main() {
   const furHead: PartSpec = { ...fur, T: 0.02 };
   const furLimb: PartSpec = { ...fur, T: 0.026 };
 
-  const bodyRegion: Region[] = [{ bb: [-0.52, 0.44, -1.16, 0.52, 1.52, 1.0], h: 0.03 }];
-  const legRegion: Region[] = [{ bb: [-0.42, -0.01, -1.12, 0.42, 0.52, 0.9], h: 0.0165 }];
-  const tailRegion: Region[] = [{ bb: [-0.14, 0.04, -2.4, 0.14, 1.05, -1.0], h: 0.0165 }];
-  const headRegion: Region[] = [{ bb: [-0.26, 0.98, 0.9, 0.26, 1.56, 1.7], h: 0.0125 }];
+  const bodyRegion: Region[] = [{ bb: [-0.52, 0.44, -1.16, 0.52, 1.52, 1.0], h: 0.034 }];
+  const legRegion: Region[] = [{ bb: [-0.42, -0.01, -1.12, 0.42, 0.52, 0.9], h: 0.02 }];
+  const tailRegion: Region[] = [{ bb: [-0.14, 0.04, -2.4, 0.14, 1.05, -1.0], h: 0.02 }];
+  const headRegion: Region[] = [{ bb: [-0.26, 0.98, 0.9, 0.26, 1.56, 1.7], h: 0.0145 }];
 
   const body = meshField(fur, bodyRegion);
   const legs = meshField(furLimb, legRegion);
@@ -429,7 +429,7 @@ async function main() {
     materials,
     parts,
     path: 'public/assets/models/lion.glb',
-    compress: false,
+    compress: true,
     extras: { generator: 'tools/gen-lion.ts', license: 'original work for this project (CC0-equivalent, see ASSET_LICENSES.md)' },
   });
   console.log(`lion.glb ${(res.bytes / 1024).toFixed(0)} KB in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

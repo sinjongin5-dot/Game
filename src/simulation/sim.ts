@@ -66,8 +66,8 @@ export class GameSim {
   get stats() { return this.ctx.stats; }
 
   /** 모든 상태를 처음 값으로 되돌린다 (재도전 시 호출) */
-  reset(o: { skipIntro?: boolean; seed?: number } = {}) {
-    const attempts = this.ctx ? this.ctx.stats.attempts + 1 : 1;
+  reset(o: { skipIntro?: boolean; seed?: number; attempts?: number } = {}) {
+    const attempts = o.attempts ?? (this.ctx ? this.ctx.stats.attempts + 1 : 1);
     if (o.seed !== undefined) this.attemptSeed = o.seed;
     const ctx = this.makeContext();
     ctx.stats.attempts = attempts;
@@ -144,12 +144,14 @@ export class GameSim {
   }
 
   /** 프레임 시간으로 갱신. 누적 시간은 상한을 둬 탭 복귀 시 폭주를 막는다. */
-  update(frameDt: number, input: InputFrame) {
+  update(frameDt: number, input: InputFrame | (() => InputFrame)) {
     this.acc += Math.min(frameDt, TUNING.maxFrameDt);
     let n = 0;
-    const pressed = { ...input.pressed };
+    const fn = typeof input === 'function' ? input : null;
+    const pressed = fn ? { light: false, heavy: false, dodge: false, heal: false, lock: false } : { ...(input as InputFrame).pressed };
     while (this.acc >= TUNING.dt && n < TUNING.maxSubSteps) {
-      this.step({ ...input, pressed }, TUNING.dt);
+      if (fn) this.step(fn(), TUNING.dt);
+      else this.step({ ...(input as InputFrame), pressed: { ...pressed } }, TUNING.dt);
       // 한 번 발생한 눌림 이벤트는 첫 스텝에서만 소비
       pressed.light = pressed.heavy = pressed.dodge = pressed.heal = pressed.lock = false;
       this.acc -= TUNING.dt;

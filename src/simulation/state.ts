@@ -53,6 +53,7 @@ export interface PlayerState {
   prevBlade: { a: V3; b: V3 } | null;
   swingFired: boolean;
   lowStaminaFlash: number;
+  lastDodgeStart: number;
 }
 
 export type LionMode =
@@ -81,6 +82,7 @@ export interface LionAttackState {
   braking: boolean;
   blockedBy: boolean;
   fired: boolean;
+  wasActive: boolean;
 }
 
 export interface LionState {

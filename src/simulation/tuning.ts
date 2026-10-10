@@ -33,7 +33,7 @@ export const TUNING = {
   },
 
   lion: {
-    hp: 520,
+    hp: 900,
     phase2At: 0.55,
     walkSpeed: 1.7,
     circleSpeed: 2.3,

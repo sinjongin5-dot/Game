@@ -16,18 +16,24 @@ function personGeometry(detail: boolean): THREE.BufferGeometry {
     parts.push(g.index ? g.toNonIndexed() : g);
   };
   const skin: [number, number, number] = [0.62, 0.42, 0.3];
-  const torso = new THREE.CylinderGeometry(0.19, 0.23, 0.56, detail ? 8 : 6);
-  torso.translate(0, 0.42, 0);
+  const torso = new THREE.CylinderGeometry(0.15, 0.2, 0.5, detail ? 8 : 6);
+  torso.translate(0, 0.4, 0);
   addPart(torso, 1, 0, [1, 1, 1]);
-  const head = new THREE.IcosahedronGeometry(0.115, detail ? 1 : 0);
-  head.translate(0, 0.86, 0);
+  const sho = new THREE.BoxGeometry(0.42, 0.13, 0.2);
+  sho.translate(0, 0.64, 0);
+  addPart(sho, 1, 0, [0.95, 0.95, 0.95]);
+  const neck = new THREE.CylinderGeometry(0.045, 0.05, 0.08, 6);
+  neck.translate(0, 0.73, 0);
+  addPart(neck, 0, 0, skin);
+  const head = new THREE.IcosahedronGeometry(0.095, detail ? 1 : 0);
+  head.translate(0, 0.82, 0);
   addPart(head, 0, 0, skin);
-  const hair = new THREE.SphereGeometry(0.12, 6, 4, 0, Math.PI * 2, 0, Math.PI * 0.55);
-  hair.translate(0, 0.89, -0.005);
+  const hair = new THREE.SphereGeometry(0.1, 6, 4, 0, Math.PI * 2, 0, Math.PI * 0.55);
+  hair.translate(0, 0.845, -0.005);
   addPart(hair, 0, 0, [0.12, 0.09, 0.07]);
   for (const s of [-1, 1]) {
-    const arm = new THREE.BoxGeometry(0.075, detail ? 0.42 : 0.36, 0.075);
-    arm.translate(s * 0.255, 0.68 - (detail ? 0.21 : 0.18), 0.0);
+    const arm = new THREE.BoxGeometry(0.07, detail ? 0.4 : 0.34, 0.07);
+    arm.translate(s * 0.245, 0.66 - (detail ? 0.2 : 0.17), 0.0);
     addPart(arm, 0.4, 1, skin);
   }
   // 병합
@@ -74,7 +80,7 @@ function crowdMaterial(shared: SharedUniforms, cheer: { value: number }): THREE.
           float ang = act * (2.4 + 0.5 * sin(ph)) + 0.12 * sg * 0.0;
           float s = sin(ang), c = cos(ang);
           vec2 r = vec2(pv.x * c - sg * pv.y * s, sg * pv.x * s + pv.y * c);
-          transformed = vec3(r.x, r.y + 0.68, pv.z);
+          transformed = vec3(r.x, r.y + 0.66, pv.z);
         }
         transformed.y += act * 0.07 * abs(sin(ph)) + calm * 0.5;
         transformed.x += calm * (position.y);`);
@@ -101,7 +107,7 @@ export class Crowd {
   constructor(shared: SharedUniforms, profile: { o: number; y: number }[]) {
     const rnd = mulberry32(2024);
     const mat = crowdMaterial(shared, this.cheer);
-    const palette = [0xe8dcc2, 0xd9c9a5, 0xc9b48a, 0xb08a4a, 0x8a3a2a, 0xa0522d, 0x5e6a4a, 0x4a5a6a, 0x2f2a26, 0xd6c8b0, 0xb99a6a, 0x6e3a2a, 0xe0d4b8, 0x7a2a22];
+    const palette = [0xcdbf9f, 0xb8a47a, 0xa8895a, 0x9a6a30, 0x7a3326, 0x8a4a28, 0x55603f, 0x3f4d5c, 0x2f2a26, 0xb5a587, 0x8c6c40, 0x5e3226, 0xc2b690, 0x6a2620, 0x44382c];
     const tmp = new THREE.Color();
     // 방석 위(트레드) 목록
     const treads: { o0: number; o1: number; y: number; far: boolean }[] = [];
@@ -117,7 +123,7 @@ export class Crowd {
       const mid = (t.o0 + t.o1) / 2 + 0.12;
       // 둘레 길이를 근사해 균등 간격 배치
       const per = 2 * Math.PI * Math.sqrt(((15 + mid) ** 2 + (12 + mid) ** 2) / 2);
-      const spacing = 0.78;
+      const spacing = 0.72;
       const n = Math.floor(per / spacing);
       for (let i = 0; i < n; i++) {
         if (rnd() < 0.2) continue; // 빈 자리

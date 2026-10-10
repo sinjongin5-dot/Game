@@ -210,6 +210,7 @@ export class ArenaBuilder {
     const smallDoors = [0.6, 2.5, 3.8, 5.7];
     for (const th of smallDoors) {
       const p = ellipseAt(th, 0.0);
+      const g = new THREE.Group();
       const doorW = 1.5, doorH = 2.3;
       const mk = (w: number, h: number, depth: number, mat: THREE.Material) => {
         const sh = new THREE.Shape();

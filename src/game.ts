@@ -40,6 +40,8 @@ export class Game {
   private lastPhase2 = false;
   /** 진단/테스트용 */
   timeScale = 1;
+  /** 자동화 테스트 전용: 값이 있으면 키보드/마우스 대신 이 입력을 사용 */
+  inputOverride: (() => import('./simulation/state').InputFrame) | null = null;
   frames = 0;
 
   constructor() {
@@ -148,7 +150,7 @@ export class Game {
   startGame() {
     if (this.state !== 'title') return;
     void this.audio.resume();
-    this.sim.reset({ skipIntro: false });
+    this.sim.reset({ skipIntro: false, attempts: 1 });
     this.director.reset();
     this.scene.resetForNewAttempt(this.sim);
     this.scene.setMode('game');
@@ -206,7 +208,7 @@ export class Game {
 
   toTitle() {
     this.ui.closeAllPanels();
-    this.sim.reset({ skipIntro: false });
+    this.sim.reset({ skipIntro: false, attempts: 1 });
     this.director.reset();
     this.scene.resetForNewAttempt(this.sim);
     this.scene.setMode('title');
@@ -316,9 +318,13 @@ export class Game {
     const live = this.state === 'intro' || this.state === 'fight' || this.state === 'dead' || this.state === 'victory';
     const look = this.input.enabled ? this.input.consumeLook() : { dx: 0, dy: 0 };
     if (live) {
-      const f = this.input.enabled ? this.input.frame(sc.cam.yaw) : { ...emptyInput(), cameraYaw: sc.cam.yaw };
-      if (this.state === 'intro' && (f.pressed.dodge || f.pressed.light || f.pressed.heal)) this.skipIntro();
-      sim.update(dt, f);
+      if (this.inputOverride) {
+        sim.update(dt, this.inputOverride);
+      } else {
+        const f = this.input.enabled ? this.input.frame(sc.cam.yaw) : { ...emptyInput(), cameraYaw: sc.cam.yaw };
+        if (this.state === 'intro' && (f.pressed.dodge || f.pressed.light || f.pressed.heal)) this.skipIntro();
+        sim.update(dt, f);
+      }
     }
     const events = sim.drainEvents();
     if (events.length) {
@@ -439,6 +445,19 @@ export class Game {
     this.director.handle(ev, this.sim);
     this.scene.handleEvents(ev, this.sim);
     this.handleFlowEvents(ev);
+  }
+
+  /** 테스트/진단용 상태 스냅샷 */
+  snapshot() {
+    const s = this.sim, p = s.player, l = s.lion;
+    return {
+      state: this.state, phase: s.phase, time: s.ctx.time,
+      player: { x: p.pos.x, z: p.pos.z, yaw: p.yaw, hp: p.hp, stamina: p.stamina, heals: p.heals, mode: p.mode, lock: p.lockOn, guard: p.guardHeld },
+      lion: { x: l.pos.x, z: l.pos.z, hp: l.hp, mode: l.mode, atk: l.attack?.id ?? null, atkT: l.attack?.t ?? 0, phase: l.phase, y: l.y },
+      stats: { ...s.stats }, fps: this.lastStats.fps, calls: this.lastStats.calls, tris: this.lastStats.tris,
+      objects: this.scene.scene.children.length, geometries: this.lastStats.geometries, textures: this.lastStats.textures,
+      audioActive: this.audio.activeCount(), locked: this.input.locked, cam: this.scene.cam.camera.position.toArray(),
+    };
   }
 
   dispose() {

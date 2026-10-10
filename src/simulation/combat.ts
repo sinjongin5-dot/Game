@@ -73,8 +73,16 @@ export function resolveLionAttack(ctx: SimContext) {
     if (a) a.prevVol = null;
     return;
   }
+  const active = attackIsActive(l);
+  if (a.wasActive && !active && !a.hitDone && !a.dodged && !a.blockedBy && ctx.time - p.lastDodgeStart < 1.0) {
+    // 공격이 유효 구간을 끝낼 때까지 맞지 않았고 직전에 회피했다면 회피 성공
+    a.dodged = true;
+    ctx.stats.dodges++;
+    ctx.events.push({ type: 'dodgeSuccess', attack: a.id });
+  }
+  a.wasActive = active;
   if (a.hitDone || a.dodged) return;
-  if (!attackIsActive(l)) { a.prevVol = null; return; }
+  if (!active) { a.prevVol = null; return; }
   const def = LION_ATTACKS[a.id];
   const vol = lionAttackVolume(l);
   if (!vol) return;

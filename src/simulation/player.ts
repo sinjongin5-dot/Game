@@ -17,7 +17,7 @@ export function createPlayer(): PlayerState {
     dodge: { dir: v2(0, 1), backstep: false, dodgedSet: 0 },
     guardHeld: false, guardUpT: 0, guardImpact: 0, healApplied: false,
     hitDir: v2(0, -1), hitHeavy: false, invulnT: 0, knock: v2(), lockOn: false, running: false, speed: 0,
-    moveLocal: v2(), buffer: { action: null, t: 0 }, prevBlade: null, swingFired: false, lowStaminaFlash: 0,
+    moveLocal: v2(), buffer: { action: null, t: 0 }, prevBlade: null, swingFired: false, lowStaminaFlash: 0, lastDodgeStart: -10,
   };
 }
 
@@ -103,6 +103,7 @@ function startDodge(ctx: SimContext, p: PlayerState, input: InputFrame): boolean
   p.mode = 'dodge';
   p.modeT = 0;
   p.dodge = { dir, backstep: back, dodgedSet: 0 };
+  p.lastDodgeStart = ctx.time;
   if (!back) p.yaw = yawOf(dir);
   p.buffer.action = null;
   ctx.events.push({ type: 'playerDodge', backstep: back });

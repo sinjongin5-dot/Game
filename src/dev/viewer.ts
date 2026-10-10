@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { createCharMaterial } from '../render/charMaterials';
 import { GladiatorAnimator, type PlayerView } from '../animation/gladiatorAnimator';
@@ -42,7 +43,8 @@ cam.position.set(tx + Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitc
 cam.lookAt(tx, ty, tz);
 
 const furMeshes: any[] = [];
-new GLTFLoader().load(`/assets/models/${model}.glb`, (g) => {
+const _gl = new GLTFLoader(); _gl.setMeshoptDecoder(MeshoptDecoder);
+_gl.load(`/assets/models/${model}.glb`, (g) => {
   g.scene.traverse((o: any) => {
     if (o.isMesh) {
       o.castShadow = true; o.receiveShadow = true;

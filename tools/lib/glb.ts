@@ -1,7 +1,6 @@
 import { Document, NodeIO, type Node as GNode, type Material as GMat } from '@gltf-transform/core';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import { EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { meshopt } from '@gltf-transform/functions';
 import type { BoneDef } from '../../src/rig/types';
 
 export interface MatSpec {
@@ -142,11 +141,12 @@ export async function writeGlb(opts: {
   if (opts.compress) {
     await MeshoptEncoder.ready;
     await MeshoptDecoder.ready;
+    // 스킨드 메시를 건드리지 않는 EXT_meshopt_compression (필터 방식 양자화는 디코더가 복원)
+    doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.FILTER });
     const io2 = new NodeIO().registerExtensions([EXTMeshoptCompression]).registerDependencies({
       'meshopt.encoder': MeshoptEncoder,
       'meshopt.decoder': MeshoptDecoder,
     });
-    await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
     bytes = await io2.writeBinary(doc);
   } else {
     bytes = await io.writeBinary(doc);

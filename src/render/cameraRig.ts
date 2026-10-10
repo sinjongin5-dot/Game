@@ -35,6 +35,8 @@ export class CameraRig {
   private tmpLook = new THREE.Vector3();
   /** 마지막 프레임에서 카메라가 벽에 의해 당겨졌는가 (진단용) */
   clipped = false;
+  /** 진단/캡처용: 설정하면 모든 카메라 로직을 우회한다 */
+  debugShot: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
 
   constructor(public settings: CameraSettings) {}
 
@@ -199,6 +201,7 @@ export class CameraRig {
   }
 
   private apply(shot: Shot, dt: number) {
+    if (this.debugShot) shot = this.debugShot;
     // 연출 → 게임플레이 블렌드
     let pos = shot.pos, look = shot.look, fov = shot.fov;
     if (this.blend < 1) {

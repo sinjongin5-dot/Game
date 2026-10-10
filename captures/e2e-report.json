@@ -1,0 +1,191 @@
+{
+  "startedAt": "2026-10-10T01:40:46.295Z",
+  "checks": [
+    {
+      "name": "시작 후 입장 연출 상태",
+      "ok": true,
+      "detail": "intro/intro"
+    },
+    {
+      "name": "입장 중 플레이어가 공격받지 않음(체력 100)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Enter 로 입장 연출 건너뛰기",
+      "ok": true,
+      "detail": "fight/fight"
+    },
+    {
+      "name": "잠금 상태(포인터 잠금 또는 폴백)",
+      "ok": true,
+      "detail": "locked=true"
+    },
+    {
+      "name": "W 키로 전진",
+      "ok": true,
+      "detail": "moved 2.64m"
+    },
+    {
+      "name": "F 로 락온",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Space 회피가 스태미나를 소모",
+      "ok": true,
+      "detail": "100 → 75"
+    },
+    {
+      "name": "우클릭 유지로 방패 방어",
+      "ok": true,
+      "detail": "guard=true"
+    },
+    {
+      "name": "포커스 상실 → 일시정지",
+      "ok": true,
+      "detail": "paused"
+    },
+    {
+      "name": "일시정지 패널 표시",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "일시정지 중 상태가 변하지 않음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "계속하기로 전투 복귀",
+      "ok": true,
+      "detail": "fight"
+    },
+    {
+      "name": "복귀 후 눌린 키가 남지 않음",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "리사이즈 후 카메라 종횡비 갱신",
+      "ok": true,
+      "detail": "{\"cw\":1280,\"aspect\":1.7777777777777777}"
+    },
+    {
+      "name": "#1 사망 화면 도달",
+      "ok": true,
+      "detail": "dead"
+    },
+    {
+      "name": "#1 사망 시 사자 공격 판정 제거",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "#1 사망 화면 버튼 표시",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "#2 사망 화면 도달",
+      "ok": true,
+      "detail": "dead"
+    },
+    {
+      "name": "#2 사망 시 사자 공격 판정 제거",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "#2 사망 화면 버튼 표시",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "#3 사망 화면 도달",
+      "ok": true,
+      "detail": "dead"
+    },
+    {
+      "name": "#3 사망 시 사자 공격 판정 제거",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "#3 사망 화면 버튼 표시",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "재도전 후 초기화(HP 100/사자 HP 900/1페이즈)",
+      "ok": true,
+      "detail": "{\"hp\":100,\"lion\":900,\"ph\":1,\"st\":\"fight\"}"
+    },
+    {
+      "name": "재도전 시 입장 연출을 자동으로 생략",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "재도전을 반복해도 씬 객체가 누적되지 않음",
+      "ok": false,
+      "detail": "[{\"objects\":11,\"geometries\":132,\"textures\":8,\"audioActive\":1},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2}]"
+    },
+    {
+      "name": "오디오 소스가 누적되지 않음",
+      "ok": true,
+      "detail": "[1,2,2]"
+    },
+    {
+      "name": "봇 전투가 승리 또는 사망으로 종료",
+      "ok": true,
+      "detail": "victory"
+    },
+    {
+      "name": "승리 화면과 기록 표시",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "타이틀 복귀",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "콘솔 오류/예외 없음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "에셋 요청 실패 없음",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "notes": [
+    {
+      "objCounts": [
+        {
+          "objects": 11,
+          "geometries": 132,
+          "textures": 8,
+          "audioActive": 1
+        },
+        {
+          "objects": 11,
+          "geometries": 143,
+          "textures": 8,
+          "audioActive": 2
+        },
+        {
+          "objects": 11,
+          "geometries": 143,
+          "textures": 8,
+          "audioActive": 2
+        }
+      ]
+    }
+  ],
+  "console": [],
+  "failedRequests": []
+}
