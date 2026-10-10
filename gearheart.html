@@ -10335,7 +10335,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   });
 
   // ---------------------------------------------------------------- where they live
-  const QUOTA = {2: [['Bulwark', 1], ['Burrower', 2]], 11: [['Bulwark', 1]], 12: [['Burrower', 1]], 13: [['Jelly', 3], ['Bulwark', 1]], 4: [['Bulwark', 1]]};
+  const QUOTA = {2: [['Bulwark', 1], ['Burrower', 2]], 11: [['Bulwark', 1]], 12: [['Burrower', 1]], 13: [['Jelly', 3], ['Bulwark', 1]]};
   const MAKE = {Bulwark: (g, x, y) => new Bulwark(g, x, y), Jelly: (g, x, y) => new Jelly(g, x, y - 66), Burrower: (g, x, y) => new Burrower(g, x, y)};
   const MINSPAN = {Bulwark: 8, Jelly: 6, Burrower: 7};
   function place(g) {
@@ -10351,14 +10351,17 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     const keep = L.entities.filter(e => e instanceof Checkpoint || e instanceof Exit || e instanceof Lever || e instanceof Door || e instanceof Sign || e instanceof Trigger || e instanceof ArenaTrigger || /Mech|Cam|Crank|Geneva|Fly|Ratchet|Pendulum|Spring|Tesla|Fan|Spike|Piston|Crusher|GearPlat|Vent/.test(e.constructor.name));
     const A = L.arena, taken = [];
     for (const [kind, n] of q) {
-      const need = MINSPAN[kind], pool = spans.filter(s => s.n >= need && (!A || s.x0 * TS < A.x0 - 160) && s.x0 * TS > L.spawn.x + 280);
-      for (let i = 0; i < n && pool.length; i++) {
-        let tries = 0, done = false;
-        while (tries++ < 14 && !done) {
-          const s = pool[(R() * pool.length) | 0], x = (s.x0 + 2 + R() * Math.max(0, s.n - 4)) * TS + 16, y = s.y;
-          if (keep.some(e => Math.abs(e.x - x) < 130 && Math.abs(e.y - y) < 200)) continue;
-          if (taken.some(t => Math.abs(t.x - x) < 220 && Math.abs(t.y - y) < 160)) continue;
-          const e = MAKE[kind](g, x, y); e.home = x; L.entities.push(e); taken.push({x, y}); done = true;
+      for (let i = 0; i < n; i++) {
+        let done = false;
+        for (const [need, kd, td, lead] of [[MINSPAN[kind], 130, 220, 280], [MINSPAN[kind] - 2, 80, 150, 200]]) {   // strict first, then a looser second pass
+          const pool = spans.filter(s => s.n >= need && (!A || s.x0 * TS < A.x0 - 160) && s.x0 * TS > L.spawn.x + lead);
+          for (let tries = 0; tries < 24 && pool.length && !done; tries++) {
+            const s = pool[(R() * pool.length) | 0], x = (s.x0 + 1 + R() * Math.max(0, s.n - 2)) * TS + 16, y = s.y;
+            if (keep.some(e => Math.abs(e.x - x) < kd && Math.abs(e.y - y) < 200)) continue;
+            if (taken.some(t => Math.abs(t.x - x) < td && Math.abs(t.y - y) < 160)) continue;
+            const e = MAKE[kind](g, x, y); e.home = x; L.entities.push(e); taken.push({x, y}); done = true;
+          }
+          if (done) break;
         }
       }
     }
@@ -10378,6 +10381,433 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
       seen[k] = 1; this.persist(); this.toast('▣ ' + CODEX[k][0] + ' — ' + CODEX[k][1]); this.audio.play('click'); break;
     }
   };
+})();
+
+// ================= MID-BOSS · Warden Momentum, the flywheel hall's jailer =================
+// Chapter 5 (플라이휠 홀) used to end on a bare exit ledge. The ledge now overlooks a pit arena; dropping in starts the duel with the
+// Governor's warden, a hulking loader whose back-mounted flywheel never stops spinning ("inertia's keeper").
+//   · It is ARMOURED: Lin's wrench only bites while the machine is spent — after a charge crashes into the wall, after a hammer slam
+//     gets stuck, or after an overload vent. Everything else is clank + spark, so the fight is "survive the move, punish the recovery".
+//   · Moves, each with its own telegraph:  hammer slam (arm rises, landing zone marked)  ·  inertia charge (flywheel whines up, floor lane marked)
+//     ·  chain hook (sight-line at a locked height)  ·  overload (phase 2: ring swells, spark fan + floor waves).
+//   · Two floating platforms sit above the charge lane (it is only 62 px tall) so there is always a safe high ground.
+// Chapter 5 is one-touch-death; for the duel only, the chapter's `ohk` flag is switched off (5 HP, focus-heal) and restored afterwards.
+(() => {
+  'use strict';
+  const K = 1.3, FLY_ID = 12, EXT = 27, NAME = '간수 모멘텀', SUB = '정지를 허락하지 않는 감시자';
+  const sgn = v => (v < 0 ? -1 : 1);
+  NAMES.warden = NAME;
+  const PRE = [['bolt', '거대 동력체 접근! 저 등 뒤의 플라이휠… 한 번 돌기 시작하면 멈추질 않아요.'], ['warden', '정지는 허가되지 않았다. 이 홀의 모든 것은 계속 돌아야 한다.'], ['lin', '그럼 내가 멈춰 줄게.'], ['bolt', '관성이 큰 놈일수록 부딪히고 나면 오래 휘청여요! 돌진이 벽에 박힐 때를 노려요!']];
+  const POST = [['warden', '…멈췄다. 이상하군. 불쾌하지 않아.'], ['lin', '300년이나 돌았잖아. 이제 쉬어도 돼.'], ['warden', '…쉬는 법을… 가르쳐 주겠나, 정비공.'], ['bolt', '간수 모듈 정지! 거버너의 감시망이 한 겹 벗겨졌어요. 출구가 열렸어요!']];
+
+  // ---------------------------------------------------------------- 1. the map: carve the pit arena behind the exit ledge
+  const D = LEVELS.find(l => l.id === FLY_ID);
+  let TILES = null;
+  if (D && !D._midInstalled) {
+    const rows = D.rows.map(r => r.split('')), H = rows.length, W0 = rows[0].length;
+    let xr = -1, xc = -1; for (let y = 0; y < H; y++) for (let x = 0; x < W0; x++) if (rows[y][x] === 'X') { xr = y; xc = x; }
+    if (xr >= 0) {
+      let pl0 = xc; while (pl0 > 0 && rows[xr + 1][pl0 - 1] === '#') pl0--;
+      const A0 = pl0 + 2, FR = xr + 9, WN = W0 + EXT;
+      rows[xr][xc] = '.';
+      for (let y = xr + 1; y < FR; y++) for (let x = A0; x < W0; x++) rows[y][x] = '.';
+      for (let y = 0; y < H; y++) for (let i = 0; i < EXT; i++) rows[y].push(y < 2 ? '#' : y < FR ? '.' : '#');
+      for (let y = 0; y < H; y++) rows[y][WN - 1] = '#';
+      const plat = (r, c0, c1) => { for (let x = c0; x <= c1; x++) rows[r][x] = '-'; };
+      plat(FR - 3, A0 + 5, A0 + 9); plat(FR - 3, A0 + 19, A0 + 23); plat(FR - 6, A0 + 12, A0 + 16);
+      rows[FR - 1][A0 + 1] = 'C';
+      D.rows = rows.map(r => r.join('')); D._midInstalled = true;
+      TILES = {A0, FR, WN};
+      D._midArena = {x0: A0 * TS, x1: (WN - 1) * TS, floor: FR * TS};
+    }
+  }
+
+  // ---------------------------------------------------------------- 2. the warden
+  class Warden extends Entity {
+    constructor(g, A) {
+      super(g, (A.x0 + A.x1) / 2 + 240, A.floor);
+      this.A = A; this.big = true; this.w = 70 * K; this.h = 100 * K; this.dir = -1;
+      this.maxHp = this.hp = this.hpD = this.hpTrail = 40; this.trailT = 0; this.phase = 0; this.state = 'dormant'; this.st = 'idle'; this.stt = 0;
+      this.rpm = 2; this.rpmT = 2; this.fa = 0; this.vuln = false; this.vulnK = 0; this.flash = 0; this.shown = false; this.crouch = 0; this.armT = 0;
+      this.waves = []; this.sparks = []; this.hook = null; this.queue = []; this.wait = 1; this.invul = 0; this.zone = null; this.hookY = 0; this.chain = 0; this.card = 0;
+    }
+    get active() { return this.state === 'fight' || this.state === 'intro' || this.state === 'dying'; }
+    get alert() { return false; }
+    hurtBox() { return {l: this.x - 34 * K, r: this.x + 34 * K, t: this.y - 112 * K, b: this.y}; }
+    box() { return this.hurtBox(); }
+    buildQueue() {
+      const P = [['slam', 'charge', 'hook', 'charge'], ['charge2', 'slam', 'hook', 'overload', 'charge', 'slam']][this.phase];
+      this.queue = P.slice();
+    }
+    engage() {
+      const g = this.g, A = this.A, p = g.player, d = g.level.def;
+      // one-touch death off for the duel: the level copy's flag (story/normal already have it off) and, for hard mode, isOHK() reads `level.boss`
+      this.state = 'intro'; g.mid = this; this._ohk = d.ohk; d.ohk = false; g.level.boss = this; p.hp = p.maxHp = 5; p.energy = 100; g.titanUnlocked = true;
+      g.checkpoint = {x: A.x0 + 64, y: A.floor}; g.camera.lock = {x0: A.x0 - TS * 1, x1: A.x1 + TS * 1};
+      this._bz = g.baseZ; g.baseZ = 1; g.camera.tz = 1; g.audio.setMusic('none');
+      g.director.play(makeIntro(g, this));
+    }
+    resetFight() {                                                           // after a death: same phase, boss restored to where that phase began
+      this.hp = this.hpD = this.hpTrail = this.phase >= 1 ? 20 : 40; this.state = 'fight'; this.st = 'idle'; this.stt = 0; this.vuln = false; this.crouch = 0;
+      this.waves = []; this.sparks = []; this.hook = null; this.zone = null; this.chain = 0; this.rpmT = this.phase >= 1 ? 7 : 4; this.wait = 2.2; this.buildQueue();
+      this.x = (this.A.x0 + this.A.x1) / 2 + 240; this.dir = -1; this.invul = 0;
+      this.g.camera.lock = {x0: this.A.x0 - TS, x1: this.A.x1 + TS}; this.g.audio.setMusic('boss');
+    }
+    begin(a) {
+      const g = this.g, p = g.player; this.stt = 0; this.dir = sgn(p.x - this.x);
+      if (a === 'slam') this.st = 'walk';
+      else if (a === 'charge' || a === 'charge2') { this.st = 'charge_t'; this.chain = a === 'charge2' ? 1 : 0; g.audio.bsfx('charge'); }
+      else if (a === 'hook') { this.st = 'hook_t'; this.hookY = clamp(p.y - 26, this.A.floor - 104, this.A.floor - 16); this.hookN = this.phase >= 1 ? 2 : 1; }
+      else if (a === 'overload') { this.st = 'over_t'; g.audio.bsfx('charge'); }
+    }
+    update(dt) {
+      const g = this.g, p = g.player, A = this.A; this.t += dt; this.flash = Math.max(0, this.flash - dt * 3);
+      this.hpD = lerp(this.hpD, this.hp, 1 - Math.exp(-10 * dt)); if (this.hpTrail > this.hp) { this.trailT -= dt; if (this.trailT <= 0) this.hpTrail = Math.max(this.hp, this.hpTrail - dt * 2.4); } else this.hpTrail = this.hp;
+      this.rpm = approach(this.rpm, this.rpmT, dt * (this.rpmT > this.rpm ? 7 : 3)); this.fa += dt * this.rpm; this.vulnK = approach(this.vulnK, this.vuln ? 1 : 0, dt * 4);
+      this.card += dt;
+      if (this.state === 'dormant') { if (!p.dead && !g.director.active && !g.dialogue.active && p.x > A.x0 + 36 && p.y > A.floor - 90) this.engage(); return; }
+      if (this.state === 'intro' || this.state === 'dead') return;
+      if (this.state === 'dying') { this.stt += dt; this.dying(dt); return; }
+      this.invul = Math.max(0, this.invul - dt);
+      this.updProj(dt);
+      if (this.state !== 'fight') return;
+      this.stt += dt; this.act(dt);
+    }
+    hurtP(box, dir) { const p = this.g.player; if (!p.dead && overlap(p.hbox(), box)) p.hurt(dir || sgn(p.x - (box.l + box.r) / 2)); }
+    act(dt) {
+      const g = this.g, p = g.player, A = this.A, ph = this.phase, S = this.st;
+      const edge = () => (this.dir > 0 ? this.x >= A.x1 - 52 : this.x <= A.x0 + 52);
+      if (S === 'idle') {
+        this.vuln = false; this.crouch = approach(this.crouch, 0, dt * 5); this.rpmT = ph ? 7 : 4;
+        this.dir = sgn(p.x - this.x); if (Math.abs(p.x - this.x) > 150) this.x += this.dir * 60 * dt;
+        this.wait -= dt; if (this.wait <= 0) { if (!this.queue.length) this.buildQueue(); this.begin(this.queue.shift()); }
+      } else if (S === 'walk') {                                              // close in for the hammer
+        this.dir = sgn(p.x - this.x); this.x = clamp(this.x + this.dir * 170 * dt, A.x0 + 50, A.x1 - 50); this.rpmT = 6;
+        if (Math.abs(p.x - this.x) < 104 * K || this.stt > 1.1) { this.st = 'slam_t'; this.stt = 0; this.zone = {x: this.x + this.dir * 108 * K * 0.9}; g.audio.bsfx('charge'); }
+      } else if (S === 'slam_t') {
+        this.armT = Math.min(1, this.stt / (ph ? 0.6 : 0.8)); this.rpmT = 8;
+        if (this.stt >= (ph ? 0.6 : 0.8)) {
+          this.st = 'stuck'; this.stt = 0; this.armT = 2; const zx = this.zone.x;
+          g.audio.bsfx('impact'); g.camera.shake(0.55); g.particles.ring(zx, A.floor, 'rgba(255,180,90,0.9)', 90, 0.3); g.particles.dust(zx, A.floor, 10, 2); g.particles.debris(zx, A.floor - 6, 10, [C.steel, C.rustD, C.brassD]); g.addCrack && g.addCrack(zx, A.floor, 1);
+          this.hurtP({l: zx - 46, r: zx + 46, t: A.floor - 90, b: A.floor}, this.dir);
+          if (ph >= 1) for (const s of [-1, 1]) this.waves.push({x: zx + s * 36, dir: s, sp: 330, t: 0});
+        }
+      } else if (S === 'stuck') {
+        this.vuln = true; this.rpmT = 2;
+        if (Math.random() < dt * 12) g.particles.steam(this.x - this.dir * 20, this.y - 96, 1, rand(-20, 20), -60, 5);
+        if (this.stt >= (ph ? 1.2 : 1.45)) { this.st = 'idle'; this.vuln = false; this.armT = 0; this.zone = null; this.wait = ph ? 0.4 : 0.7; }
+      } else if (S === 'charge_t') {
+        const tt = ph ? 0.78 : 1.0; this.crouch = approach(this.crouch, 1, dt * 6); this.rpmT = 8 + 12 * Math.min(1, this.stt / tt); this.dir = this.dir || 1;
+        if (Math.random() < dt * 40) g.particles.sparks(this.x - this.dir * 36, this.y - 66 + rand(-12, 12), 1, '#ffd070', 0.5);
+        if (this.stt >= tt) { this.st = 'charging'; this.stt = 0; g.audio.bsfx('scrape'); g.camera.shake(0.2); }
+      } else if (S === 'charging') {
+        this.rpmT = 22; this.x += this.dir * (ph ? 540 : 440) * dt; this.crouch = 1;
+        g.particles.sparks(this.x - this.dir * 38 * K, this.y - 2, 2, '#ffd070', 0.6); if (Math.random() < 0.5) g.particles.dust(this.x - this.dir * 30, this.y, 1, 1.2);
+        this.hurtP({l: this.x - 40 * K, r: this.x + 40 * K, t: this.y - 64 * K, b: this.y}, this.dir);
+        if (edge()) {
+          this.x = clamp(this.x, A.x0 + 52, A.x1 - 52); g.audio.bsfx('impact'); g.audio.play('boom'); g.camera.shake(0.95); g.hitstop = Math.max(g.hitstop, 0.06);
+          g.particles.ring(this.x + this.dir * 40, this.y - 40, 'rgba(255,180,90,0.9)', 120, 0.35); g.particles.debris(this.x + this.dir * 40, this.y - 50, 14, [C.steel, C.rustD, C.brassD]);
+          if (this.chain > 0) { this.chain--; this.st = 'rebound'; this.stt = 0; this.dir *= -1; this.crouch = 0.6; }
+          else { this.st = 'crash'; this.stt = 0; this.rpmT = 2; }
+          for (let i = 0; i < 3; i++) g.particles.debris(clamp(this.x + rand(-300, 300), A.x0 + 40, A.x1 - 40), A.floor - 280, 4, [C.steel, '#2a2018']);   // ceiling grit shaken loose
+        }
+      } else if (S === 'rebound') {
+        this.rpmT = 16; if (this.stt >= 0.42) { this.st = 'charging'; this.stt = 0; g.audio.bsfx('scrape'); }
+      } else if (S === 'crash') {
+        this.vuln = true; this.crouch = approach(this.crouch, 0.4, dt * 4);
+        if (Math.random() < dt * 16) g.particles.steam(this.x + rand(-26, 26), this.y - 92, 1, rand(-20, 20), -70, 5);
+        if (Math.random() < dt * 8) g.particles.sparks(this.x + rand(-20, 20), this.y - 70, 2, C.cyan, 0.5);
+        if (this.stt >= (ph ? 2.0 : 2.4)) { this.st = 'idle'; this.vuln = false; this.wait = ph ? 0.4 : 0.7; }
+      } else if (S === 'hook_t') {
+        const tt = ph ? 0.66 : 0.82; this.rpmT = 6; this.dir = sgn(p.x - this.x);
+        if (this.stt >= tt) { this.st = 'hooking'; this.stt = 0; this.hook = {len: 0, out: true}; g.audio.bsfx('throw'); }
+      } else if (S === 'hooking') {
+        const H = this.hook, reach = 900; H.len += (H.out ? 760 : -980) * dt;
+        const hx = this.x + this.dir * (54 * K + H.len), edgeHit = this.dir > 0 ? hx >= A.x1 - 6 : hx <= A.x0 + 6;
+        if (H.out && (H.len >= reach || edgeHit)) { H.out = false; g.audio.bsfx('clank'); g.camera.shake(0.2); g.particles.sparks(hx, this.hookY, 8, C.fireL, 0.7); }
+        this.hurtP({l: Math.min(this.x + this.dir * 54 * K, hx) - 8, r: Math.max(this.x + this.dir * 54 * K, hx) + 8, t: this.hookY - 8, b: this.hookY + 8}, this.dir);
+        if (!H.out && H.len <= 0) { this.hook = null; this.hookN--; if (this.hookN > 0) { this.st = 'hook_t'; this.stt = -0.15; this.hookY = clamp(p.y - 26, A.floor - 104, A.floor - 16); } else { this.st = 'idle'; this.wait = 0.55; } }
+      } else if (S === 'over_t') {
+        this.rpmT = 24; this.crouch = approach(this.crouch, 0.5, dt * 4); if (Math.random() < dt * 30) g.particles.sparks(this.x + rand(-40, 40), this.y - 70 + rand(-40, 40), 1, '#fff2c0', 0.7);
+        if (Math.floor(this.stt * 8) !== Math.floor((this.stt - dt) * 8)) g.camera.shake(0.12);
+        if (this.stt >= 1.25) {
+          this.st = 'vent'; this.stt = 0; this.vuln = true; this.rpmT = 2; g.audio.bsfx('laser'); g.audio.bsfx('shock'); g.camera.shake(0.8); g.flash = Math.max(g.flash, 0.15);
+          for (const s of [-1, 1]) { this.waves.push({x: this.x + s * 40, dir: s, sp: 300, t: 0}); for (const a of [0.12, 0.5, 0.88]) this.sparks.push({x: this.x + s * 30, y: this.y - 78, vx: s * Math.cos(a) * 380, vy: -Math.sin(a) * 380, life: 2.4}); }
+          g.particles.ring(this.x, this.y - 70, 'rgba(255,230,160,0.95)', 170, 0.4);
+        }
+      } else if (S === 'vent') {
+        this.vuln = true; if (Math.random() < dt * 18) g.particles.steam(this.x + rand(-30, 30), this.y - 100, 1, rand(-30, 30), -80, 6);
+        if (this.stt >= 1.7) { this.st = 'idle'; this.vuln = false; this.wait = 0.5; }
+      } else if (S === 'phase') {
+        this.vuln = false; this.rpmT = 26; this.invul = 9; this.crouch = approach(this.crouch, 0.3, dt * 4);
+        if (Math.random() < dt * 24) g.particles.sparks(this.x + rand(-40, 40), this.y - 80 + rand(-40, 40), 2, C.fireL, 1);
+        if (this.stt >= 2.4) { this.st = 'idle'; this.wait = 1.0; this.invul = 1.0; this.buildQueue(); g.audio.choir && g.audio.choir(true, 1.2); }
+      }
+      this.x = clamp(this.x, A.x0 + 40, A.x1 - 40);
+    }
+    updProj(dt) {
+      const g = this.g, A = this.A;
+      for (const w of this.waves) { w.t += dt; w.x += w.dir * w.sp * dt; if (Math.random() < 0.5) g.particles.dust(w.x, A.floor, 1, 1.2); this.hurtP({l: w.x - 12, r: w.x + 12, t: A.floor - 26, b: A.floor}, w.dir); }
+      this.waves = this.waves.filter(w => w.x > A.x0 + 12 && w.x < A.x1 - 12 && w.t < 4);
+      for (const s of this.sparks) {
+        s.life -= dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 80 * dt; if (Math.random() < 0.6) g.particles.sparks(s.x, s.y, 1, '#ffd070', 0.3);
+        const p = g.player; if (!p.dead && circRect(s.x, s.y, 9, p.hbox())) { p.hurt(sgn(s.vx)); s.life = 0; }
+        if (s.x < A.x0 + 8 || s.x > A.x1 - 8 || s.y > A.floor - 4 || s.y < 70) { s.life = 0; g.particles.sparks(s.x, clamp(s.y, 70, A.floor - 4), 6, C.fireL, 0.6); }
+      }
+      this.sparks = this.sparks.filter(s => s.life > 0);
+    }
+    takeHit(dmg, hit) {
+      const g = this.g, hb = this.hurtBox(); this.hp = Math.max(0, this.hp - dmg); this.flash = 1; this.trailT = 0.6;
+      g.particles.sparks(this.x, this.y - 70 * K, 10, C.cyan, 0.9); g.particles.sparks(this.x, this.y - 70 * K, 6, C.fireL, 0.8); g.audio.bsfx('impact');
+      g.addPop && g.addPop(this.x + rand(-14, 14), hb.t + 6, '-' + dmg, '#9ff8ff', dmg >= 2); g.stats && (g.stats.score += dmg * 150);
+      if (this.hp <= 0) { this.defeat(); return; }
+      if (this.phase === 0 && this.hp <= 20) {
+        this.phase = 1; this.st = 'phase'; this.stt = 0; this.waves = []; this.sparks = []; this.hook = null; this.zone = null; this.armT = 0; this.chain = 0;
+        g.audio.play('roar'); g.audio.bsfx('gong'); g.camera.shake(1); g.flash = Math.max(g.flash, 0.3); g.particles.ring(this.x, this.y - 70, 'rgba(255,120,50,0.9)', 320, 0.7);
+        g.toast('모멘텀 — 과속! 더 빠르고 더 길게 돈다'); g.player.invuln = Math.max(g.player.invuln, 1.5);
+      }
+    }
+    defeat() {
+      const g = this.g; this.state = 'dying'; this.stt = 0; this.vuln = false; this.waves = []; this.sparks = []; this.hook = null; this.zone = null; this.rpmT = 0; this.crouch = 0.5;
+      g.audio.choir && g.audio.choir(false); g.audio.setMusic('none'); g.audio.bsfx('gong'); g.camera.shake(1); g.hitstop = 0.28; g.slowT = 1.2;
+      g.player.invuln = 99; g.lbT = 1;
+    }
+    dying(dt) {
+      const g = this.g;
+      if (Math.random() < dt * 18) { g.particles.sparks(this.x + rand(-40, 40), this.y - rand(10, 110), 5, Math.random() < 0.5 ? C.cyan : C.fireL, 1); g.particles.steam(this.x + rand(-30, 30), this.y - 90, 1, rand(-30, 30), -80, 6); }
+      if (Math.floor(this.stt * 4) !== Math.floor((this.stt - dt) * 4) && this.stt < 2.4) { g.audio.play('smallboom'); g.camera.shake(0.3); }
+      if (this.stt >= 2.6 && !this._fin) {
+        this._fin = true; g.audio.play('boom'); g.camera.shake(1); g.flash = 0.6;
+        g.particles.ring(this.x, this.y - 60, C.cyan, 260, 0.6); g.particles.debris(this.x, this.y - 60, 30, [C.steel, C.brass, C.rustD, C.brassD]); g.particles.sparks(this.x, this.y - 60, 50, C.fireL, 1.6);
+        this.state = 'dead'; g.dialogue.show(POST, () => this.finish());
+      }
+    }
+    finish() {
+      const g = this.g, A = this.A, d = g.level.def, p = g.player;
+      d.ohk = this._ohk; g.level.boss = null; if (isOHK(g)) { p.hp = p.maxHp = 1; } p.invuln = 1; g.lbT = 0;
+      g.camera.lock = null; g.baseZ = this._bz || g.baseZ; g.camera.tz = g.baseZ; g.mid = null; g.audio.setMusic(g.musicFor());
+      g.level.entities.push(new Exit(g, A.x1 - 90, A.floor)); const m = g.M(); m.midDone = 1; g.persist(); g.toast('간수 격파 — 출구가 열렸다');
+      g.checkpoint = {x: A.x1 - 200, y: A.floor};
+    }
+    // ---------------------------------------------------------------- drawing
+    hand() {                                                                  // hammer hand target in local space (feet at 0, facing +x)
+      const A = this.armT;
+      if (this.st === 'slam_t') return {x: lerp(46, 22, A), y: lerp(-42, -176, ease.outCubic(A)), a: lerp(0.4, -1.9, A)};
+      if (this.st === 'stuck') return {x: 82, y: -16, a: 0.45 + 0.1 * Math.sin(this.t * 40) * Math.max(0, 0.6 - this.stt)};
+      if (this.st === 'walk') return {x: 50 + Math.sin(this.t * 9) * 6, y: -52 + Math.cos(this.t * 9) * 4, a: 0.3};
+      return {x: 46, y: -42 + Math.sin(this.t * 2) * 2, a: 0.4};
+    }
+    draw(ctx) {
+      if (this.state === 'dead') return;
+      const x = this.x, y = this.y, d = this.dir || 1, t = this.t;
+      this.drawLane(ctx);
+      outlined(ctx, x - 190, y - 250, x + 200, y + 8, c => this.body(c), '#05070a', 1.2);
+    }
+    body(c) {
+      const x = this.x, y = this.y, d = this.dir || 1, t = this.t, fl = this.flash > 0, cr = this.crouch, vk = this.vulnK;
+      const hot = this.rpm > 12, ph = this.phase;
+      c.save(); if (fl) c.filter = 'brightness(2.8)';
+      c.translate(x, y); c.scale(d * K, K); c.lineCap = 'round'; c.lineJoin = 'round';
+      const drop = cr * 9, lean = cr * 7;
+      const STEEL = ['#2a323a', '#4a5762', '#7a8a96'], BRASS = C.brass, DK = '#10151a';
+      // --- flywheel (behind everything), mounted on the back
+      const fx = -24 - lean * 0.5, fy = -72 + drop;
+      c.save(); c.translate(fx, fy);
+      c.fillStyle = 'rgba(0,0,0,0.55)'; circ(c, 3, 3, 52);
+      drawGear(c, 0, 0, 50, 22, this.fa, '#3a444d', '#12181d', 8);
+      c.strokeStyle = hot ? '#ffb050' : C.brassD; c.lineWidth = 5; c.beginPath(); c.arc(0, 0, 41, 0, 7); c.stroke();
+      for (let i = 0; i < 16; i++) { const a = this.fa + i * 0.3927; c.fillStyle = i % 2 ? (hot ? '#ffe9a0' : '#d9b230') : '#15120a'; c.beginPath(); c.arc(0, 0, 45.5, a, a + 0.19); c.arc(0, 0, 37, a + 0.19, a, true); c.closePath(); c.fill(); }
+      c.fillStyle = '#12181d'; circ(c, 0, 0, 20); drawGear(c, 0, 0, 16, 8, -this.fa * 1.4, '#59666f', '#0a0e11', 4); c.fillStyle = BRASS; circ(c, 0, 0, 6); rivet(c, 0, 0, 3);
+      c.restore();
+      // --- far arm (hook launcher), behind the torso
+      const hy = this.hookY ? (this.hookY - y) / K : -60, hookOn = this.st === 'hook_t' || this.st === 'hooking';
+      const fh = hookOn ? {x: 54, y: hy} : {x: 38, y: -60};
+      const fe = opIK(-4, -92 + drop, fh.x, fh.y + drop * 0.4, 38, 38, 1);
+      this.limb(c, -4, -92 + drop, fe[0], fe[1], fh.x, fh.y + drop * 0.4, 13, STEEL);
+      c.save(); c.translate(fh.x, fh.y + drop * 0.4); c.fillStyle = DK; rr(c, -4, -9, 26, 18, 3); c.fill(); c.fillStyle = STEEL[1]; c.fillRect(0, -7, 20, 14); c.fillStyle = '#050709'; c.fillRect(18, -4, 8, 8);
+      c.fillStyle = hookOn ? '#ff6a3a' : '#5a3a20'; c.fillRect(4, -3, 10, 2); c.restore();
+      // --- legs (pistons) + boots
+      for (const s of [-1, 1]) {
+        const lx = s * 15 + (s > 0 ? lean * 0.3 : 0);
+        c.fillStyle = DK; c.fillRect(lx - 8, -44 + drop, 16, 44 - drop); c.fillStyle = STEEL[1]; c.fillRect(lx - 6, -40 + drop, 12, 22); c.fillStyle = '#9aa8b2'; c.fillRect(lx - 2, -20 + drop * 0.5, 4, 14 - drop * 0.4);
+        c.fillStyle = BRASS; c.fillRect(lx - 8, -26 + drop, 16, 3);
+        c.fillStyle = '#1a2026'; rr(c, lx - 14, -8, 28, 8, 3); c.fill(); stripes(c, lx - 13, -4, 26, 4, 4);
+      }
+      // --- pelvis + torso
+      c.save(); c.translate(lean, drop);
+      c.fillStyle = DK; rr(c, -28, -52, 56, 12, 3); c.fill(); c.fillStyle = STEEL[1]; c.fillRect(-26, -50, 52, 8); stripes(c, -26, -44, 52, 5, 6);
+      const tg = c.createLinearGradient(0, -100, 0, -50); tg.addColorStop(0, STEEL[2]); tg.addColorStop(0.4, STEEL[1]); tg.addColorStop(1, STEEL[0]);
+      c.fillStyle = DK; c.beginPath(); c.moveTo(-35, -98); c.lineTo(33, -98); c.lineTo(39, -72); c.lineTo(29, -46); c.lineTo(-29, -46); c.lineTo(-39, -72); c.closePath(); c.fill();
+      c.fillStyle = tg; c.beginPath(); c.moveTo(-32, -95); c.lineTo(30, -95); c.lineTo(36, -72); c.lineTo(26, -49); c.lineTo(-26, -49); c.lineTo(-36, -72); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-24, -92); c.lineTo(-30, -64); c.moveTo(24, -92); c.lineTo(30, -64); c.stroke();
+      for (const [bx, by] of [[-27, -90], [26, -90], [-30, -60], [29, -60], [-22, -53], [22, -53]]) rivet(c, bx, by, 1.8);
+      // chest: grille furnace, or the cyan service hatch while the machine is spent
+      c.fillStyle = '#07090b'; rr(c, -17, -88, 34, 26, 3); c.fill();
+      if (vk > 0.05) { const hg = c.createLinearGradient(0, -88, 0, -62); hg.addColorStop(0, `rgba(160,255,255,${0.35 + 0.65 * vk})`); hg.addColorStop(1, `rgba(20,150,170,${0.35 + 0.65 * vk})`); c.fillStyle = hg; rr(c, -15, -86, 30, 22, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(-12, -84, 24, 1.5); }
+      else { c.fillStyle = ph ? '#ff5a2a' : '#ffa030'; for (let i = 0; i < 5; i++) c.fillRect(-14, -85 + i * 5, 28, 2.4); }
+      c.fillStyle = 'rgba(0,0,0,0.5)'; for (let i = 0; i < 6; i++) c.fillRect(-14 + i * 5.6, -87, 1.6, 24);
+      c.font = 'bold 6px ' + MONO; c.fillStyle = 'rgba(235,225,200,0.55)'; c.textAlign = 'center'; c.fillText('WARDEN', 0, -58); c.textAlign = 'left';
+      // pauldrons
+      for (const s of [-1, 1]) { const px = s * 36; c.fillStyle = DK; circ(c, px, -90, 15); c.fillStyle = STEEL[1]; circ(c, px, -90, 13); c.fillStyle = BRASS; c.beginPath(); c.arc(px, -90, 13, Math.PI * 1.05, Math.PI * 1.95); c.lineTo(px, -90); c.fill(); c.fillStyle = 'rgba(255,255,255,0.2)'; circ(c, px - 3, -94, 4); rivet(c, px, -90, 2.2); }
+      // head: helmet, visor slit, warden's peaked cap, badge
+      const hx = 4, hyy = -112;
+      c.fillStyle = DK; rr(c, hx - 14, hyy - 12, 28, 24, 5); c.fill(); c.fillStyle = STEEL[1]; rr(c, hx - 12, hyy - 10, 24, 20, 4); c.fill();
+      c.fillStyle = '#050709'; c.fillRect(hx - 12, hyy - 3, 25, 6); const eye = this.st === 'charge_t' || this.st === 'charging' || this.st === 'over_t' || this.st === 'phase' ? '#ff3a22' : vk > 0.5 ? '#3aa8b0' : ph ? '#ff7a2a' : '#ffc050';
+      c.fillStyle = eye; c.fillRect(hx - 10, hyy - 2, 22, 3.4);
+      c.fillStyle = '#1a2026'; c.beginPath(); c.moveTo(hx - 16, hyy - 12); c.lineTo(hx + 14, hyy - 12); c.lineTo(hx + 12, hyy - 21); c.quadraticCurveTo(hx, hyy - 28, hx - 12, hyy - 21); c.closePath(); c.fill();       // cap crown
+      c.fillStyle = '#0c1014'; c.beginPath(); c.moveTo(hx - 15, hyy - 12); c.lineTo(hx + 28, hyy - 10); c.lineTo(hx + 26, hyy - 7); c.lineTo(hx - 15, hyy - 9); c.closePath(); c.fill();                    // brim
+      c.fillStyle = BRASS; c.fillRect(hx - 15, hyy - 14, 29, 2.4); drawGear(c, hx + 5, hyy - 19, 4.6, 8, 0, BRASS, '#1a1208', 3);
+      c.strokeStyle = '#7a8892'; c.lineWidth = 1.2; line(c, hx - 8, hyy - 21, hx - 10, hyy - 32); c.fillStyle = hot ? '#ff3a22' : '#ffd070'; circ(c, hx - 10, hyy - 33, 1.6);
+      c.restore();
+      // --- near arm: the mallet
+      const H = this.hand(), sx = 34 + lean, sy = -88 + drop;
+      const e = opIK(sx, sy, H.x + lean, H.y + drop, 42, 44, 1);
+      this.limb(c, sx, sy, e[0], e[1], H.x + lean, H.y + drop, 15, STEEL);
+      c.save(); c.translate(H.x + lean, H.y + drop); c.rotate(this.st === 'slam_t' ? lerp(0.2, -1.1, this.armT) : this.st === 'stuck' ? 1.45 : 0.3);
+      c.fillStyle = DK; rr(c, -6, -7, 30, 14, 3); c.fill(); c.fillStyle = '#3a2a1a'; c.fillRect(0, -3, 26, 6);                                                         // haft
+      c.fillStyle = DK; rr(c, 20, -22, 26, 44, 5); c.fill(); const mg = c.createLinearGradient(0, -20, 0, 20); mg.addColorStop(0, '#8a98a4'); mg.addColorStop(0.5, '#56636e'); mg.addColorStop(1, '#2a323a'); c.fillStyle = mg; rr(c, 22, -20, 22, 40, 4); c.fill();
+      c.fillStyle = BRASS; c.fillRect(22, -20, 22, 4); c.fillRect(22, 16, 22, 4); stripes(c, 24, -6, 18, 7, 5); rivet(c, 27, -14, 1.6); rivet(c, 39, -14, 1.6); rivet(c, 27, 14, 1.6); rivet(c, 39, 14, 1.6);
+      c.restore();
+      // --- the chain + hook head while hooking
+      if (this.hook) {
+        const o = this.hook.len / K, hyl = (this.hookY - y) / K;
+        c.strokeStyle = '#0c1014'; c.lineWidth = 6; line(c, 54, hyl, 54 + o, hyl); c.strokeStyle = '#8a98a4'; c.lineWidth = 3; c.setLineDash([6, 4]); line(c, 54, hyl, 54 + o, hyl); c.setLineDash([]);
+        c.save(); c.translate(54 + o, hyl); c.fillStyle = '#05070a'; c.beginPath(); c.moveTo(0, -11); c.lineTo(20, -3); c.lineTo(8, 0); c.lineTo(20, 3); c.lineTo(0, 11); c.lineTo(-4, 0); c.closePath(); c.fill();
+        c.fillStyle = '#b8c4ca'; c.beginPath(); c.moveTo(1, -8); c.lineTo(15, -2); c.lineTo(5, 0); c.lineTo(15, 2); c.lineTo(1, 8); c.lineTo(-2, 0); c.closePath(); c.fill(); c.restore();
+      }
+      c.restore();
+    }
+    limb(c, ax, ay, bx, by, cx, cy, w, ST) {
+      const tube = (x0, y0, x1, y1, ww) => { c.strokeStyle = '#06090c'; c.lineWidth = ww + 5; line(c, x0, y0, x1, y1); c.strokeStyle = ST[1]; c.lineWidth = ww; line(c, x0, y0, x1, y1); c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = ww * 0.25; line(c, x0, y0 - ww * 0.25, x1, y1 - ww * 0.25); };
+      tube(ax, ay, bx, by, w); tube(bx, by, cx, cy, w * 0.86); c.fillStyle = C.brassD; circ(c, bx, by, w * 0.62); c.fillStyle = C.brass; circ(c, bx, by, w * 0.4); rivet(c, bx, by, 2);
+    }
+    drawLane(ctx) {                                                            // world-space ground telegraphs (additive in glow(), plain marks here)
+      const A = this.A, g = this.g;
+      if (this.zone && (this.st === 'slam_t' || this.st === 'stuck')) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(this.zone.x - 40, A.floor - 3, 80, 3); }
+      for (const w of this.waves) { ctx.fillStyle = 'rgba(40,28,20,0.9)'; ctx.beginPath(); ctx.moveTo(w.x - 14, A.floor); ctx.quadraticCurveTo(w.x, A.floor - 30, w.x + 14, A.floor); ctx.fill(); }
+    }
+    glow(ctx) {
+      const A = this.A, t = this.t, x = this.x, y = this.y; if (this.state === 'dormant' || this.state === 'dead') return;
+      const hotK = clamp((this.rpm - 6) / 16, 0, 1);
+      glow(ctx, x - 24 * K * (this.dir || 1), y - 72 * K, (70 + 40 * hotK) * K, hotK > 0.5 ? '255,200,110' : '255,150,60', 0.1 + 0.2 * hotK);
+      glow(ctx, x + (this.dir || 1) * 14 * K, y - 112 * K, 22 * K, this.st === 'charge_t' || this.st === 'charging' ? '255,60,40' : '255,170,60', 0.45);
+      if (this.vuln) glow(ctx, x + (this.dir || 1) * 4 * K, y - 74 * K, 46 * K, '90,240,255', 0.26 + 0.1 * Math.sin(t * 10));
+      const d = this.dir || 1;
+      if (this.st === 'charge_t') {                                           // charge lane: hatched strip from the boss to the wall + chevrons
+        const k = clamp(this.stt / (this.phase ? 0.78 : 1.0), 0, 1), x0 = x + d * 42 * K, x1 = d > 0 ? A.x1 : A.x0, l = Math.min(x0, x1), w = Math.abs(x1 - x0);
+        ctx.fillStyle = `rgba(255,90,40,${0.07 + 0.2 * k * (0.6 + 0.4 * Math.sin(this.stt * 30))})`; ctx.fillRect(l, A.floor - 64 * K, w, 64 * K);
+        ctx.strokeStyle = `rgba(255,150,70,${0.3 + 0.5 * k})`; ctx.lineWidth = 1; ctx.strokeRect(l + 0.5, A.floor - 64 * K + 0.5, w - 1, 64 * K - 1);
+        ctx.fillStyle = `rgba(255,200,120,${0.4 + 0.4 * k})`; for (let i = 0; i < Math.floor(w / 46); i++) { const cx = x0 + d * ((i * 46 + this.stt * 220) % Math.max(60, w)); ctx.beginPath(); ctx.moveTo(cx, A.floor - 52); ctx.lineTo(cx + d * 9, A.floor - 32); ctx.lineTo(cx, A.floor - 12); ctx.lineTo(cx - d * 3, A.floor - 32); ctx.fill(); }
+      }
+      if (this.st === 'slam_t' && this.zone) {
+        const k = clamp(this.stt / (this.phase ? 0.6 : 0.8), 0, 1);
+        ctx.fillStyle = `rgba(255,90,40,${0.12 + 0.3 * k * (0.6 + 0.4 * Math.sin(this.stt * 34))})`; ctx.fillRect(this.zone.x - 46, A.floor - 90, 92, 90);
+        ctx.strokeStyle = `rgba(255,170,90,${0.4 + 0.5 * k})`; ctx.lineWidth = 1.2; ctx.strokeRect(this.zone.x - 45.5, A.floor - 89.5, 91, 89); glow(ctx, this.zone.x, A.floor - 6, 60, '255,120,50', 0.25 + 0.3 * k);
+      }
+      if (this.st === 'hook_t') {
+        const k = clamp(this.stt / (this.phase ? 0.66 : 0.82), 0, 1), x0 = x + d * 56 * K, x1 = d > 0 ? A.x1 : A.x0, yy = this.hookY;
+        ctx.strokeStyle = `rgba(255,70,50,${0.25 + 0.55 * k})`; ctx.lineWidth = 1.4; ctx.setLineDash([10, 7]); ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); ctx.setLineDash([]);
+        const r = 26 - 14 * k; ctx.beginPath(); ctx.ellipse(x1 - d * 18, yy, r * 0.5, r, 0, 0, 7); ctx.stroke(); glow(ctx, x + d * 58 * K, yy, 22, '255,80,50', 0.3 + 0.4 * k);
+      }
+      if (this.st === 'over_t') { const k = clamp(this.stt / 1.25, 0, 1), r = 30 + 110 * k; ctx.strokeStyle = `rgba(255,230,160,${0.3 + 0.6 * k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y - 72 * K, r * K, 0, 7); ctx.stroke(); glow(ctx, x, y - 72 * K, (80 + 60 * k) * K, '255,220,150', 0.1 + 0.2 * k);
+        ctx.fillStyle = `rgba(255,230,160,${0.5 * k})`; for (const s of [-1, 1]) for (const a of [0.12, 0.5, 0.88]) { ctx.beginPath(); ctx.moveTo(x + s * (80 + 40 * k) * K, y - 78 * K - a * 50 * k); ctx.lineTo(x + s * (96 + 40 * k) * K, y - 78 * K - a * 50 * k - 4); ctx.lineTo(x + s * (96 + 40 * k) * K, y - 78 * K - a * 50 * k + 4); ctx.fill(); } }
+      for (const w of this.waves) glow(ctx, w.x, A.floor - 12, 46, '255,130,50', 0.7);
+      for (const s of this.sparks) glow(ctx, s.x, s.y, 22, '255,200,100', 0.8);
+      if (this.hook) glow(ctx, x + d * (54 * K + this.hook.len), this.hookY, 26, '255,120,70', 0.4);
+      if (this.st === 'charging') glow(ctx, x - d * 30 * K, y - 8, 60 * K, '255,170,60', 0.6);
+    }
+    lights(add, CYC, ORG) {
+      if (this.state === 'dormant' || this.state === 'dead') return;
+      const hotK = clamp((this.rpm - 6) / 16, 0, 1);
+      add(this.x, this.y - 70 * K, (170 + 90 * hotK) * K, ORG, 0.5 + 0.5 * hotK);
+      if (this.vuln) add(this.x, this.y - 74 * K, 110 * K, [90, 240, 255], 0.55);
+      for (const w of this.waves) add(w.x, this.A.floor - 10, 70, ORG, 0.7);
+      for (const s of this.sparks) add(s.x, s.y, 60, ORG, 0.7);
+    }
+  }
+
+  // ---------------------------------------------------------------- intro cutscene (same director shape as the Governor's)
+  function makeIntro(g, b) {
+    const A = g.audio;
+    return {duration: 7.2, skippable: true, playerPhysics: true, keys: [
+      {t: 0, fn: () => { g.lbT = 1; g.camera.focus = {x: b.x, y: b.y - 70}; g.camera.tz = 1.1; A.bsfx('gong'); g.camera.shake(0.4); b.rpmT = 8; }},
+      {t: 1.4, fn: () => { A.bsfx('charge'); b.rpmT = 16; for (let i = 0; i < 24; i++) g.particles.add({x: b.x + rand(-60, 60), y: 70, vx: rand(-20, 20), vy: rand(20, 90), life: 2, size: rand(2, 4), color: '#4a3e34', type: 'dot', grav: 300}); }},
+      {t: 2.6, fn: () => { A.play('roar'); A.bsfx('impact'); g.camera.shake(1); g.flash = Math.max(g.flash, 0.3); g.particles.ring(b.x, b.y - 70, 'rgba(255,170,70,0.9)', 340, 0.8); b.card = 0; g.midCard = {t: 0}; b.rpmT = 5; }},
+      {t: 5.0, fn: () => { g.camera.focus = null; g.camera.tz = 1; }},
+      {t: 5.5, fn: () => g.dialogue.show(PRE)}],
+      update: (g2, cs, dt) => { b.t += dt; b.fa += dt * b.rpm; b.rpm = approach(b.rpm, b.rpmT, dt * 6); },
+      end: () => { g.lbT = 0; g.camera.focus = null; g.camera.tz = 1; b.state = 'fight'; b.st = 'idle'; b.stt = 0; b.wait = 1.0; b.shown = true; b.buildQueue(); b.rpmT = 4; g.audio.setMusic('boss'); }};
+  }
+
+  // ---------------------------------------------------------------- damage rules (armoured unless spent)
+  GH_COMBAT.registerBossHit((target, hit) => {
+    if (!(target instanceof Warden)) return null;
+    const none = {hit: false, damage: 0, killed: false};
+    if (target.state !== 'fight' || target.invul > 0) return none;
+    if (!hit.box || !overlap(hit.box, target.hurtBox())) return none;
+    if (!target.vuln) { target.g.particles.sparks(clamp(target.x + sgn(hit.player.x - target.x) * 30, 0, 1e6), target.y - 60, 6, C.fireL, 0.7); return {hit: true, damage: 0, killed: false, armored: true}; }
+    const dmg = Math.max(1, hit.damage | 0);
+    target.takeHit(dmg, hit);
+    return {hit: true, damage: dmg, killed: target.hp <= 0, weakpoint: true};
+  });
+
+  // ---------------------------------------------------------------- wiring: level, respawn, music, HUD, name card, portrait
+  const baseLoad = Game.prototype.loadLevel;
+  Game.prototype.loadLevel = function (n) {
+    this.mid = null; this.midCard = null; baseLoad.call(this, n);
+    const L = this.level, d = L.def; if (d.id !== FLY_ID || !d._midArena) return;
+    const A = d._midArena;
+    L.entities = L.entities.filter(e => !(e instanceof Enemy) || e.x < A.x0 - 96);
+    L.entities = L.entities.filter(e => !(e instanceof Prop) || e.x < A.x0 - 32 || !['crate', 'barrel', 'tank', 'reel', 'vent', 'lampstand', 'panel', 'toolchest', 'scrap', 'warn'].includes(e.kind));
+    if (this.M().midDone) L.entities.push(new Exit(this, A.x1 - 90, A.floor));
+    else { const w = new Warden(this, A); this.mid = w; L.entities.push(w); }
+  };
+  const baseRespawn = Game.prototype.respawn;
+  Game.prototype.respawn = function () { baseRespawn.call(this); const m = this.mid; if (m && m.state === 'fight') { this.player.hp = this.player.maxHp = 5; m.resetFight(); } };
+  const baseMusic = Game.prototype.musicFor;
+  Game.prototype.musicFor = function () { if (this.mid && (this.mid.state === 'fight' || this.mid.state === 'intro')) return 'boss'; return baseMusic.call(this); };
+  const baseStep = Game.prototype.step;
+  Game.prototype.step = function (dt) { baseStep.call(this, dt); if (this.midCard) { this.midCard.t += dt; if (this.midCard.t > 4.6) this.midCard = null; } };
+
+  const baseHud = UI.prototype.drawHUD;
+  UI.prototype.drawHUD = function (ctx) {
+    baseHud.call(this, ctx);
+    const g = this.g, b = g.mid; if (!b || !b.shown || b.state === 'dormant' || b.state === 'dead' || g.state !== 'play') return;
+    const a = 1 - g.lb; if (a < 0.02) return;
+    ctx.save(); ctx.globalAlpha = a; const w = 520, x = W / 2 - w / 2, y = H - 44;
+    ghBossPlate(ctx, x - 6, y - 30, w + 12, 48);
+    ctx.font = '18px ' + HF; ctx.fillStyle = '#f1e2c0'; ctx.textAlign = 'left'; try { ctx.letterSpacing = '3px'; } catch (e) {} ctx.fillText(NAME, x, y - 8); try { ctx.letterSpacing = '0px'; } catch (e) {}
+    ctx.font = '11px ' + FONT; ctx.fillStyle = '#a8957a'; ctx.fillText(SUB, x + ctx.measureText(NAME).width + 60, y - 9);
+    ctx.fillStyle = '#0a0606'; ctx.fillRect(x, y, w, 10); const k = Math.max(0, b.hpD / b.maxHp), kt = Math.max(0, b.hpTrail / b.maxHp); ctx.fillStyle = '#d8b060'; ctx.fillRect(x, y, w * kt, 10);
+    const gr = ctx.createLinearGradient(0, y, 0, y + 10); gr.addColorStop(0, b.vuln ? '#4ad8e8' : '#c0402a'); gr.addColorStop(0.5, b.vuln ? '#1a8a9a' : '#8a1a12'); gr.addColorStop(1, b.vuln ? '#0a4a56' : '#4a0a08'); ctx.fillStyle = gr; ctx.fillRect(x, y, w * k, 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(x, y, w * k, 2); ctx.fillStyle = 'rgba(241,226,192,0.7)'; ctx.fillRect(x + w * 0.5 - 1, y - 2, 2, 14);
+    if (b.vuln) { ctx.fillStyle = '#9ff8ff'; ctx.font = 'bold 11px ' + MONO; ctx.textAlign = 'right'; ctx.fillText('가동 정지 — 지금!', x + w, y - 8); }
+    ctx.strokeStyle = 'rgba(201,160,67,0.8)'; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, y - 0.5, w + 1, 11); ctx.restore(); ctx.textAlign = 'left';
+  };
+  const baseOv = UI.prototype.drawOverlays;
+  UI.prototype.drawOverlays = function (ctx) {
+    baseOv.call(this, ctx);
+    const g = this.g; if (!g.midCard) return;
+    const t = g.midCard.t, a = sstep(0, 0.9, t) * (1 - sstep(3.6, 4.6, t)); if (a < 0.01) return;
+    ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '300 15px ' + FONT; try { ctx.letterSpacing = '8px'; } catch (e) {} ctx.fillStyle = '#c9b58a'; ctx.fillText(SUB, W / 2, H / 2 + 44);
+    ctx.font = 'bold 60px "GH Serif","Noto Serif KR","Nanum Myeongjo",Batang,serif'; try { ctx.letterSpacing = (16 - 8 * sstep(0, 2.5, t)) + 'px'; } catch (e) {}
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillText(NAME, W / 2 + 2, H / 2 - 2); ctx.fillStyle = '#f3e4c0'; ctx.fillText(NAME, W / 2, H / 2 - 4);
+    try { ctx.letterSpacing = '0px'; } catch (e) {} ctx.fillStyle = 'rgba(201,160,67,0.8)'; const lw = 240 * sstep(0.3, 1.6, t); ctx.fillRect(W / 2 - lw, H / 2 + 24, lw * 2, 1.5); ctx.restore();
+  };
+  const basePortrait = drawPortrait;
+  drawPortrait = function (ctx, who, x, y, s, t) {
+    if (who !== 'warden') return basePortrait(ctx, who, x, y, s, t);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, s, s); ctx.clip(); const g2 = ctx.createLinearGradient(0, y, 0, y + s); g2.addColorStop(0, '#2a1a10'); g2.addColorStop(1, '#0e0806'); ctx.fillStyle = g2; ctx.fillRect(x, y, s, s);
+    const k = s / 96; ctx.translate(x + s / 2, y + s * 0.58); ctx.scale(k, k);
+    ctx.fillStyle = '#10151a'; rr(ctx, -34, -30, 68, 62, 10); ctx.fill(); ctx.fillStyle = '#4a5762'; rr(ctx, -30, -26, 60, 54, 8); ctx.fill();
+    ctx.fillStyle = '#050709'; ctx.fillRect(-30, -4, 60, 14); const pulse = 0.7 + 0.3 * Math.sin(t * 3); ctx.fillStyle = `rgba(255,170,60,${pulse})`; ctx.fillRect(-26, -1, 52, 7); ctx.fillStyle = 'rgba(255,200,120,0.35)'; ctx.fillRect(-26, -1, 52, 2);
+    ctx.fillStyle = '#1a2026'; ctx.beginPath(); ctx.moveTo(-38, -30); ctx.lineTo(38, -30); ctx.lineTo(32, -52); ctx.quadraticCurveTo(0, -66, -32, -52); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#0c1014'; ctx.beginPath(); ctx.moveTo(-40, -30); ctx.lineTo(54, -26); ctx.lineTo(52, -19); ctx.lineTo(-40, -23); ctx.closePath(); ctx.fill(); ctx.fillStyle = C.brass; ctx.fillRect(-40, -34, 80, 5); drawGear(ctx, 8, -46, 9, 8, t * 0.3, C.brass, '#1a1208', 3);
+    ctx.fillStyle = '#2a343d'; for (let i = 0; i < 6; i++) ctx.fillRect(-22 + i * 8, 18, 4, 10);
+    ctx.restore(); ctx.save(); ctx.strokeStyle = C.brass; ctx.lineWidth = 3; ctx.strokeRect(x, y, s, s); ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1; ctx.strokeRect(x + 3, y + 3, s - 6, s - 6); ctx.restore();
+  };
+  window.GH_MID = {Warden};
 })();
 
 // ================= READABILITY PASS · actors keep a visible edge after the lightmap =================
