@@ -5,7 +5,7 @@ import { LION_ATTACKS, type LionAttackId } from '../src/combat/attackData';
 
 export interface BotOpts { skill: number; aggression: number }
 
-const DODGE_AT: Record<LionAttackId, number> = { swipe: 0.5, bite: 0.38, pounce: 0.8, charge: 1.55, rear: 0.5, swipeBite: 0.2, pounceSwat: 0.2 };
+const DODGE_AT: Record<LionAttackId, number> = { swipe: 0.57, bite: 0.42, pounce: 0.8, charge: 1.55, rear: 0.65, swipeBite: 0.2, pounceSwat: 0.2 };
 
 /** 규칙 기반 플레이어 봇 (균형/막힘/승리 경로 검증용). 사람이 하듯 "읽고, 피하고, 반격" 한다. */
 export class Bot {
@@ -45,6 +45,7 @@ export class Bot {
       if (p.hp < 50 && p.heals > 0 && d > 5 && !a) inp.pressed.heal = true;
       else if ((open && (l.mode === 'recover' || lionStaggered || attackDone)) && l.hp > 0) {
         if (d > 2.3) inp.moveY = 1;
+        else if (d < 1.5 && !lionStaggered) inp.moveY = -1; // 붙어서 버티지 않고 간격 유지
         else if (p.stamina > 36 && this.rnd() < this.opts.aggression) {
           if (lionStaggered && p.stamina > 50) inp.pressed.heavy = true; else inp.pressed.light = true;
           this.comboLeft = 1;

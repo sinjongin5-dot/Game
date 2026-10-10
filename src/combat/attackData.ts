@@ -145,7 +145,7 @@ export const LION_ATTACKS: Record<LionAttackId, LionAttackDef> = {
   swipe: {
     id: 'swipe', kind: 'paw', duration: 1.55, windup: 0.78, activeStart: 0.78, activeEnd: 0.96,
     trackUntil: 0.5, trackRate: 2.2, damage: 20, blockCost: 26, poiseHit: true, heavyHit: false,
-    range: [1.1, 3.1], bearingMax: 1.0, cooldown: 3.0, radius: 0.3,
+    range: [0.5, 3.1], bearingMax: 1.0, cooldown: 3.0, radius: 0.3,
     // 사자의 오른발 기준 경로 (왼발은 x 반전)
     path: [
       { t: 0.0, p: [-0.22, 0.2, 0.55] },

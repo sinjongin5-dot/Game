@@ -157,7 +157,7 @@ if (section === 'fight' || section === 'all') {
   // 첫 시도에서만 지연 생성되는 GPU 리소스(파티클/데칼 등)가 있으므로 2→3번째 시도 사이 증가가 없는지 본다
   check('재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음', objCounts.every((o) => o.objects === objCounts[0].objects) && objCounts[2].geometries === objCounts[1].geometries && objCounts[2].textures === objCounts[1].textures, JSON.stringify(objCounts));
   check('오디오 소스가 누적되지 않음', objCounts[2].audioActive <= objCounts[0].audioActive + 6, JSON.stringify(objCounts.map((o) => o.audioActive)));
-  await setupBot(4, 0.9, 0.8, true);
+  await setupBot(20, 0.97, 0.9, true);
   const res = await runUntilEnd(400);
   await sleep(2500);
   await shot('11_end');

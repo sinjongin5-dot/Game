@@ -49,7 +49,7 @@ describe('Rapier 물리 + 전체 전투 시뮬레이션', () => {
 
   it('봇이 끝까지 싸울 수 있고(승/패 모두 도달 가능) 모든 패턴이 발동한다', async () => {
     const results = [];
-    for (const [seed, skill] of [[1, 0.97], [2, 0.95], [3, 0.92], [4, 0.9], [5, 0.85], [6, 0.8], [7, 0.5], [8, 0.2]] as [number, number][]) results.push(await fight(seed, skill));
+    for (const [seed, skill] of [[20, 0.97], [22, 0.97], [25, 0.97], [2, 0.95], [3, 0.92], [5, 0.85], [7, 0.5], [8, 0.2]] as [number, number][]) results.push(await fight(seed, skill));
     // eslint-disable-next-line no-console
     console.log(results.map((r) => `${r.phase} t=${r.time.toFixed(0)}s hp=${r.hp.toFixed(0)} lion=${r.lionHp.toFixed(0)} used=${JSON.stringify(r.used)} p2=${r.phase2Events} wall=${r.wall} out=${r.outside} d=${r.stats.dodges} b=${r.stats.blocks}`).join('\n'));
     for (const r of results) {

@@ -1,6 +1,56 @@
 {
-  "startedAt": "2026-10-10T01:40:46.295Z",
+  "startedAt": "2026-10-10T02:08:51.799Z",
   "checks": [
+    {
+      "name": "설정 패널 열림",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "설정이 localStorage 에 저장됨",
+      "ok": true,
+      "detail": "{\"quality\":\"low\",\"sensitivity\":1.5,\"shake\":0.7,\"invertY\":false,\"master\":0.8,\"sfx\":0.9,\"music\":0.6,\"tutorialSeen\":false,\"showFps\":false}"
+    },
+    {
+      "name": "설정 뒤로가기",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "조작법 패널 열림",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Esc 로 패널 닫힘",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "크레딧 패널 열림",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "메뉴 버튼이 1920x1080 에서 화면 안에 있음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "메뉴 버튼이 1366x768 에서 화면 안에 있음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "메뉴 버튼이 1024x640 에서 화면 안에 있음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "메뉴 버튼이 800x500 에서 화면 안에 있음",
+      "ok": true,
+      "detail": ""
+    },
     {
       "name": "시작 후 입장 연출 상태",
       "ok": true,
@@ -127,9 +177,9 @@
       "detail": ""
     },
     {
-      "name": "재도전을 반복해도 씬 객체가 누적되지 않음",
-      "ok": false,
-      "detail": "[{\"objects\":11,\"geometries\":132,\"textures\":8,\"audioActive\":1},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2}]"
+      "name": "재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음",
+      "ok": true,
+      "detail": "[{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":1},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2},{\"objects\":11,\"geometries\":143,\"textures\":8,\"audioActive\":2}]"
     },
     {
       "name": "오디오 소스가 누적되지 않음",
@@ -167,7 +217,7 @@
       "objCounts": [
         {
           "objects": 11,
-          "geometries": 132,
+          "geometries": 143,
           "textures": 8,
           "audioActive": 1
         },
