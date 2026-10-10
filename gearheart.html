@@ -9927,6 +9927,459 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   };
 })();
 
+// ================= ENEMY ROSTER · nine machines, nine temperaments =================
+// Every foe is a Governor-era maintenance machine gone wrong, and each now has its own silhouette, paint, noise, signature move and a
+// readable warning, so they can be told apart (and answered) at a glance:
+//   감시구  Watcher    brass eyeball      sees Lin → pings, then rushes             answer: dash through / sidestep
+//   용접공  Torchman   rust-red welder    nozzle heats (0.55 s) then burns          answer: back off, or strike during the warm-up
+//   리벳포  Riveter    steel tripod gun   double-tap bursts, drum magazine          answer: jump the pair
+//   주전자  Kettle     verdigris boiler   whistle + gauge into red, then shells     answer: read the landing ring
+//   잭      Jack       violet jack-in-box lid pops, every 3rd hop is a long lunge   answer: wait out the lid
+//   그라인더 Grinder    toothed saw wheel  revs (!) then rolls                      answer: jump / wall
+//   불워크  Bulwark    shield sentinel    front is armour; bashes after a wind-up   answer: go over, behind, or wait for the vent
+//   아크램프 Arclamp    glass coil jelly   ring closes in, then discharges          answer: leave the ring, strike the dark bulb
+//   드릴    Drillmole  mining burrower    floor cracks where it will surface        answer: sidestep, hit it while it spins down
+// Damage, stomps, soul, score and hit-stop all go through the existing Combat V2 pipeline (applyHit / registerBossHit).
+(() => {
+  'use strict';
+  const INK = '#05070a';
+  const A = (g, n) => { try { g.audio.play(n); } catch (e) {} };
+  const sgn = v => (v < 0 ? -1 : 1);
+  const hitFlash = (e, ctx, fn) => { if (e.hitUntil && e.g.time < e.hitUntil) { ctx.save(); ctx.filter = 'brightness(3.2)'; fn(); ctx.restore(); } else fn(); };
+  const ink = (ctx, b, fn) => outlined(ctx, b[0], b[1], b[2], b[3], fn, INK, 0.9);
+  const CODEX = {
+    Drone:    ['감시구 "아이"',        '린을 보면 신호를 보내고 돌진한다 — 대시나 옆걸음으로 흘려라'],
+    Welder:   ['용접공 "토치맨"',      '노즐이 달아오르면 불꽃이 온다 — 예열 중에 치면 꺼진다'],
+    Turret:   ['리벳포 "탁탁이"',      '두 발씩 연사한다 — 총구가 깜박이면 점프'],
+    Mortar:   ['증기 박격포 "주전자"', '휘파람이 울리면 포탄이 날아온다 — 착탄 원을 읽어라'],
+    Hopper:   ['용수철 인형 "잭"',     '뚜껑이 열리면 다음 도약은 길다'],
+    Roller:   ['톱날 바퀴 "그라인더"', '공회전 소리 뒤에 굴러온다 — 점프하거나 벽 뒤로'],
+    Bulwark:  ['방패병 "불워크"',      '정면은 막힌다 — 위·뒤를 노리거나 지친 틈을 쳐라'],
+    Jelly:    ['전기 해파리 "아크램프"', '고리가 오므라들면 방전한다 — 방전 직후 전구가 꺼진 틈이 기회'],
+    Burrower: ['굴착충 "드릴"',        '땅이 갈라진 자리에서 솟는다 — 옆으로 피하고 솟은 뒤를 쳐라']
+  };
+
+  // ---------------------------------------------------------------- 감시구 · Drone (Watcher)
+  {
+    const base = Drone.prototype.update;
+    Drone.prototype.update = function (dt) {
+      const g = this.g, p = g.player;
+      if (this.dead) return;
+      if (this.stun > 0 || this._combatLaunch || this._combatDrop) { this.wk = 0; return base.call(this, dt); }
+      if (!this.wk) {
+        this.wkT = (this.wkT || 0) - dt;
+        const near = !p.dead && this.wkT <= 0 && Math.abs(p.x - this.x) < 170 && Math.abs((p.y - p.h / 2) - (this.y - 9)) < 110;
+        if (!near) return base.call(this, dt);
+        this.wk = 'ping'; this.wt = 0; this.dir = sgn(p.x - this.x); g.audio.tone(1320, 0.12, 'square', 0.05); g.audio.tone(1760, 0.16, 'square', 0.05, null, 0.12);
+      }
+      this.t += dt; this.wt += dt;
+      const tm = g.level.tm;
+      if (this.wk === 'ping') { this.y = this.base + Math.sin(this.t * 30) * 1.4; if (this.wt >= 0.45) { this.wk = 'rush'; this.wt = 0; this.rx = sgn(p.x - this.x); } }
+      else if (this.wk === 'rush') {
+        const nx = this.x + this.rx * 150 * dt;
+        if (Math.abs(nx - this.x0) < 190 && !tm.solid(Math.floor((nx + this.rx * 14) / TS), Math.floor((this.y - 9) / TS))) this.x = nx;
+        this.dir = this.rx; this.y = this.base + Math.sin(this.t * 14) * 1.2;
+        if (this.wt >= 1.0) { this.wk = 'cool'; this.wt = 0; }
+      } else if (this.wk === 'cool') {
+        const dx = this.x0 - this.x; this.x += clamp(dx, -60 * dt, 60 * dt); this.dir = sgn(dx || this.dir); this.y = this.base + Math.sin(this.t * 3) * 2;
+        if (this.wt >= 1.0) { this.wk = 0; this.wkT = 1.6; }
+      }
+      enemyContact(g, this);
+    };
+    Object.defineProperty(Drone.prototype, 'alert', {get() { return this.wk === 'ping' || this.wk === 'rush'; }, configurable: true});
+    Drone.prototype.draw = function (ctx) {
+      const x = this.x, y = this.y - 9, t = this.t, d = this.dir, st = this.stun > 0, al = this.wk === 'ping' || this.wk === 'rush';
+      ink(ctx, [x - 22, y - 24, x + 22, y + 34], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y); c.rotate(st ? Math.sin(t * 9) * 0.28 : this.wk === 'rush' ? d * 0.28 : Math.sin(t * 2) * 0.06 + d * 0.08); c.lineCap = 'round';
+        for (let i = -1; i <= 1; i++) {                                               // dangling sensor cables
+          const sw = Math.sin(t * 3 + i * 1.7) * 3;
+          c.strokeStyle = '#101418'; c.lineWidth = 2; c.beginPath(); c.moveTo(i * 4, 8); c.bezierCurveTo(i * 5 + sw, 15, i * 7 - sw, 20, i * 6 + sw, 26 + (i === 0 ? 5 : 0)); c.stroke();
+          c.fillStyle = al ? '#ff4a2a' : '#c9a043'; circ(c, i * 6 + sw, 26.4 + (i === 0 ? 5 : 0), 1.4);
+        }
+        for (const s of [-1, 1]) { c.fillStyle = '#4a3a1a'; c.beginPath(); c.moveTo(s * 9, -2); c.lineTo(s * 17, 1); c.lineTo(s * 9, 5); c.closePath(); c.fill(); c.fillStyle = C.brassD; c.fillRect(s * 9 - (s < 0 ? 0 : 0), 0, 0, 0); }
+        const bg = c.createRadialGradient(-3, -4, 1, 0, 0, 11.5); bg.addColorStop(0, '#e6c36a'); bg.addColorStop(0.45, '#9a7428'); bg.addColorStop(1, '#2e1e08'); c.fillStyle = bg; circ(c, 0, 0, 10.5);
+        c.strokeStyle = '#1a1208'; c.lineWidth = 2.2; c.beginPath(); c.ellipse(0, 1, 10.5, 3.2, 0, 0, 7); c.stroke();                // equator band
+        rivet(c, -7, 1, 0.8); rivet(c, 7, 1, 0.8);
+        c.fillStyle = '#07090b'; circ(c, d * 2.4, -2.2, 6.4);                                                                  // eye socket
+        const ir = st ? '#3a1a0e' : al ? '#ff3a22' : '#ffb040'; c.fillStyle = ir; circ(c, d * 2.8, -2.2, 4.6);
+        c.strokeStyle = 'rgba(40,10,4,0.65)'; c.lineWidth = 0.6; for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283 + t * (al ? 3 : 0.4); line(c, d * 2.8 + Math.cos(a) * 1.4, -2.2 + Math.sin(a) * 1.4, d * 2.8 + Math.cos(a) * 4.4, -2.2 + Math.sin(a) * 4.4); }
+        c.fillStyle = '#0a0604'; c.beginPath(); c.ellipse(d * 3, -2.2, al ? 0.9 : 1.6, al ? 3.6 : 2.6, 0, 0, 7); c.fill();           // slit pupil narrows when alert
+        c.fillStyle = 'rgba(255,255,255,0.8)'; circ(c, d * 1.2, -4.2, 0.9);
+        if (al) { c.strokeStyle = '#1a0a06'; c.lineWidth = 2.2; line(c, d * 2.8 - 6, -9.5, d * 2.8 + 5, -6.5); }                    // angry lid
+        c.strokeStyle = '#6a5a3a'; c.lineWidth = 1.1; line(c, -d * 3, -9.6, -d * 4.2, -14.4); c.fillStyle = al ? '#ff3a22' : (Math.floor(t * 2.4) % 2 ? '#ffd070' : '#4a3a1a'); circ(c, -d * 4.2, -14.8, 1.5);
+        c.restore();
+      }));
+    };
+    Drone.prototype.glow = function () { const c = arguments[0]; if (this.stun <= 0) { const al = this.alert; glow(c, this.x + this.dir * 3, this.y - 11, al ? 34 : 22, al ? '255,60,40' : '255,170,60', al ? 0.6 : 0.4); } };
+    Drone.prototype.lights = function (add, CYC, ORG) { if (this.stun <= 0) add(this.x + this.dir * 4, this.y - 10, this.alert ? 66 : 54, this.alert ? [255, 70, 50] : ORG, this.alert ? 0.9 : 0.7); };
+  }
+
+  // ---------------------------------------------------------------- 리벳포 · Turret (Riveter): double-tap
+  {
+    const base = Turret.prototype.update;
+    Turret.prototype.update = function (dt) {
+      const g = this.g, L = g.level.entities, n0 = L.length;
+      if (this._b2 > 0) {
+        this._b2 -= dt;
+        if (this._b2 <= 0 && this.stun <= 0 && !this.dead) { L.push(new Bullet(g, this.x + this.dir * 16, this.y - 13, this.dir * 280)); this.recoil = 4; A(g, 'shoot'); g.particles.steam(this.x + this.dir * 16, this.y - 13, 2, this.dir * 40, 0, 2); }
+      }
+      base.call(this, dt);
+      if (L.length > n0 && L[L.length - 1] instanceof Bullet) this._b2 = 0.17;
+    };
+    Object.defineProperty(Turret.prototype, 'alert', {get() { return this.stun <= 0 && this.cd < 0.5; }, configurable: true});
+    Turret.prototype.draw = function (ctx) {
+      const x = this.x, y = this.y, d = this.dir, t = this.t, st = this.stun > 0, rc = this.recoil, warn = !st && this.cd < 0.5;
+      ink(ctx, [x - 20, y - 36, x + 28, y + 2], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y); c.scale(d, 1); c.lineCap = 'round';
+        c.strokeStyle = '#161b20'; c.lineWidth = 2.6; line(c, 2, -11, 12, 0); line(c, -3, -11, -12, 0); line(c, 0, -11, 0, 0);                  // tripod
+        c.fillStyle = '#242c33'; c.fillRect(9, -1.8, 7, 1.8); c.fillRect(-15, -1.8, 7, 1.8); c.fillRect(-3, -1.8, 6, 1.8);
+        const bg = c.createLinearGradient(0, -24, 0, -10); bg.addColorStop(0, '#7c8a95'); bg.addColorStop(0.5, '#4a5762'); bg.addColorStop(1, '#222a31'); c.fillStyle = bg; rr(c, -9, -24, 19, 13, 2.5); c.fill();
+        c.fillStyle = '#d9b230'; c.fillRect(-9, -17, 19, 3); c.fillStyle = '#15120a'; for (let i = 0; i < 4; i++) c.fillRect(-8 + i * 5, -17, 2.4, 3);   // yellow safety band
+        const rot = t * (warn ? 6 : 0.8); c.save(); c.translate(-5, -28); c.fillStyle = '#2b333a'; circ(c, 0, 0, 7.4); c.fillStyle = '#12171b'; circ(c, 0, 0, 6);        // drum magazine
+        for (let i = 0; i < 6; i++) { const a = rot + i * 1.047; c.fillStyle = i % 2 ? '#c9a043' : '#a8842f'; circ(c, Math.cos(a) * 3.8, Math.sin(a) * 3.8, 1.5); }
+        c.fillStyle = '#4a5762'; circ(c, 0, 0, 1.6); c.restore();
+        c.fillStyle = '#9aa8b2'; c.fillRect(8 - rc, -21, 15, 4.4); c.fillStyle = '#2a3238'; c.fillRect(8 - rc, -18, 15, 1.4); c.fillStyle = '#4a5762'; c.fillRect(20 - rc, -22.4, 3.4, 7.2); c.fillStyle = '#050608'; c.fillRect(22.2 - rc, -20, 1.2, 2.4);   // barrel + muzzle brake
+        c.fillStyle = '#07090b'; c.fillRect(0.4, -22.6, 6.2, 2.8); c.fillStyle = st ? '#3a1a0e' : warn ? '#fff0c0' : '#ff3a22'; c.fillRect(0.9, -22.2, 5.2, 1.8);             // sensor slit
+        c.font = 'bold 5px ' + MONO; c.fillStyle = 'rgba(20,16,6,0.8)'; c.fillText('R-7', -7, -12.4);
+        rivet(c, -7, -22, 0.8); rivet(c, 8, -13, 0.8);
+        c.restore();
+      }));
+    };
+    Turret.prototype.glow = function (ctx) { if (this.stun <= 0 && this.cd < 0.5) glow(ctx, this.x + this.dir * 4, this.y - 21, 20, '255,240,200', 0.5 + 0.3 * Math.sin(this.t * 40)); };
+  }
+
+  // ---------------------------------------------------------------- 주전자 · Mortar (Kettle): whistle + gauge
+  {
+    const base = Mortar.prototype.update;
+    Mortar.prototype.update = function (dt) {
+      const g = this.g, wasLow = this.cd < 0.6;
+      base.call(this, dt);
+      if (this.dead) return;
+      if (Math.random() < dt * 2.2) g.particles.steam(this.x - this.dir * 8, this.y - 31, 1, -this.dir * 10, -34, 3);                                  // chimney smoke
+      if (this.stun <= 0 && this.cd < 0.6 && this.cd > 0) {
+        if (!wasLow) { g.audio.tone(980, 0.5, 'sine', 0.05, 1380); A(g, 'hiss'); }
+        if (Math.random() < 0.5) g.particles.steam(this.x + this.dir * 7, this.y - 31, 1, this.dir * 20, -60, 2.4);                                    // whistle jets
+      }
+    };
+    Object.defineProperty(Mortar.prototype, 'alert', {get() { return this.stun <= 0 && this.cd < 0.6; }, configurable: true});
+    Mortar.prototype.draw = function (ctx) {
+      const x = this.x, y = this.y, d = this.dir, t = this.t, st = this.stun > 0, press = clamp(1 - this.cd / 3.3, 0, 1), hot = !st && this.cd < 0.6;
+      ink(ctx, [x - 20, y - 44, x + 26, y + 2], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y); c.scale(d, 1);
+        c.fillStyle = '#12171b'; rr(c, -11, -5, 9, 5, 2); c.fill(); rr(c, 3, -5, 9, 5, 2); c.fill(); c.fillStyle = '#2a343d'; c.fillRect(-9, -9, 5, 5); c.fillRect(5, -9, 5, 5);   // stumpy legs
+        c.fillStyle = '#2a2a1c'; c.fillRect(-12, -35, 5, 12); c.fillStyle = '#4a4a34'; c.fillRect(-12, -35, 5, 2); c.fillStyle = '#131309'; c.fillRect(-13, -37, 7, 3);                    // chimney
+        const bg = c.createLinearGradient(-12, 0, 12, 0); bg.addColorStop(0, '#1f4a3c'); bg.addColorStop(0.35, '#4f9a7e'); bg.addColorStop(1, '#16372d'); c.fillStyle = bg; rr(c, -12, -29, 24, 22, 6); c.fill();   // verdigris boiler
+        c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-12, -22); c.lineTo(12, -22); c.moveTo(-12, -14); c.lineTo(12, -14); c.stroke();
+        c.fillStyle = C.brassD; c.fillRect(-12, -23, 24, 2.4); c.fillRect(-12, -15, 24, 2.4); c.fillStyle = C.brassL; c.fillRect(-12, -23, 24, 0.8);
+        for (const [rx, ry] of [[-9, -26], [9, -26], [-9, -10], [9, -10]]) rivet(c, rx, ry, 0.9);
+        c.fillStyle = '#0a0d10'; circ(c, 4, -19, 5.2); c.fillStyle = '#e8dcb0'; circ(c, 4, -19, 4.2);                                                    // pressure gauge
+        c.strokeStyle = '#a02a1a'; c.lineWidth = 1.4; c.beginPath(); c.arc(4, -19, 3.4, -0.2, 0.9); c.stroke();
+        const na = Math.PI * 0.8 + press * Math.PI * 1.4; c.strokeStyle = '#201208'; c.lineWidth = 0.9; line(c, 4, -19, 4 + Math.cos(na) * 3.4, -19 + Math.sin(na) * 3.4);
+        c.fillStyle = st ? '#2a0f08' : hot ? '#ffe0a0' : '#c8481a'; c.fillRect(-6, -12, 6, 3);                                                          // fire door
+        c.save(); c.translate(2, -29); c.rotate(-0.95); c.fillStyle = '#5a6672'; c.fillRect(-3 - this.rec, -4, 21, 8); c.fillStyle = '#10161b'; c.fillRect(16 - this.rec, -4.4, 4.4, 8.8); c.fillStyle = C.brassD; c.fillRect(6 - this.rec, -4, 2.4, 8); c.restore();
+        c.strokeStyle = '#8a6a2c'; c.lineWidth = 1.6; line(c, 9, -29, 9, -34); c.fillStyle = '#c9a043'; c.fillRect(6.4, -36.4, 5.4, 2.6);                  // steam whistle
+        c.restore();
+      }));
+    };
+    Mortar.prototype.glow = function (ctx) { if (this.stun <= 0 && this.cd < 0.6) glow(ctx, this.x + this.dir * 4, this.y - 11, 24, '255,200,120', 0.4 + 0.25 * Math.sin(this.t * 30)); };
+  }
+
+  // ---------------------------------------------------------------- 잭 · Hopper (Jack-in-the-box): every 3rd hop is a long lunge, the lid warns
+  {
+    const base = Hopper.prototype.update;
+    Hopper.prototype.update = function (dt) {
+      const wasGr = this.gr, vy0 = this.vy;
+      this.hn = this.hn || 0;
+      this.lid = approach(this.lid || 0, (this.hn % 3 === 2 && this.gr && this.cd < 0.45 && this.stun <= 0) ? 1 : 0, dt * 7);
+      base.call(this, dt);
+      if (this.dead) return;
+      if (wasGr && !this.gr && this.vy < 0) {                                     // a hop just started
+        this.hn++;
+        if ((this.hn - 1) % 3 === 2) { this.vy = -590; this.vx *= 1.55; this.sq = -1.4; A(this.g, 'bolt'); this.g.particles.sparks(this.x, this.y - 20, 6, '#ffd070', 0.5); }
+      }
+    };
+    Object.defineProperty(Hopper.prototype, 'alert', {get() { return (this.lid || 0) > 0.4; }, configurable: true});
+    Hopper.prototype.draw = function (ctx) {
+      const x = this.x, y = this.y, sq = this.sq, st = this.stun > 0, d = this.dir, t = this.t, lid = this.lid || 0, hh = lerp(12, 5, Math.max(0, sq)) + (sq < 0 ? 4 : 0);
+      ink(ctx, [x - 20, y - 56, x + 20, y + 4], c => hitFlash(this, c, () => {
+        c.lineCap = 'round'; c.strokeStyle = '#a9b4bc'; c.lineWidth = 2.4; c.beginPath(); for (let i = 0; i <= 8; i++) { const k = i / 8; c.lineTo(x + (i % 2 ? -5.5 : 5.5) * (i === 0 || i === 8 ? 0.3 : 1), y - 2 - k * hh); } c.stroke();
+        c.fillStyle = '#1a2026'; c.fillRect(x - 9, y - 3, 18, 3);
+        const by = y - 2 - hh - 15;
+        c.fillStyle = '#2a2040'; rr(c, x - 12, by, 24, 15, 3); c.fill(); c.fillStyle = '#4a3a6a'; c.fillRect(x - 10, by + 1, 20, 3); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x - 12, by + 11, 24, 4);   // violet crate
+        c.strokeStyle = '#6a5a8a'; c.lineWidth = 1; c.strokeRect(x - 11.5, by + 0.5, 23, 14);
+        // painted face: one big eye, one cracked eye, sawtooth grin
+        const ex = d * 2; c.fillStyle = '#0a0c10'; circ(c, x - 5 + ex, by + 6, 3.2); circ(c, x + 5 + ex, by + 6, 2.4);
+        c.fillStyle = st ? '#3a1a0e' : '#ffa030'; circ(c, x - 5 + ex + d * 0.6, by + 6, 2.2); c.fillStyle = st ? '#3a1a0e' : '#ff6a2a'; circ(c, x + 5 + ex + d * 0.5, by + 6, 1.4);
+        c.strokeStyle = '#d8d0e8'; c.lineWidth = 0.7; line(c, x + 3.4 + ex, by + 4.2, x + 6.4 + ex, by + 8.2);
+        c.fillStyle = '#e8e0f0'; c.beginPath(); c.moveTo(x - 7 + ex, by + 10.5); for (let i = 0; i < 7; i++) c.lineTo(x - 7 + ex + i * 2.4 + 1.2, by + (i % 2 ? 10.5 : 13)); c.lineTo(x + 8.4 + ex, by + 10.5); c.closePath(); c.fill();
+        c.save(); c.translate(x - 11, by + 0.5); c.rotate(-lid * 1.9 - (st ? 0.2 : 0)); c.fillStyle = '#4a3a6a'; c.fillRect(0, -3, 23, 3.6); c.fillStyle = C.brassD; c.fillRect(0, -3, 23, 1.2); c.restore();   // hinged lid
+        if (lid > 0.3) { c.strokeStyle = '#ffd070'; c.lineWidth = 1.2; line(c, x - 8, by - 6, x - 10, by - 10); line(c, x + 8, by - 6, x + 10, by - 10); line(c, x, by - 7, x, by - 12); }
+        c.strokeStyle = '#8a96a0'; c.lineWidth = 1.2; line(c, x + 7, by, x + 9 + Math.sin(t * 4) * 1.5, by - 6); c.fillStyle = C.warn; circ(c, x + 9 + Math.sin(t * 4) * 1.5, by - 6.8, 1.6);
+      }));
+    };
+    Hopper.prototype.glow = function (ctx) { if ((this.lid || 0) > 0.4) glow(ctx, this.x, this.y - 24, 28, '255,200,100', 0.4); };
+  }
+
+  // ---------------------------------------------------------------- 그라인더 · Roller
+  {
+    Roller.prototype.draw = function (ctx) {
+      const x = this.x, y = this.y - 14, r = 14, rev = this.st === 'rev', t = this.t;
+      ink(ctx, [x - 24, y - 24, x + 24, y + 16], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y); c.rotate(this.rot);
+        for (let i = 0; i < 14; i++) {                                                                                     // saw teeth, hot tips when revving
+          const a = i * Math.PI / 7, tipC = rev || this.st === 'roll' ? '#ff9a50' : '#a8b4bc';
+          c.fillStyle = '#7c8892'; c.beginPath(); c.moveTo(Math.cos(a - 0.16) * (r - 1), Math.sin(a - 0.16) * (r - 1)); c.lineTo(Math.cos(a + 0.05) * (r + 7), Math.sin(a + 0.05) * (r + 7)); c.lineTo(Math.cos(a + 0.2) * (r - 1), Math.sin(a + 0.2) * (r - 1)); c.fill();
+          c.fillStyle = tipC; c.beginPath(); c.moveTo(Math.cos(a + 0.05) * (r + 7), Math.sin(a + 0.05) * (r + 7)); c.lineTo(Math.cos(a - 0.02) * (r + 3.4), Math.sin(a - 0.02) * (r + 3.4)); c.lineTo(Math.cos(a + 0.12) * (r + 3.4), Math.sin(a + 0.12) * (r + 3.4)); c.fill();
+        }
+        const g = c.createRadialGradient(-4, -4, 1, 0, 0, r); g.addColorStop(0, '#6a7884'); g.addColorStop(1, '#1a2128'); c.fillStyle = g; circ(c, 0, 0, r); c.strokeStyle = '#06080a'; c.lineWidth = 1.5; c.stroke();
+        c.strokeStyle = '#2a343d'; c.lineWidth = 2.4; for (let i = 0; i < 4; i++) { const a = i * 1.5708 + 0.4; line(c, Math.cos(a) * 4, Math.sin(a) * 4, Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86); }
+        c.restore();
+        c.save(); c.translate(x, y); c.fillStyle = '#0a0c0e'; rr(c, -6.5, -3.4, 13, 6.8, 2.4); c.fill();                                // the hub never spins: an angry visor
+        c.fillStyle = this.st === 'idle' ? '#5a1a0e' : '#ff3a22'; c.beginPath(); c.moveTo(-5, -1); c.lineTo(5, -2.6); c.lineTo(5, -0.2); c.lineTo(-5, 1.8); c.closePath(); c.fill();
+        c.restore();
+        if (rev) { c.fillStyle = C.warn; c.font = 'bold 11px ' + MONO; c.textAlign = 'center'; c.fillText('!', x, y - 28 - Math.sin(t * 30) * 2); c.textAlign = 'left'; }
+      }));
+    };
+    Object.defineProperty(Roller.prototype, 'alert', {get() { return this.st === 'rev'; }, configurable: true});
+  }
+
+  // ================================================================ NEW · 방패병 불워크 (Bulwark)
+  class Bulwark extends Enemy {
+    constructor(g, x, y) {
+      super(g, x, y); this.w = 30; this.h = 44; this.dir = -1; this.home = x; this.st = 'patrol'; this.stt = 0; this.cd = 0; this.shieldK = 1;
+      this.maxHp = this.hp = 6; this._combatHealthInitialized = true;
+    }
+    get armored() { return this.st !== 'tired' && this.st !== 'bash'; }
+    get alert() { return this.st === 'wind'; }
+    update(dt) {
+      const g = this.g, p = g.player, tm = g.level.tm; this.t += dt; this.stt += dt; this.cd -= dt;
+      this.shieldK = approach(this.shieldK, this.st === 'tired' ? 0 : this.st === 'bash' ? 1.35 : this.st === 'wind' ? 0.55 : 1, dt * 7);
+      if (this.stun > 0) { this.stun -= dt; if (this.st === 'wind') { this.st = 'tired'; this.stt = 0; } enemyContact(g, this); return; }
+      const dx = p.x - this.x, near = !p.dead && Math.abs(dx) < 200 && Math.abs(p.y - this.y) < 60;
+      const step = (v) => {
+        const nx = this.x + v * dt, fx = Math.floor((nx + sgn(v) * 18) / TS), gy = Math.floor((this.y + 2) / TS), gc = tm.get(fx, gy);
+        if (tm.solid(fx, Math.floor((this.y - 10) / TS)) || !(SOLID.has(gc) || gc === '-')) return false; this.x = nx; return true;
+      };
+      if (this.st === 'patrol') {
+        if (!step(this.dir * 26) || Math.abs(this.x - this.home) > 110) this.dir *= -1;
+        if (near) { this.st = 'guard'; this.stt = 0; A(g, 'clank'); }
+      } else if (this.st === 'guard') {
+        if (sgn(dx) !== this.dir) { this.turnT = (this.turnT || 0) + dt; if (this.turnT > 0.7) { this.dir = sgn(dx); this.turnT = 0; A(g, 'tap'); } }   // heavy plate: it takes 0.7 s to turn around — that is the window to get behind it
+        else { this.turnT = 0; if (Math.abs(dx) > 46) step(this.dir * 44); }
+        if (!near) { this.st = 'patrol'; this.stt = 0; }
+        else if (Math.abs(dx) < 92 && this.cd <= 0 && this.stt > 0.5) { this.st = 'wind'; this.stt = 0; this.dir = sgn(dx); g.audio.tone(140, 0.6, 'sawtooth', 0.06, 70); A(g, 'hiss'); }
+      } else if (this.st === 'wind') {
+        if (Math.random() < dt * 14) g.particles.steam(this.x - this.dir * 10, this.y - 30, 1, -this.dir * 30, -30, 2.4);
+        if (this.stt >= 0.65) { this.st = 'bash'; this.stt = 0; A(g, 'stomp'); g.camera.shake(0.12); }
+      } else if (this.st === 'bash') {
+        step(this.dir * 300); g.particles.dust(this.x - this.dir * 14, this.y, 1, 0.8);
+        const b = {l: this.x + (this.dir > 0 ? 6 : -34), r: this.x + (this.dir > 0 ? 34 : -6), t: this.y - 40, b: this.y - 2};
+        if (!p.dead && overlap(p.hbox(), b)) p.hurt(this.dir);
+        if (this.stt >= 0.34) { this.st = 'tired'; this.stt = 0; this.cd = 2.2; g.particles.steam(this.x, this.y - 22, 8, 0, -60, 6); A(g, 'steam'); }
+      } else if (this.st === 'tired') {
+        if (Math.random() < dt * 10) g.particles.steam(this.x - this.dir * 6, this.y - 36, 1, rand(-10, 10), -50, 3);
+        if (this.stt >= 1.5) { this.st = 'guard'; this.stt = 0; }
+      }
+      enemyContact(g, this);
+    }
+    box() { return {l: this.x - 15, t: this.y - 44, r: this.x + 15, b: this.y}; }
+    draw(ctx) {
+      const x = this.x, y = this.y, d = this.dir, t = this.t, sk = this.shieldK, tired = this.st === 'tired', wind = this.st === 'wind';
+      this.noticeT = 0;
+      ink(ctx, [x - 30, y - 56, x + 34, y + 3], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y); c.scale(d, 1);
+        const lean = this.st === 'bash' ? 4 : wind ? -3 : 0, bob = tired ? 3 : 0;
+        c.fillStyle = '#12171b'; rr(c, -11 + lean * 0.3, -9, 10, 9, 2); c.fill(); rr(c, 1 + lean * 0.3, -9, 10, 9, 2); c.fill(); c.fillStyle = '#2a343d'; c.fillRect(-9 + lean * 0.3, -14, 6, 6); c.fillRect(3 + lean * 0.3, -14, 6, 6);   // stout legs
+        const tg = c.createLinearGradient(-13, 0, 13, 0); tg.addColorStop(0, '#2a3238'); tg.addColorStop(0.5, '#56646f'); tg.addColorStop(1, '#222a30'); c.fillStyle = tg; rr(c, -12 + lean, -34 + bob, 24, 22, 3); c.fill();   // torso
+        c.fillStyle = C.brassD; c.fillRect(-12 + lean, -20 + bob, 24, 2.4); rivet(c, -9 + lean, -30 + bob, 0.9); rivet(c, 9 + lean, -30 + bob, 0.9);
+        c.fillStyle = '#1a2026'; rr(c, -7 + lean, -44 + bob, 15, 11, 3); c.fill();                                          // helmet
+        c.fillStyle = '#050709'; c.fillRect(-2 + lean, -40 + bob, 10, 3.4); c.fillStyle = tired ? '#3a2a10' : wind ? '#ffd070' : '#ff7a2a'; c.fillRect(-1 + lean, -39.6 + bob, 8.2, 2.6);   // visor slit
+        c.fillStyle = '#3a4650'; c.beginPath(); c.moveTo(-7 + lean, -44 + bob); c.lineTo(0 + lean, -49 + bob); c.lineTo(8 + lean, -44 + bob); c.closePath(); c.fill();
+        // the shield: tower plate, hazard band, dents, central boss; slides forward on a bash and drops when the Bulwark is spent
+        const sx = 10 + (sk - 1) * 12 + lean, sy = -44 + (1 - Math.min(sk, 1)) * 14 + bob, sh = 44 - (1 - Math.min(sk, 1)) * 10;
+        c.fillStyle = '#0c1014'; c.fillRect(sx - 1, sy - 1, 13, sh + 2);
+        const sg = c.createLinearGradient(sx, 0, sx + 11, 0); sg.addColorStop(0, '#8a4a2a'); sg.addColorStop(0.5, '#b0612e'); sg.addColorStop(1, '#5a2e18'); c.fillStyle = sg; c.fillRect(sx, sy, 11, sh);
+        stripes(c, sx, sy + sh * 0.62, 11, 6, 4); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(sx + 8, sy, 3, sh); c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(sx, sy, 1.6, sh);
+        c.fillStyle = '#6a7a86'; circ(c, sx + 5, sy + sh * 0.3, 3.4); c.fillStyle = '#2a343d'; circ(c, sx + 5, sy + sh * 0.3, 1.6);
+        c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 1; line(c, sx + 1, sy + sh * 0.12, sx + 6, sy + sh * 0.2); line(c, sx + 3, sy + sh * 0.85, sx + 9, sy + sh * 0.8);
+        rivet(c, sx + 2, sy + 3, 0.9); rivet(c, sx + 9, sy + 3, 0.9); rivet(c, sx + 2, sy + sh - 3, 0.9); rivet(c, sx + 9, sy + sh - 3, 0.9);
+        c.restore();
+      }));
+    }
+    glow(ctx) { if (this.st === 'wind' || this.st === 'bash') glow(ctx, this.x + this.dir * 12, this.y - 20, 34, '255,120,50', this.st === 'wind' ? 0.3 + 0.3 * Math.sin(this.t * 40) : 0.5); if (this.stun <= 0) glow(ctx, this.x + this.dir * 4, this.y - 39, 12, this.st === 'tired' ? '120,80,30' : '255,140,50', 0.4); }
+    lights(add, CYC, ORG) { if (this.st === 'wind' || this.st === 'bash') add(this.x + this.dir * 14, this.y - 20, 80, ORG, 0.8); else add(this.x + this.dir * 4, this.y - 39, 40, ORG, this.st === 'tired' ? 0.15 : 0.4); }
+  }
+
+  // ================================================================ NEW · 아크램프 (Arclamp, electric jelly)
+  class Jelly extends Enemy {
+    constructor(g, x, y) { super(g, x, y); this.w = 26; this.h = 22; this.home = x; this.hy = y; this.st = 'drift'; this.stt = 0; this.cd = 1.2 + Math.random(); this.maxHp = this.hp = 3; this._combatHealthInitialized = true; this.ph = Math.random() * 6; }
+    get alert() { return this.st === 'charge' || this.st === 'zap'; }
+    update(dt) {
+      const g = this.g, p = g.player; this.t += dt; this.stt += dt; this.cd -= dt;
+      this.y = this.hy + Math.sin(this.t * 1.7 + this.ph) * 5 + (this.st === 'dim' ? 6 : 0);
+      if (this.stun > 0) { this.stun -= dt; if (this.st === 'charge') { this.st = 'dim'; this.stt = 0; } enemyContact(g, this); return; }
+      const dx = p.x - this.x, dy = (p.y - p.h / 2) - (this.y - 11), dist = Math.hypot(dx, dy);
+      if (this.st === 'drift') {
+        if (!p.dead && Math.abs(dx) < 280 && Math.abs(this.x - this.home) < 150) this.x += sgn(dx) * 24 * dt; else this.x += clamp(this.home - this.x, -16 * dt, 16 * dt);
+        if (!p.dead && dist < 112 && this.cd <= 0) { this.st = 'charge'; this.stt = 0; g.audio.tone(220, 0.9, 'sawtooth', 0.05, 880); }
+      } else if (this.st === 'charge') {
+        if (Math.random() < dt * 20) g.particles.sparks(this.x + rand(-12, 12), this.y - 11 + rand(-8, 8), 1, '#c8a8ff', 0.4);
+        if (this.stt >= 0.9) { this.st = 'zap'; this.stt = 0; g.audio.bsfx('shock'); g.camera.shake(0.18); g.particles.ring(this.x, this.y - 11, 'rgba(200,170,255,0.9)', 78, 0.25); g.particles.sparks(this.x, this.y - 11, 18, '#d8c0ff', 1); }
+      } else if (this.st === 'zap') {
+        const b = p.hbox(), cx = (b.l + b.r) / 2, cy = (b.t + b.b) / 2;
+        if (!p.dead && Math.hypot(cx - this.x, cy - (this.y - 11)) < 78 + 6) p.hurt(sgn(cx - this.x));
+        if (this.stt >= 0.22) { this.st = 'dim'; this.stt = 0; this.cd = 2.6; }
+      } else if (this.st === 'dim') { if (this.stt >= 1.5) { this.st = 'drift'; this.stt = 0; } }
+      enemyContact(g, this);
+    }
+    draw(ctx) {
+      const x = this.x, y = this.y, t = this.t, ch = this.st === 'charge', zap = this.st === 'zap', dim = this.st === 'dim' || this.stun > 0, k = ch ? Math.min(1, this.stt / 0.9) : 0;
+      ink(ctx, [x - 20, y - 30, x + 20, y + 30], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y - 11); c.lineCap = 'round';
+        for (let i = -2; i <= 2; i++) {                                                                                 // trailing electrode cables
+          const sw = Math.sin(t * 3 + i) * 3, len = 18 + (i % 2 ? 6 : 0);
+          c.strokeStyle = '#0c0f14'; c.lineWidth = 2; c.beginPath(); c.moveTo(i * 4.5, 6); c.bezierCurveTo(i * 5 + sw, 12, i * 6 - sw, len - 6, i * 5 + sw * 1.4, len); c.stroke();
+          c.fillStyle = dim ? '#3a2a5a' : '#c8a8ff'; circ(c, i * 5 + sw * 1.4, len, 1.4);
+        }
+        c.fillStyle = 'rgba(190,170,255,' + (dim ? 0.12 : 0.22) + ')'; c.beginPath(); c.ellipse(0, -1, 13, 11, 0, Math.PI, 0); c.lineTo(13, 4); c.quadraticCurveTo(0, 8, -13, 4); c.closePath(); c.fill();   // glass bell
+        c.strokeStyle = 'rgba(210,200,255,0.55)'; c.lineWidth = 1; c.stroke();
+        c.fillStyle = '#6a5a8a'; c.fillRect(-13, 3, 26, 3.4); c.fillStyle = C.brassD; c.fillRect(-13, 3, 26, 1.2);                       // rim
+        c.strokeStyle = dim ? '#3a2a5a' : '#2a2142'; c.lineWidth = 3; line(c, 0, 3, 0, -8);                                              // coil post
+        for (let j = 0; j < 4; j++) { c.fillStyle = dim ? '#2e2448' : '#4a3a7a'; c.beginPath(); c.ellipse(0, 1 - j * 2.8, 5.5 - j * 0.6, 1.3, 0, 0, 7); c.fill(); }
+        if (!dim) { c.strokeStyle = (ch || zap) ? '#fff' : '#c8a8ff'; c.lineWidth = 1; c.beginPath(); let px = 0, py = -9; c.moveTo(px, py); for (let i = 0; i < 5; i++) { px = (Math.sin(t * 40 + i * 3.1) * 7); py = -9 + (i + 1) * 3; c.lineTo(px, py); } c.stroke(); }
+        c.fillStyle = dim ? '#3a2a5a' : '#f0e0ff'; circ(c, 0, -9.4, 2 + k * 1.4);
+        c.restore();
+      }));
+    }
+    glow(ctx) {
+      const x = this.x, y = this.y - 11, ch = this.st === 'charge', dim = this.st === 'dim' || this.stun > 0;
+      glow(ctx, x, y, dim ? 14 : 30, '190,150,255', dim ? 0.12 : 0.4);
+      if (ch) { const k = this.stt / 0.9, r = lerp(112, 78, k); ctx.strokeStyle = `rgba(210,180,255,${0.35 + 0.5 * k})`; ctx.lineWidth = 1.4; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle = `rgba(255,255,255,${0.2 + 0.6 * k})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 78, 0, 7); ctx.stroke(); }
+      if (this.st === 'zap') { glow(ctx, x, y, 110, '210,180,255', 0.7); ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 78, 0, 7); ctx.stroke(); }
+    }
+    lights(add) { const dim = this.st === 'dim' || this.stun > 0; add(this.x, this.y - 11, this.st === 'zap' ? 170 : dim ? 40 : 90, [190, 150, 255], this.st === 'zap' ? 1.3 : dim ? 0.2 : 0.6); }
+  }
+
+  // ================================================================ NEW · 드릴 (Drillmole, burrower)
+  class Burrower extends Enemy {
+    constructor(g, x, y) { super(g, x, y); this.w = 26; this.h = 34; this.st = 'hidden'; this.stt = 0; this.tx = x; this.maxHp = this.hp = 3; this._combatHealthInitialized = true; this.rot = 0; this.cd = 0.6; this.rise = 0; }
+    get alert() { return this.st === 'tremor'; }
+    get underground() { return this.st === 'hidden' || this.st === 'tremor' || this.st === 'sink'; }
+    box() { return this.underground ? {l: this.x, t: this.y, r: this.x, b: this.y} : {l: this.x - 13, t: this.y - 34 * this.rise, r: this.x + 13, b: this.y}; }
+    update(dt) {
+      const g = this.g, p = g.player, tm = g.level.tm; this.t += dt; this.stt += dt; this.cd -= dt; this.rot += dt * (this.st === 'out' ? 22 : 6);
+      if (this.stun > 0) { this.stun -= dt; if (this.st === 'out') { this.st = 'sink'; this.stt = 0; } }
+      const onFloor = (x) => { const fx = Math.floor(x / TS); const gy = Math.floor((this.y + 2) / TS); return SOLID.has(tm.get(fx, gy)) || tm.get(fx, gy) === '-'; };
+      if (this.st === 'hidden') {
+        this.rise = 0;
+        const dx = p.x - this.x;
+        if (!p.dead && this.cd <= 0 && Math.abs(dx) < 170 && Math.abs(p.y - this.y) < 70 && p.grounded) {
+          this.st = 'tremor'; this.stt = 0; this.tx = clamp(p.x, this.x - 150, this.x + 150); g.audio.bsfx('shock');
+          g.addCrack && g.addCrack(this.tx, this.y, 0.5);
+        }
+      } else if (this.st === 'tremor') {
+        this.x += clamp(this.tx - this.x, -330 * dt, 330 * dt);                                                         // tunnels under the floor to the marked spot
+        if (Math.random() < dt * 30) g.particles.dust(this.x + rand(-10, 10), this.y, 1, 1.2);
+        if (Math.abs(this.x - this.tx) < 4 && this.stt >= 0.75) { this.x = this.tx; this.st = 'out'; this.stt = 0; this.rise = 0; A(g, 'smallboom'); g.camera.shake(0.25); g.particles.debris(this.x, this.y - 6, 8, [C.steel, '#5a4a3a', C.rustD]); g.particles.dust(this.x, this.y, 8, 1.6); }
+      } else if (this.st === 'out') {
+        this.rise = approach(this.rise, 1, dt * 7);
+        const b = {l: this.x - 12, r: this.x + 12, t: this.y - 36 * this.rise, b: this.y};
+        if (this.stt < 0.35 && !p.dead && overlap(p.hbox(), b)) p.hurt(sgn(p.x - this.x));                                // the eruption itself: only the first 0.35 s hurts
+        if (this.stt >= 1.7) { this.st = 'sink'; this.stt = 0; }
+      } else if (this.st === 'sink') {
+        this.rise = approach(this.rise, 0, dt * 6);
+        if (this.rise <= 0) { this.st = 'hidden'; this.stt = 0; this.cd = 1.8; }
+      }
+      if (this.st === 'out' && this.stt >= 0.35) { if (this.stun <= 0 && this.rise > 0.5) { /* exposed & harmless: spinning down */ } }
+      if (this.st === 'out' && this.stt < 0.35) enemyContact(g, this);
+    }
+    draw(ctx) {
+      const x = this.x, y = this.y, t = this.t, r = this.rise;
+      if (this.underground) {                                                                                           // rubble mound + ripple
+        ctx.save(); ctx.fillStyle = '#12161a'; ctx.beginPath(); ctx.ellipse(x, y + 1, 15, 4, 0, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = '#2a3036'; for (let i = 0; i < 5; i++) { const a = hash(Math.floor(this.home || x), i); ctx.fillRect(x - 12 + a * 22, y - 3 - (i % 2) * 1.6, 3 + (i % 3), 2.4); }
+        if (this.st === 'tremor') { ctx.fillStyle = 'rgba(255,170,60,0.9)'; ctx.fillRect(x - 3, y - 1, 6, 1.6); }
+        ctx.restore(); return;
+      }
+      ink(ctx, [x - 20, y - 44, x + 20, y + 4], c => hitFlash(this, c, () => {
+        c.save(); c.translate(x, y); c.beginPath(); c.rect(-30, -60, 60, 60); c.clip(); c.translate(0, (1 - r) * 36);
+        c.fillStyle = '#2a2a24'; rr(c, -11, -18, 22, 20, 5); c.fill(); c.fillStyle = '#4a4a3a'; c.fillRect(-11, -18, 22, 3); stripes(c, -11, -7, 22, 4, 4);   // armoured body
+        c.fillStyle = '#0a0c0e'; circ(c, -4, -13, 3.2); circ(c, 4, -13, 3.2); c.fillStyle = this.stun > 0 ? '#3a1a0e' : '#ff7a2a'; circ(c, -3.6, -13, 1.9); circ(c, 4.4, -13, 1.9);   // goggles
+        c.strokeStyle = '#7a8892'; c.lineWidth = 1.2; c.beginPath(); c.arc(-4, -13, 3.6, 0, 7); c.arc(4, -13, 3.6, 0, 7); c.stroke();
+        c.fillStyle = '#7c8892'; c.beginPath(); c.moveTo(-8, -17); c.lineTo(0, -40); c.lineTo(8, -17); c.closePath(); c.fill();                         // drill cone
+        c.save(); c.beginPath(); c.moveTo(-8, -17); c.lineTo(0, -40); c.lineTo(8, -17); c.closePath(); c.clip();
+        c.strokeStyle = '#2a343d'; c.lineWidth = 2.4; for (let i = -2; i < 7; i++) { const yy = -17 - ((i * 5 + this.rot * 4) % 30); c.beginPath(); c.moveTo(-9, yy + 6); c.lineTo(9, yy - 2); c.stroke(); }
+        c.fillStyle = 'rgba(255,255,255,0.14)'; c.fillRect(-6, -40, 2, 24); c.restore();
+        c.strokeStyle = '#05070a'; c.lineWidth = 1; c.beginPath(); c.moveTo(-8, -17); c.lineTo(0, -40); c.lineTo(8, -17); c.stroke();
+        c.restore();
+      }));
+    }
+    glow(ctx) { if (this.st === 'tremor') { const k = clamp(this.stt / 0.75, 0, 1); glow(ctx, this.tx, this.y - 2, 20 + 22 * k, '255,150,50', 0.25 + 0.5 * k); ctx.strokeStyle = `rgba(255,170,70,${0.4 + 0.5 * k})`; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(this.tx - 16, this.y - 0.5); ctx.lineTo(this.tx + 16, this.y - 0.5); ctx.stroke(); for (let i = -1; i <= 1; i += 2) { ctx.beginPath(); ctx.moveTo(this.tx + i * 18, this.y - 1); ctx.lineTo(this.tx + i * 18, this.y - 14 * k); ctx.stroke(); } } }
+    lights(add, CYC, ORG) { if (this.st === 'tremor' || (this.st === 'out' && this.stt < 0.5)) add(this.tx, this.y - 4, 70, ORG, 0.6); }
+  }
+  Burrower.prototype.stunIt = function () { this.stun = 2; if (this.st === 'out') { this.st = 'sink'; this.stt = 0; } };
+  window.GH_ROSTER = {Bulwark, Jelly, Burrower, CODEX};
+
+  // ---------------------------------------------------------------- armour & invulnerability, through the existing boss-hit hook
+  GH_COMBAT.registerBossHit((target, hit) => {
+    if (target instanceof Burrower && target.underground) return {hit: false, damage: 0, killed: false};
+    if (target instanceof Bulwark) {
+      const p = hit.player, front = p && sgn(p.x - target.x) === target.dir;
+      if (hit.kind === 'attack' && hit.dir === 'side' && front && target.armored) {                                      // blocked: spark + shield shove, no damage
+        target.shieldK = 0.6; target.g.particles.sparks(target.x + target.dir * 18, target.y - 22, 8, C.fireL, 0.8);
+        return {hit: true, damage: 0, killed: false, armored: true};
+      }
+    }
+    return null;
+  });
+
+  // ---------------------------------------------------------------- where they live
+  const QUOTA = {2: [['Bulwark', 1], ['Burrower', 2]], 11: [['Bulwark', 1]], 12: [['Burrower', 1]], 13: [['Jelly', 3], ['Bulwark', 1]], 4: [['Bulwark', 1]]};
+  const MAKE = {Bulwark: (g, x, y) => new Bulwark(g, x, y), Jelly: (g, x, y) => new Jelly(g, x, y - 66), Burrower: (g, x, y) => new Burrower(g, x, y)};
+  const MINSPAN = {Bulwark: 8, Jelly: 6, Burrower: 7};
+  function place(g) {
+    const L = g.level, d = L.def, q = QUOTA[d.id]; if (!q) return;
+    const tm = L.tm, R = rng32(d.id * 7919 + 13), spans = [];
+    for (let ty = 2; ty < tm.h - 1; ty++) {
+      let run = null;
+      for (let tx = 1; tx <= tm.w; tx++) {
+        const ok = tx < tm.w && tm.get(tx, ty) === '#' && !tm.solid(tx, ty - 1) && !tm.solid(tx, ty - 2) && !tm.solid(tx, ty - 3) && !tm.solid(tx, ty - 4);
+        if (ok) { if (!run) run = {x0: tx, y: ty * TS, n: 0}; run.n++; } else if (run) { spans.push(run); run = null; }
+      }
+    }
+    const keep = L.entities.filter(e => e instanceof Checkpoint || e instanceof Exit || e instanceof Lever || e instanceof Door || e instanceof Sign || e instanceof Trigger || e instanceof ArenaTrigger || /Mech|Cam|Crank|Geneva|Fly|Ratchet|Pendulum|Spring|Tesla|Fan|Spike|Piston|Crusher|GearPlat|Vent/.test(e.constructor.name));
+    const A = L.arena, taken = [];
+    for (const [kind, n] of q) {
+      const need = MINSPAN[kind], pool = spans.filter(s => s.n >= need && (!A || s.x0 * TS < A.x0 - 160) && s.x0 * TS > L.spawn.x + 280);
+      for (let i = 0; i < n && pool.length; i++) {
+        let tries = 0, done = false;
+        while (tries++ < 14 && !done) {
+          const s = pool[(R() * pool.length) | 0], x = (s.x0 + 2 + R() * Math.max(0, s.n - 4)) * TS + 16, y = s.y;
+          if (keep.some(e => Math.abs(e.x - x) < 130 && Math.abs(e.y - y) < 200)) continue;
+          if (taken.some(t => Math.abs(t.x - x) < 220 && Math.abs(t.y - y) < 160)) continue;
+          const e = MAKE[kind](g, x, y); e.home = x; L.entities.push(e); taken.push({x, y}); done = true;
+        }
+      }
+    }
+  }
+  const baseLoad = Game.prototype.loadLevel;
+  Game.prototype.loadLevel = function (n) { baseLoad.call(this, n); try { place(this); } catch (e) { console.error('roster place', e); } };
+
+  // ---------------------------------------------------------------- first meeting: name + the one-line answer (once per save)
+  const baseStep = Game.prototype.step;
+  Game.prototype.step = function (dt) {
+    baseStep.call(this, dt);
+    if (this.state !== 'play' || !this.level || !this.player || this.toastMsg || this.dialogue.active || this.director.active) return;
+    const seen = this.M().codex || (this.M().codex = {}), p = this.player;
+    for (const e of this.level.entities) {
+      if (!(e instanceof Enemy) || e.dead || Math.abs(e.x - p.x) > 300 || Math.abs(e.y - p.y) > 200) continue;
+      const k = e.constructor.name === 'Dummy' ? null : e.constructor.name; if (!k || !CODEX[k] || seen[k]) continue;
+      seen[k] = 1; this.persist(); this.toast('▣ ' + CODEX[k][0] + ' — ' + CODEX[k][1]); this.audio.play('click'); break;
+    }
+  };
+})();
+
 // ================= READABILITY PASS · actors keep a visible edge after the lightmap =================
 // Why: the ink outline (outlined()) is DARK and the rim light (drawWithRim) only exists next to a light source, so in the
 // dark zones Lin's navy trousers and the grey Welder / Turret / Mortar sink into the background (measured: ~41 % of Lin's
@@ -9967,6 +10420,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
   // is this foe about to hurt? (same thresholds the foes use for their own warning blink)
   function alerting(e) {
     if (!e || e.stun > 0) return false;
+    if (e.alert) return true;                                          // roster foes expose their own warning state
     if (e instanceof Welder) return e.st === 'warn' || e.st === 'flame';
     if (e instanceof Turret) return e.cd < 0.5;
     if (e instanceof Mortar) return e.cd < 0.6;
@@ -10012,7 +10466,7 @@ window.GH_PIXEL_ASSETS={"lin-attack-down":{"src":"data:image/png;base64,iVBORw0K
     stamp(g, z, box, drawFn, role, k);
   };
   // the foe draw wrappers tell us which entity a drawWithRim call belongs to (the call itself only carries a closure)
-  for (const cls of [Drone, Welder, Turret, Mortar, Hopper, Roller, typeof Dummy !== 'undefined' ? Dummy : null]) {
+  for (const cls of [Drone, Welder, Turret, Mortar, Hopper, Roller, typeof Dummy !== 'undefined' ? Dummy : null, ...(window.GH_ROSTER ? [GH_ROSTER.Bulwark, GH_ROSTER.Jelly, GH_ROSTER.Burrower] : [])]) {
     if (!cls) continue;
     const d = cls.prototype.draw;
     cls.prototype.draw = function (c) { RO.cur = this; return d.call(this, c); };
