@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-12T10:47:38.970Z",
+  "startedAt": "2026-10-12T10:55:23.520Z",
   "checks": [
     {
       "name": "설정 패널 열림",
@@ -9,7 +9,7 @@
     {
       "name": "설정이 localStorage 에 저장됨",
       "ok": true,
-      "detail": "{\"quality\":\"low\",\"sensitivity\":1.5,\"shake\":0.7,\"invertY\":false,\"master\":0.8,\"sfx\":0.9,\"music\":0.6,\"tutorialSeen\":false,\"showFps\":false,\"rumble\":1,\"qte\":\"normal\"}"
+      "detail": "{\"quality\":\"low\",\"sensitivity\":1.5,\"shake\":0.7,\"invertY\":false,\"master\":0.8,\"sfx\":0.9,\"music\":0.6,\"tutorialSeen\":false,\"showFps\":false,\"rumble\":1,\"qte\":\"off\"}"
     },
     {
       "name": "설정 뒤로가기",
