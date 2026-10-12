@@ -6,6 +6,7 @@ import {
 } from './math';
 import { TUNING } from './tuning';
 import { canExecute } from './execution';
+import { holdPlayerInGrapple } from './grapple';
 import type { InputFrame, PlayerState } from './state';
 
 const T = TUNING.player;
@@ -131,8 +132,8 @@ function startAttack(ctx: SimContext, p: PlayerState, id: PlayerAttackId, chain:
 }
 
 /** 처형: 경직한 사자 앞으로 도약 내려찍기 클립을 재사용해 파고든다. 판정은 고정 명중이고 동작 내내 무적이다. */
-function startExecution(ctx: SimContext, p: PlayerState): boolean {
-  if (!canExecute(ctx)) return false;
+export function startExecution(ctx: SimContext, p: PlayerState, force = false): boolean {
+  if (!force && !canExecute(ctx)) return false;
   const lion = ctx.lion;
   const def = PLAYER_ATTACKS.heavy;
   const dl = dist2(p.pos, lion.pos);
@@ -205,6 +206,9 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
   p.buffer.t -= dt;
   if (p.buffer.t <= 0) p.buffer.action = null;
   p.knock = { x: approach(p.knock.x, 0, 14 * dt), z: approach(p.knock.z, 0, 14 * dt) };
+
+  // 물어뜯기 포획 중: 방패를 든 채 제자리에 묶여 상호작용 입력만 받는다 (입력 처리는 grapple.ts)
+  if (ctx.grapple) { holdPlayerInGrapple(ctx); return; }
 
   const dead = p.mode === 'dead';
   const scripted = p.mode === 'scripted';

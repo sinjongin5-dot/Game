@@ -154,3 +154,34 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; c
   .stack.row .btn { min-width: 150px; padding: 8px 18px; font-size: 14px; }
   .result-body { padding: 8px; }
 }
+
+/* ── 컨트롤러 / 상호작용 ── */
+.gl { display: inline-block; min-width: 1.5em; height: 1.5em; line-height: 1.5em; border-radius: 50%; text-align: center; font-weight: 700; font-style: normal; color: #101010; margin: 0 2px; font-family: var(--font-display); }
+.gl.a { background: #7cc450; } .gl.b { background: #e0584f; } .gl.x { background: #4f86e0; color: #fff; } .gl.y { background: #e8c53c; }
+.pad-only { display: none; }
+body.dev-pad .pad-only { display: block; }
+body.dev-pad { cursor: none; }
+body.dev-pad.menu-open { cursor: default; }
+/* 컨트롤러로 선택 중인 항목 (키보드 포커스와 같은 강조) */
+.btn.gp-focus { color: #fff7e0; background: linear-gradient(to right, rgba(95,66,30,0.72), rgba(23,18,14,0.2)); padding-left: 30px; border-color: var(--bronze-hi); }
+.seg button.gp-focus { color: #fff3d8; box-shadow: inset 0 0 0 2px var(--bronze-hi); }
+input.gp-focus { outline: 2px solid var(--bronze-hi); outline-offset: 3px; }
+.panel .row.gp-row { background: linear-gradient(to right, rgba(169,123,58,0.16), transparent); }
+#pad-toast { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 30; padding: 8px 22px; font-size: 14px; letter-spacing: 0.12em; color: var(--parch); background: rgba(8,6,4,0.8); border-bottom: 1px solid var(--bronze); }
+#pad-toast.hidden { display: none; }
+
+#qte { position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); z-index: 9; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; text-shadow: 0 2px 6px #000; }
+#qte.hidden { display: none; }
+.qte-title { min-height: 1.6em; margin-bottom: 70px; font-size: 22px; letter-spacing: 0.3em; color: #fff3d8; font-weight: 700; }
+.qte-title.ok { color: #9be07a; } .qte-title.perfect { color: #ffe27a; } .qte-title.miss { color: #ff6a5a; }
+.qte-btn { position: relative; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; }
+.qte-glyph { position: relative; z-index: 2; min-width: 68px; height: 68px; padding: 0 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 34px; color: #101010; background: #888; box-shadow: 0 0 0 3px rgba(0,0,0,0.6), 0 4px 18px rgba(0,0,0,0.6); }
+.qte-glyph.key { border-radius: 12px; font-size: 22px; min-width: 84px; letter-spacing: 0.08em; background: #e9dfc6; }
+.qte-glyph.A { background: #7cc450; } .qte-glyph.B { background: #e0584f; } .qte-glyph.X { background: #4f86e0; color: #fff; } .qte-glyph.Y { background: #e8c53c; }
+.qte-btn.go .qte-glyph { box-shadow: 0 0 0 3px #fff, 0 0 26px 6px rgba(255,240,200,0.85); transform: scale(1.12); }
+.qte-ring { position: absolute; inset: 0; border-radius: 50%; border: 4px solid rgba(255,244,220,0.95); box-shadow: 0 0 12px rgba(255,244,220,0.5); transform: scale(2.4); opacity: 0.9; will-change: transform; }
+.qte-btn.go .qte-ring { border-color: #9be07a; }
+.qte-label { font-size: 13px; letter-spacing: 0.22em; color: var(--parch); min-height: 1.4em; }
+.qte-pips { display: flex; gap: 10px; margin-top: 4px; }
+.qte-pips i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(234,223,198,0.7); background: rgba(0,0,0,0.5); }
+.qte-pips i.success { background: #9be07a; border-color: #9be07a; } .qte-pips i.perfect { background: #ffe27a; border-color: #ffe27a; } .qte-pips i.miss { background: #d9473a; border-color: #d9473a; }

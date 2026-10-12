@@ -352,6 +352,36 @@ export class CombatVfx {
         this.pulse = Math.max(this.pulse, 0.35);
         return true;
       }
+      case 'grappleStart': {
+        // 사자가 달려들어 붙는 순간: 먼지 폭발과 낮은 충격, 이후 어깨 너머 시점으로 전환
+        this.groundImpact(l.x, l.z, 0.8, { ring: false, settle: true });
+        this.cam.impact({ dir: this.tmpK.set(p.x - l.x, 0, p.z - l.z), trauma: 0.8, kick: 0.25, fov: -2.5 });
+        this.cam.startCine('grapple', 10, sim);
+        this.hooks().onSlowmo?.(0.45, 0.28);
+        this.hooks().onScreenFlash?.('200,60,40', 0.14);
+        this.pulse = Math.max(this.pulse, 0.7);
+        return true;
+      }
+      case 'qteResult': {
+        if (!e.ok) return true; // 물렸을 때의 피격 연출은 playerHit 이벤트가 담당한다
+        const pos = this.tmpP.set(e.pos.x, e.pos.y, e.pos.z).clone();
+        const nrm = this.tmpN.set(p.x - l.x, 0.25, p.z - l.z).normalize().clone();
+        const dir = this.tmpD.set(l.x - p.x, 0, l.z - p.z).normalize().clone();
+        const kick = this.tmpK.set(l.x - p.x, 0, l.z - p.z).negate().clone();
+        // 막을 때마다 "딱" — 타이밍이 정확하면(perfect) 패링급 섬광, 아니면 방어급
+        this.impact(e.perfect ? 'parry' : 'perfectGuard', pos, nrm, dir, kick, e.perfect ? 1 : 0.85);
+        return true;
+      }
+      case 'grappleCounter': {
+        this.pulse = 1;
+        this.hooks().onScreenFlash?.('255,240,215', 0.2);
+        this.hooks().onSlowmo?.(0.3, 0.45);
+        return true;
+      }
+      case 'grappleEnd': {
+        if (e.outcome !== 'counter') this.cam.endCine();
+        return true;
+      }
       case 'playerSlam': {
         // 강공격이 지면을 찍는 순간. 사자 몸에 맞은 경우(hit)는 몸 쪽 연출이, 빗나가 바닥을 때린 경우만 땅 연출이 강하다
         const big = !sim.lion || Math.hypot(e.pos.x - l.x, e.pos.z - l.z) > 1.6;

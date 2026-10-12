@@ -245,6 +245,8 @@ export function updateLion(ctx: SimContext, dt: number) {
   const lookTarget = clamp(angleDiff(toP, l.yaw), -1.1, 1.1);
   l.lookYaw += (lookTarget - l.lookYaw) * Math.min(1, dt * 6);
 
+  if (ctx.grapple && l.mode !== 'dying' && l.mode !== 'dead') return; // 포획 중에는 grapple.ts 가 사자를 직접 제어한다
+
   if (l.mode === 'dying' || l.mode === 'dead') {
     l.deadT += dt;
     l.speed = approach(l.speed, 0, 6 * dt);

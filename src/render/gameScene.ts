@@ -285,7 +285,13 @@ export class GameScene {
           this.vfx.handle(e, sim);
           break;
         case 'executionStart':
+        case 'grappleStart':
+        case 'qteResult':
+        case 'grappleCounter':
+        case 'grappleEnd':
           this.vfx.handle(e, sim);
+          if (e.type === 'qteResult' && e.ok) this.crowd.cheerBurst(e.perfect ? 0.3 : 0.15);
+          if (e.type === 'grappleCounter') this.crowd.cheerBurst(0.9);
           break;
         case 'lionHop': {
           this.particles.puff(new V3(e.pos.x, 0.05, e.pos.z), 1.0, undefined, 10);

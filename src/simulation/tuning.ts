@@ -36,6 +36,8 @@ export const TUNING = {
   parry: { poiseLight: 40, poiseHeavy: 14, recover: 1.15, riposteWindow: 1.3, riposteDamage: 1.25, riposteHitstop: 0.02, hitstop: 0.13, knockLight: 1.2 },
   /** 처형: 사자가 경직(stagger/stunned)일 때 강공격 입력으로 발동 */
   execute: { range: 4.4, bearing: 1.15, minTime: 0.18, minRemain: 0.45, standDist: 1.9, hpFrac: 0.17, minDamage: 120, hitstop: 0.3, killHitstop: 0.45 },
+  /** 물어뜯기 포획: 사자 도약이 명중하면 3번 물어뜯는다. 각 물기에 표시되는 버튼을 창 안에 누르면 막는다 */
+  grapple: { intro: 0.55, count: 3, gap: 1.05, hitAt: 0.62, winLen: [0.44, 0.4, 0.36], easyMul: 1.45, perfectFrac: 0.42, damage: 14, counterWin: 1.2, counterAfter: 0.35, dist: 1.3, cooldown: 9, pushBack: 2.3, staminaReward: 25 },
   runAttack: { minSpeed: 4.4, damageMul: 1.15, poiseMul: 1.25 },
 
   lion: {

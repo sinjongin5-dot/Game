@@ -35,7 +35,7 @@ export class CameraRig {
   private tensionV = 0;
   private tensionTarget = 0;
   private tensionHold = 0;
-  private cine: { kind: 'execute'; t: number; dur: number; side: number; focus: THREE.Vector3 } | null = null;
+  private cine: { kind: 'execute' | 'grapple'; t: number; dur: number; side: number; focus: THREE.Vector3 } | null = null;
   private blendFrom: Shot = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 58 };
   private lastShot: Shot = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 58 };
   private deathT = 0;
@@ -92,7 +92,7 @@ export class CameraRig {
   }
 
   /** 처형 등 짧은 시네마틱: 끝나면 게임플레이 카메라로 부드럽게 돌아온다 (플레이어 입력이 막힌 동안에만 사용) */
-  startCine(kind: 'execute', dur: number, sim: GameSim) {
+  startCine(kind: 'execute' | 'grapple', dur: number, sim: GameSim) {
     if (this.settings.shake <= 0) return;
     const p = sim.player.pos, l = sim.lion.pos;
     const ax = new THREE.Vector3(l.x - p.x, 0, l.z - p.z).normalize();
@@ -102,6 +102,14 @@ export class CameraRig {
     this.startBlendFromCurrent();
     this.blendDur = 0.4;
     this.cine = { kind, t: 0, dur, side: camSide, focus: new THREE.Vector3() };
+  }
+
+  /** 시네마틱을 끝내고 게임플레이 카메라로 부드럽게 돌아간다 */
+  endCine() {
+    if (!this.cine) return;
+    this.cine = null;
+    this.startBlendFromCurrent();
+    this.blendDur = 0.55;
   }
 
   get cineActive() { return this.cine !== null; }
@@ -290,7 +298,7 @@ export class CameraRig {
   private cineShot(sim: GameSim, dt: number, out: Shot) {
     const c = this.cine!;
     c.t += dt;
-    if (c.t >= c.dur || sim.phase === 'playerDead') {
+    if (c.t >= c.dur || sim.phase === 'playerDead' || sim.phase === 'victory') {
       this.cine = null;
       this.startBlendFromCurrent();
       this.blendDur = 0.55;
@@ -298,6 +306,22 @@ export class CameraRig {
     }
     const u = clamp(c.t / c.dur, 0, 1);
     const p = sim.player.pos, l = sim.lion.pos;
+    if (c.kind === 'grapple') {
+      // 물어뜯기 상호작용: 플레이어 어깨 너머로 사자의 머리를 가까이서 본다 (물기마다 살짝 흔들리며 천천히 다가간다)
+      const ax = new THREE.Vector3(l.x - p.x, 0, l.z - p.z);
+      if (ax.lengthSq() < 1e-6) ax.set(0, 0, 1);
+      ax.normalize();
+      const right = new THREE.Vector3(-ax.z, 0, ax.x).multiplyScalar(c.side);
+      const t = Math.min(1, c.t / 3);
+      // 옆 뒤쪽 높은 곳에서 두 몸이 맞물린 모습과 사자의 머리가 함께 보이게 한다 (플레이어 몸이 사자를 가리지 않도록 옆으로 비킨다)
+      const pos = new THREE.Vector3(p.x, 0, p.z).addScaledVector(ax, -1.9 + 0.3 * t).addScaledVector(right, 2.1 - 0.2 * t);
+      pos.y = 1.9;
+      c.focus.set((p.x + l.x) / 2 + ax.x * 0.2, 1.15, (p.z + l.z) / 2 + ax.z * 0.2);
+      out.pos.copy(pos);
+      out.look.copy(c.focus);
+      out.fov = lerp(52, 47, t);
+      return;
+    }
     const mid = new THREE.Vector3((p.x + l.x) / 2, 0, (p.z + l.z) / 2);
     const ax = new THREE.Vector3(l.x - p.x, 0, l.z - p.z).normalize();
     const right = new THREE.Vector3(-ax.z, 0, ax.x).multiplyScalar(c.side);

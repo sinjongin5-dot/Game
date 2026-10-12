@@ -30,6 +30,13 @@
       <div id="fps"></div>
     </div>
 
+    <div id="qte" class="hidden" aria-live="assertive">
+      <div class="qte-title" id="qte-title"></div>
+      <div class="qte-btn" id="qte-btn"><div class="qte-ring" id="qte-ring"></div><span class="qte-glyph" id="qte-glyph"></span></div>
+      <div class="qte-label" id="qte-label"></div>
+      <div class="qte-pips" id="qte-pips"><i></i><i></i><i></i></div>
+    </div>
+    <div id="pad-toast" class="hidden"></div>
     <div id="intro-hint" class="hidden">Enter · Space · 클릭 : 건너뛰기</div>
     <div id="fade"></div>
 
@@ -57,7 +64,8 @@
         <button class="btn" id="btn-controls">조작법</button>
         <button class="btn" id="btn-credits">크레딧</button>
       </nav>
-      <p class="foot">권장 환경: 데스크톱 · 키보드와 마우스 · 이어폰 권장</p>
+      <p class="foot">권장 환경: 데스크톱 · 키보드와 마우스 또는 Xbox 컨트롤러(진동 지원) · 이어폰 권장</p>
+      <p class="foot pad-only" id="pad-hint">컨트롤러 연결됨 — 방향키/왼쪽 스틱으로 선택, <b class="gl a">A</b> 확인, <b class="gl b">B</b> 뒤로</p>
     </section>
 
     <!-- 설정 -->
@@ -73,6 +81,11 @@
         <div class="row"><label for="rng-master">마스터 음량</label><input type="range" id="rng-master" min="0" max="1" step="0.05" /><output id="out-master"></output></div>
         <div class="row"><label for="rng-sfx">효과음 음량</label><input type="range" id="rng-sfx" min="0" max="1" step="0.05" /><output id="out-sfx"></output></div>
         <div class="row"><label for="rng-music">음악 음량</label><input type="range" id="rng-music" min="0" max="1" step="0.05" /><output id="out-music"></output></div>
+        <div class="row"><label for="rng-rumble">컨트롤러 진동</label><input type="range" id="rng-rumble" min="0" max="1" step="0.05" /><output id="out-rumble"></output></div>
+        <div class="row"><label>물어뜯기 막기 (상호작용)</label>
+          <div class="seg" id="seg-qte">
+            <button data-v="off">끔</button><button data-v="easy">여유</button><button data-v="normal">보통</button>
+          </div></div>
         <div class="row"><label for="chk-invert">시점 상하 반전</label><input type="checkbox" id="chk-invert" /></div>
         <div class="row"><label for="chk-fps">FPS 표시</label><input type="checkbox" id="chk-fps" /></div>
         <div class="actions"><button class="btn" id="btn-settings-back">뒤로</button></div>
@@ -95,6 +108,20 @@
           <div><kbd>F / 휠 클릭</kbd><span>사자 락온 전환</span></div>
           <div><kbd>Esc</kbd><span>일시정지</span></div>
         </div>
+        <h3>Xbox 컨트롤러</h3>
+        <div class="keys">
+          <div><kbd>왼쪽 스틱</kbd><span>이동</span></div>
+          <div><kbd>오른쪽 스틱</kbd><span>카메라 회전</span></div>
+          <div><kbd>RB</kbd><span>약공격 (3연계)</span></div>
+          <div><kbd>RT / Y</kbd><span>강공격 · 사자가 쓰러졌을 때 처형</span></div>
+          <div><kbd>LB / LT 유지</kbd><span>방패 방어 · 패링</span></div>
+          <div><kbd>B</kbd><span>회피</span></div>
+          <div><kbd>A 유지</kbd><span>달리기</span></div>
+          <div><kbd>X</kbd><span>회복</span></div>
+          <div><kbd>오른쪽 스틱 클릭</kbd><span>사자 락온</span></div>
+          <div><kbd>Start</kbd><span>일시정지 / 계속하기</span></div>
+          <div><kbd>D-패드 · A · B</kbd><span>메뉴 이동 · 확인 · 뒤로</span></div>
+        </div>
         <h3>규칙</h3>
         <ul class="rules">
           <li>모든 행동은 스태미나가 부족하면 실행되지 않습니다. 소비 후 약 0.7초 뒤 회복이 시작됩니다.</li>
@@ -104,6 +131,7 @@
           <li><b>패링</b>: 사자의 앞발·물기가 닿기 직전(방패를 든 뒤 약 0.3초 안)에 막으면 공격이 끊기고 사자가 휘청거립니다. 직후 반격은 더 큰 피해를 줍니다. 도약·돌진·충격파·회전 같은 큰 기술은 끊기지 않습니다.</li>
           <li><b>자세 붕괴와 처형</b>: 경직 게이지가 가득 차거나 벽에 부딪혀 사자가 쓰러지면, 가까이에서 <kbd>Q</kbd> 로 처형(스태미나 소모 없음·동작 중 무적)할 수 있습니다. 한 번의 경직 동안 한 번만 가능합니다.</li>
           <li>달리다가 처음 휘두르는 약공격은 달리기 공격이 되어 피해가 조금 더 큽니다.</li>
+          <li><b>물어뜯기 막기</b>: 사자의 도약에 맞으면 사자가 달라붙어 세 번 뭅니다. 화면에 뜨는 버튼(컨트롤러 <b class="gl a">A</b><b class="gl b">B</b><b class="gl x">X</b><b class="gl y">Y</b> / 키보드 <kbd>Space</kbd><kbd>Q</kbd><kbd>E</kbd><kbd>F</kbd>)을 고리가 모이는 순간 눌러 한 번씩 막으세요. 세 번을 모두 막으면 <b class="gl y">Y</b> 로 반격해 사자를 밀쳐 내고 처형 일격이 이어집니다. 틀리거나 놓치면 그 물기는 피해를 입습니다. 설정에서 끄거나 입력 여유를 늘릴 수 있습니다.</li>
           <li>사자는 준비 동작을 보인 뒤 공격합니다. 공격이 끝난 직후가 반격의 기회입니다.</li>
         </ul>
         <div class="actions"><button class="btn" id="btn-controls-back">뒤로</button></div>

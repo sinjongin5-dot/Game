@@ -56,3 +56,7 @@ OFL 은 글꼴의 포함·재배포를 허용하며, 글꼴 자체를 단독 판
 
 - 검 궤적/충돌 프로필/카메라 연출/후처리 펄스는 모두 이 저장소의 코드(`src/render/slashTrail.ts`, `combatVfx.ts` 등)이며 외부 이미지·텍스처를 쓰지 않습니다.
 - 추가 효과음 11종(`swing_light_b/c`, `swing_run`, `hit_flesh_b/c`, `parry_clang`, `stagger_break`, `execute_whoosh`, `execute_hit`, `ground_crack`, `lion_tell`)은 `tools/gen-audio-combat.py`(numpy/scipy 절차적 합성)가 직접 만든 원본입니다. 외부 샘플·녹음을 사용하지 않았고 라이선스 문제가 없습니다(실제 녹음보다 질감이 단순).
+
+## 컨트롤러/상호작용 추가분 (v2.1)
+
+- 추가 효과음 `qte_prompt` 1종은 `tools/gen-audio-combat.py`(절차적 합성)가 만든 원본입니다. 컨트롤러 입력/진동/메뉴 탐색/물어뜯기 막기 UI 의 A/B/X/Y 표시는 CSS 로 그린 단색 원형 버튼이며 외부 이미지·로고·폰트 에셋을 쓰지 않습니다(Xbox 의 상표 이미지는 사용하지 않았습니다).

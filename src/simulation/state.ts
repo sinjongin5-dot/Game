@@ -9,11 +9,12 @@ export interface InputFrame {
   run: boolean;
   guard: boolean;
   cameraYaw: number;
-  pressed: { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean };
+  /** a/b/x/y: 상호작용(물어뜯기 막기) 연출용 얼굴 버튼. 게임패드 A/B/X/Y, 키보드 Space/Q/E/F */
+  pressed: { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean };
 }
 export const emptyInput = (): InputFrame => ({
   moveX: 0, moveY: 0, run: false, guard: false, cameraYaw: 0,
-  pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false },
+  pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false },
 });
 
 export type PlayerMode = 'free' | 'attack' | 'dodge' | 'guardBreak' | 'hit' | 'heal' | 'dead' | 'victory' | 'scripted';
@@ -171,7 +172,37 @@ export type SimEvent =
   | { type: 'lionGateOpen' }
   | { type: 'fightStart' }
   | { type: 'victory' }
-  | { type: 'playerDeathScreen' };
+  | { type: 'playerDeathScreen' }
+  | { type: 'grappleStart'; pos: V2 }
+  | { type: 'qtePrompt'; idx: number; button: QteButton; winStart: number; winEnd: number }
+  | { type: 'qteResult'; idx: number; ok: boolean; perfect: boolean; button: QteButton; pos: V3 }
+  | { type: 'grappleCounterPrompt'; button: QteButton }
+  | { type: 'grappleCounter' }
+  | { type: 'grappleEnd'; outcome: 'counter' | 'released' | 'dead' };
+
+export type QteButton = 'A' | 'B' | 'X' | 'Y';
+export type QteMode = 'off' | 'easy' | 'normal';
+
+/** 물어뜯기 포획 상호작용 상태 (시뮬레이션이 소유, UI/연출은 읽기만 한다) */
+export interface GrappleState {
+  phase: 'intro' | 'bite' | 'counter';
+  /** 현재 단계 시작 후 경과 */
+  t: number;
+  idx: number;
+  prompts: QteButton[];
+  results: ('pending' | 'success' | 'perfect' | 'miss')[];
+  /** 현재 물기의 입력 창 (물기 시작 기준 초) */
+  winStart: number;
+  winEnd: number;
+  /** 사자 이빨이 닿는 시각 */
+  hitAt: number;
+  /** 이번 물기가 끝났는가(성공/실패 판정 완료) */
+  resolved: boolean;
+  /** 이번 물기의 피해를 이미 적용했는가 */
+  damaged: boolean;
+  counterBtn: QteButton;
+  counterWin: number;
+}
 
 export interface Stats {
   time: number;
@@ -181,4 +212,7 @@ export interface Stats {
   hitsLanded: number;
   heals: number;
   attempts: number;
+  /** 물어뜯기 막기 성공 횟수 / 반격 성공 횟수 */
+  qteSuccess: number;
+  counters: number;
 }

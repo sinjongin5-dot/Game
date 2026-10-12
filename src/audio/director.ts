@@ -174,6 +174,29 @@ export class AudioDirector {
           a.play('lion_hurt', { volume: 0.8, rate: 0.85, pos: this.lionPos(sim), key: 'lionHurt', delay: 0.05 });
           a.duck(0.35, 0.8);
           break;
+        case 'grappleStart':
+          a.play('lion_roar2', { volume: 0.85, pos: this.lionPos(sim), rate: 1.1 });
+          a.play('impact_boom', { volume: 0.9, rate: 0.9, pos: this.playerPos(sim) });
+          a.play('ground_crack', { volume: 0.5, rate: 1.1, pos: { x: sim.lion.pos.x, y: 0.1, z: sim.lion.pos.z } });
+          a.duck(0.5, 1.2);
+          break;
+        case 'qtePrompt':
+          a.play('qte_prompt', { volume: 0.55, rate: 0.95 + e.idx * 0.08 });
+          break;
+        case 'qteResult':
+          if (e.ok) {
+            a.play('parry_clang', { volume: e.perfect ? 1 : 0.8, rate: e.perfect ? rr(1.05, 1.15) : rr(0.92, 1.0), pos: e.pos });
+            if (e.perfect) a.play('parry_ring', { volume: 0.5, rate: 1.15, pos: e.pos, delay: 0.01 });
+            this.cheer(0.4);
+          }
+          break;
+        case 'grappleCounterPrompt':
+          a.play('slowmo_whoosh', { volume: 0.55 });
+          break;
+        case 'grappleCounter':
+          a.play('execute_whoosh', { volume: 0.8, pos: this.playerPos(sim) });
+          a.play('impact_boom', { volume: 0.8, rate: 1.1, pos: this.playerPos(sim) });
+          break;
         case 'executionStart':
           a.play('execute_whoosh', { volume: 0.75, pos: this.playerPos(sim) });
           break;

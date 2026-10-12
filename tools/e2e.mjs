@@ -1,5 +1,5 @@
 // 실제 브라우저(헤드리스 Chromium, SwiftShader) 종단 간 테스트. 개발 서버(vite)가 5173 에서 실행 중이어야 한다.
-// 사용: node tools/e2e.mjs [ui|input|fight|combat|all]
+// 사용: node tools/e2e.mjs [ui|input|fight|combat|pad|all]
 import fs from 'node:fs';
 import { launch, sleep } from './harness.mjs';
 
@@ -7,7 +7,7 @@ const section = process.argv[2] ?? 'all';
 const W = 800, H = 450;
 const report = { startedAt: new Date().toISOString(), checks: [], notes: [] };
 const check = (name, ok, detail = '') => { report.checks.push({ name, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${detail}`); };
-const { browser, page, logs, failed } = await launch({ quality: 'low', w: W, h: H });
+const { browser, page, logs, failed } = await launch({ quality: 'low', w: W, h: H, settings: { qte: 'off' } }); // 봇 전투는 상호작용 입력이 없으므로 물어뜯기 막기를 끄고, 해당 섹션에서 명시적으로 켠다
 const snap = () => page.evaluate(() => window.__arena.snapshot());
 const shot = (n) => page.screenshot({ path: `captures/e2e_${n}.png` });
 const waitFor = async (fn, timeout = 60000, step = 200, arg) => { const t0 = Date.now(); for (;;) { const v = await page.evaluate(fn, arg); if (v) return v; if (Date.now() - t0 > timeout) return null; await sleep(step); } };
@@ -63,6 +63,7 @@ if (section === 'input' || section === 'fight' || section === 'all') {
   await sleep(1500);
   // 실제 키보드 입력: 이동
   const p0 = (await snap()).player;
+  await page.evaluate((p) => { window.__p0x = p.x; window.__p0z = p.z; }, p0);
   const tt0 = (await snap()).time;
   await page.keyboard.down('KeyW');
   await waitFor((t0) => window.__arena.sim.ctx.time > t0 + 1.5, 60000, 200, tt0);
@@ -238,8 +239,158 @@ if (section === 'combat' || section === 'all') {
   check('공격 40회 후에도 궤적 풀/씬 오브젝트 수가 늘지 않음', pool.size === 3 && pool.children === 3 && pool.root === objs0, JSON.stringify({ ...pool, objs0 }));
   await page.evaluate(() => { window.__arena.timeScale = 1; });
   await shot('13_combat_vfx');
-  await page.keyboard.press('Escape'); await sleep(300);
-  await page.evaluate(() => window.__arena.returnToTitle?.());
+  await page.evaluate(() => window.__arena.toTitle()); await sleep(1500);
+}
+
+if (section === 'pad' || section === 'all') {
+  // Xbox 컨트롤러: 실제 컨트롤러가 없으므로 navigator.getGamepads 를 가짜 표준 게임패드로 바꿔 끼워 전체 경로
+  // (폴링 → 메뉴 탐색/전투 입력 → 진동 호출)를 브라우저에서 검증한다. 진동은 가짜 vibrationActuator 가 호출을 기록한다.
+  await page.evaluate(() => {
+    const pad = {
+      connected: true, id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 02fd)', index: 0, mapping: 'standard', axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })),
+      vibrationActuator: { playEffect(type, p) { (window.__rumble ||= []).push({ type, ...p, t: performance.now() }); return Promise.resolve('complete'); }, reset() { window.__rumbleResets = (window.__rumbleResets || 0) + 1; return Promise.resolve('complete'); } },
+    };
+    window.__pad = pad; window.__padOn = true;
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => (window.__padOn ? [pad, null, null, null] : [null, null, null, null]) });
+    // 한 프레임 탭: 게임의 rAF(먼저 등록됨)가 눌린 상태를 폴링한 직후 우리 rAF 에서 뗀다 → 정확히 한 번의 눌림 에지
+    const raf = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+    window.__press = async (i) => { pad.buttons[i] = { pressed: true, value: 1 }; await raf(); pad.buttons[i] = { pressed: false, value: 0 }; await raf(); await raf(); };
+    window.__axes = (a) => { pad.axes = a; };
+  });
+  const press = (i, ms) => page.evaluate(([i, ms]) => window.__press(i, ms), [i, ms]);
+  const A = 0, B = 1, X = 2, Y = 3, LB = 4, RB = 5, RT = 7, START = 9, DOWN = 13, LEFT = 14;
+  const focusId = () => page.evaluate(() => document.querySelector('.gp-focus')?.id ?? '');
+  await sleep(1500);
+  // 타이틀 메뉴 탐색
+  await press(DOWN, 300); await sleep(300);
+  check('컨트롤러 입력으로 장치가 전환되고 커서가 숨는 모드가 됨', await page.evaluate(() => document.body.classList.contains('dev-pad')));
+  const f1 = await focusId();
+  check('타이틀: D-패드로 선택 항목 이동', f1 === 'btn-settings', f1);
+  await press(A, 300); await sleep(500);
+  check('타이틀: A 로 설정 패널 열림', await page.isVisible('#panel-settings'));
+  let guard = 0; while ((await focusId()) !== 'rng-rumble' && guard++ < 14) { await press(DOWN, 250); }
+  check('설정: D-패드로 진동 슬라이더까지 이동', (await focusId()) === 'rng-rumble', await focusId());
+  await press(LEFT, 250); await press(LEFT, 250);
+  const rum = await page.evaluate(() => parseFloat(document.getElementById('rng-rumble').value));
+  const savedR = await page.evaluate(() => JSON.parse(localStorage.getItem('arena.sand-and-fangs.settings.v1') || '{}').rumble);
+  check('설정: 좌/우로 슬라이더 값을 바꾸고 저장됨', rum < 1 && savedR === rum, `${rum}/${savedR}`);
+  while ((await focusId()) !== 'btn-settings-back' && guard++ < 40) { await press(DOWN, 250); }
+  await press(B, 300); await sleep(400);
+  check('설정: B 로 뒤로 (타이틀 복귀)', !(await page.isVisible('#panel-settings')) && await page.isVisible('#title'));
+  // 진동 슬라이더를 다시 100% 로 되돌린다
+  await page.evaluate(() => { const r = document.getElementById('rng-rumble'); r.value = '1'; r.dispatchEvent(new Event('input')); });
+  // 게임 시작
+  let g2 = 0; while ((await focusId()) !== 'btn-start' && g2++ < 6) await press(13, 250);
+  await press(A, 400); await sleep(800);
+  let st = await snap();
+  check('컨트롤러 A 로 결투 시작 (입장 연출)', st.state === 'intro', st.state);
+  await press(A, 400); await sleep(800);
+  st = await snap();
+  check('입장 연출을 A 로 건너뛰고 전투 시작', st.state === 'fight', st.state);
+  check('컨트롤러 플레이 중에는 포인터 잠금을 요구하지 않음', st.locked === false);
+  // 이동/시점
+  await page.evaluate(() => { const g = window.__arena; g.sim.ctx.graceUntil = 1e9; g.sim.lion.mode = 'dormant'; });
+  const p0 = (await snap()).player;
+  await page.evaluate(() => window.__axes([0, -1, 0, 0]));
+  await waitFor(() => { const g = window.__arena; return Math.hypot(g.sim.player.pos.x - window.__p0x, g.sim.player.pos.z - window.__p0z) > 1.0; }, 30000, 200);
+  await page.evaluate(() => window.__axes([0, 0, 0, 0]));
+  const p1 = (await snap()).player;
+  check('왼쪽 스틱으로 이동', Math.hypot(p1.x - p0.x, p1.z - p0.z) > 1.0, `${Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(2)}m`);
+  const yaw0 = await page.evaluate(() => window.__arena.scene.cam.yaw);
+  await page.evaluate(() => window.__axes([0, 0, 1, 0])); await sleep(1200); await page.evaluate(() => window.__axes([0, 0, 0, 0]));
+  const yaw1 = await page.evaluate(() => window.__arena.scene.cam.yaw);
+  check('오른쪽 스틱으로 카메라 회전', Math.abs(yaw1 - yaw0) > 0.15, `${(yaw1 - yaw0).toFixed(2)}rad`);
+  // 전투 버튼
+  const stam0 = (await snap()).player.stamina;
+  await press(RB, 400);
+  await sleep(200);
+  const sAtk = await snap();
+  check('RB 약공격', sAtk.player.stamina < stam0 || sAtk.player.mode === 'attack', `${sAtk.player.mode} ${sAtk.player.stamina.toFixed(0)}`);
+  await sleep(1500);
+  await page.evaluate(() => { window.__pad.buttons[4] = { pressed: true, value: 1 }; });
+  await sleep(900);
+  check('LB 유지 = 방패 방어', (await snap()).player.guard === true);
+  await page.evaluate(() => { window.__pad.buttons[4] = { pressed: false, value: 0 }; });
+  await sleep(500);
+  await press(B, 400); await sleep(100);
+  const dsn = await snap();
+  check('B 회피', dsn.player.mode === 'dodge' || dsn.stats.dodges >= 0, dsn.player.mode);
+  // 진동: 실제 피격 → 햅틱 호출
+  await sleep(1200);
+  await page.evaluate(() => { window.__rumble = []; });
+  await page.evaluate(async () => {
+    const g = window.__arena; const m = await import('/src/simulation/lion.ts');
+    g.sim.ctx.graceUntil = 1e9; g.sim.player.hp = g.sim.player.hpMax = 1000; g.sim.player.invulnT = 0;
+    g.sim.lion.mode = 'idle'; g.sim.lion.modeDur = 1e9; g.sim.lion.invuln = false;
+    g.sim.player.pos = { x: 0, z: -2 }; g.sim.physics.teleport('player', g.sim.player.pos, 0); g.sim.player.yaw = 0; g.sim.player.guardHeld = false;
+    g.sim.lion.pos = { x: 0, z: -0.4 }; g.sim.physics.teleport('lion', g.sim.lion.pos, Math.PI); g.sim.lion.yaw = Math.PI;
+    m.startLionAttack(g.sim.ctx, 'bite'); g.sim.lion.attack.hold = 0; g.sim.lion.attack.t = 0.55;
+    window.__dmg0 = g.sim.stats.damageTaken;
+  });
+  const gotHit = await waitFor(() => window.__arena.sim.stats.damageTaken > window.__dmg0, 40000, 200);
+  await sleep(1500);
+  const rumbles = await page.evaluate(() => window.__rumble || []);
+  check('피격 시 컨트롤러 진동이 dual-rumble 로 전달됨', rumbles.length > 0 && rumbles.every((r) => r.type === 'dual-rumble' && r.weakMagnitude <= 1 && r.strongMagnitude <= 1 && r.duration > 0), `hit=${!!gotHit} ${rumbles.length}회 최대 strong=${Math.max(0, ...rumbles.map((r) => r.strongMagnitude)).toFixed(2)}`);
+  check('피격 진동은 저주파(strong) 모터가 강하다', Math.max(0, ...rumbles.map((r) => r.strongMagnitude)) >= 0.5);
+  // 진동 끄기 → 호출 없음
+  await page.evaluate(() => { const r = document.getElementById('rng-rumble'); r.value = '0'; r.dispatchEvent(new Event('input')); });
+  await page.evaluate(() => { window.__rumble = []; });
+  await page.evaluate(async () => { const g = window.__arena; g.hapticDirector.handle([{ type: 'playerHit', dmg: 20, pos: { x: 0, y: 1, z: 0 }, heavy: true, attack: 'bite' }], g.sim); });
+  await sleep(500);
+  check('진동 세기를 0 으로 하면 컨트롤러에 아무것도 보내지 않음', ((await page.evaluate(() => window.__rumble || [])).length) === 0);
+  await page.evaluate(() => { const r = document.getElementById('rng-rumble'); r.value = '1'; r.dispatchEvent(new Event('input')); });
+  // Start 로 일시정지 → Start 로 계속
+  await press(START, 400); await sleep(600);
+  check('Start 로 일시정지', (await snap()).state === 'paused' && await page.isVisible('#panel-pause'));
+  await press(START, 400); await sleep(700);
+  check('일시정지 메뉴에서 Start 로 계속하기', (await snap()).state === 'fight');
+  // 물어뜯기 막기: 실제 루프(슬로모)에서 가짜 패드가 정확한 타이밍에 버튼을 누른다
+  const qte = await page.evaluate(async () => {
+    const g = window.__arena; const gr = await import('/src/simulation/grapple.ts');
+    g.sim.setQte('normal'); g.sim.ctx.graceUntil = 1e9; g.sim.player.hp = g.sim.player.hpMax = 1000; g.sim.player.invulnT = 0; g.sim.lion.invuln = false;
+    g.sim.lion.cooldown.grapple = 0; g.sim.ctx.grapple = null;
+    window.__rumble = [];
+    const evlog = []; const od = g.sim.drainEvents.bind(g.sim);
+    g.sim.drainEvents = () => { const e = od(); for (const x of e) if (/grapple|qte|execution/.test(x.type)) evlog.push(x.type + (x.outcome ? ':' + x.outcome : '') + (x.ok !== undefined ? ':' + x.ok : '')); return e; };
+    gr.startGrapple(g.sim.ctx);
+    g.timeScale = 0.25;
+    const idx = { A: 0, B: 1, X: 2, Y: 3 };
+    const seen = { glyphs: [], pips: [], overlay: false, counter: false };
+    const t0 = performance.now();
+    let coolF = -1;
+    let hold = null; // 누른 버튼은 게임이 최소 두 프레임 폴링할 때까지 유지한다 (프레임이 느려도 눌림 에지가 보이도록)
+    await new Promise((resolve) => {
+      const iv = setInterval(() => {
+        const gp = g.sim.ctx.grapple;
+        if (hold && g.frames >= hold.f + 2) { window.__pad.buttons[hold.k] = { pressed: false, value: 0 }; coolF = g.frames; hold = null; }
+        if (gp) {
+          seen.overlay = seen.overlay || !document.getElementById('qte').classList.contains('hidden');
+          if (!hold && g.frames > coolF) { // 뗀 상태를 게임이 한 프레임 이상 보도록 (같은 틱에서 떼고 다시 누르면 눌림 에지가 생기지 않는다)
+            if (gp.phase === 'bite' && !gp.resolved) {
+              seen.glyphs.push(document.getElementById('qte-glyph').textContent);
+              if (gp.t >= gp.winStart + 0.03 && gp.t < gp.winEnd - 0.04) { const k = idx[gp.prompts[gp.idx]]; window.__pad.buttons[k] = { pressed: true, value: 1 }; hold = { k, f: g.frames }; }
+            } else if (gp.phase === 'counter') { seen.counter = true; window.__pad.buttons[3] = { pressed: true, value: 1 }; hold = { k: 3, f: g.frames }; }
+          }
+        } else if (performance.now() - t0 > 1000) { clearInterval(iv); resolve(null); }
+        if (performance.now() - t0 > 240000) { clearInterval(iv); resolve(null); }
+      }, 20);
+    });
+    g.timeScale = 1;
+    for (const k of [0, 1, 2, 3]) window.__pad.buttons[k] = { pressed: false, value: 0 };
+    g.sim.drainEvents = od;
+    return { ...seen, evlog, hp: g.sim.player.hp, qteSuccess: g.sim.stats.qteSuccess, counters: g.sim.stats.counters, rumbles: (window.__rumble || []).length, lionHp: g.sim.lion.hp, glyphs2: [...new Set(seen.glyphs)] };
+  });
+  check('물어뜯기 막기: 컨트롤러 A/B/X/Y 입력으로 세 번 모두 막고 피해 없음', qte.qteSuccess >= 3 && qte.hp === 1000, JSON.stringify({ s: qte.qteSuccess, hp: qte.hp }));
+  check('물어뜯기 막기: 화면에 버튼 프롬프트가 표시되고 컨트롤러 글리프(A/B/X/Y)를 쓴다', qte.overlay && qte.glyphs2.length > 0 && qte.glyphs2.every((x) => ['A', 'B', 'X', 'Y'].includes(x)), JSON.stringify(qte.glyphs2));
+  check('물어뜯기 막기: 반격(Y) 성공 → 사자를 밀치고 처형 일격 시작', qte.counter && qte.counters >= 1 && qte.evlog.includes('executionStart'), JSON.stringify({ c: qte.counter, n: qte.counters, lion: qte.lionHp, ev: qte.evlog.join(',') }));
+  check('물어뜯기 막기 중 진동이 여러 번 발생', qte.rumbles >= 4, `${qte.rumbles}회`);
+  await shot('14_pad_qte');
+  // 키보드로 전환하면 글리프가 키 이름으로 바뀐다
+  await page.evaluate(() => { window.__padOn = false; });
+  await page.keyboard.press('KeyW'); await sleep(500);
+  check('키보드 입력으로 되돌아오면 컨트롤러 전용 표시가 사라짐', !(await page.evaluate(() => document.body.classList.contains('dev-pad'))));
+  await page.evaluate(() => { window.__arena.timeScale = 1; });
 }
 
 report.console = logs.filter((l) => !/KHR_parallel_shader_compile/.test(l));

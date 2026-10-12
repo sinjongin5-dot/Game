@@ -7,12 +7,15 @@ import { canExecute } from './execution';
 import { createLion, setLionMode, updateLion } from './lion';
 import { Rng, clamp, v2 } from './math';
 import { createPlayer, setMode, updatePlayer, bufferDuringHitstop } from './player';
-import { emptyInput, type InputFrame, type SimEvent, type Stats } from './state';
+import { emptyInput, type InputFrame, type QteMode, type SimEvent, type Stats } from './state';
+import { updateGrapple } from './grapple';
 import { TUNING } from './tuning';
 
 export interface SimOptions {
   seed?: number;
   skipIntro?: boolean;
+  /** 물어뜯기 포획 상호작용 (기본 꺼짐: 규칙 테스트/봇이 입력 없이 진행되도록) */
+  qte?: QteMode;
 }
 
 const INTRO = {
@@ -39,12 +42,14 @@ export class GameSim {
   private gateClosed = false;
   private lionGateEventSent = false;
   attemptSeed: number;
+  qteMode: QteMode;
   prevPlayer = { x: 0, z: 0, yaw: 0 };
   prevLion = { x: 0, z: 0, yaw: 0, y: 0 };
   tick = 0;
 
   constructor(public physics: Physics, private opts: SimOptions = {}) {
     this.attemptSeed = opts.seed ?? 1337;
+    this.qteMode = opts.qte ?? 'off';
     this.ctx = this.makeContext();
     this.reset({ skipIntro: opts.skipIntro ?? false });
   }
@@ -54,12 +59,15 @@ export class GameSim {
   }
 
   private makeContext(): SimContext {
-    const stats: Stats = { time: 0, damageTaken: 0, dodges: 0, blocks: 0, hitsLanded: 0, heals: 0, attempts: 0 };
+    const stats: Stats = { time: 0, damageTaken: 0, dodges: 0, blocks: 0, hitsLanded: 0, heals: 0, attempts: 0, qteSuccess: 0, counters: 0 };
     return {
       player: createPlayer(), lion: createLion(), physics: this.physics, rng: new Rng(this.attemptSeed), events: [],
-      stats, time: 0, phase: 'intro', hitstop: 0, graceUntil: 0, controlEnabled: false,
+      stats, time: 0, phase: 'intro', hitstop: 0, graceUntil: 0, controlEnabled: false, qteMode: this.qteMode, grapple: null,
     };
   }
+
+  /** 상호작용 연출 모드 변경 (설정). 다음 판부터가 아니라 즉시 적용되며 진행 중인 포획은 끝까지 간다 */
+  setQte(m: QteMode) { this.qteMode = m; this.ctx.qteMode = m; }
 
   get player() { return this.ctx.player; }
   get lion() { return this.ctx.lion; }
@@ -149,12 +157,12 @@ export class GameSim {
     this.acc += Math.min(frameDt, TUNING.maxFrameDt);
     let n = 0;
     const fn = typeof input === 'function' ? input : null;
-    const pressed = fn ? { light: false, heavy: false, dodge: false, heal: false, lock: false } : { ...(input as InputFrame).pressed };
+    const pressed = fn ? { ...emptyInput().pressed } : { ...(input as InputFrame).pressed };
     while (this.acc >= TUNING.dt && n < TUNING.maxSubSteps) {
       if (fn) this.step(fn(), TUNING.dt);
       else this.step({ ...(input as InputFrame), pressed: { ...pressed } }, TUNING.dt);
       // 한 번 발생한 눌림 이벤트는 첫 스텝에서만 소비
-      pressed.light = pressed.heavy = pressed.dodge = pressed.heal = pressed.lock = false;
+      pressed.light = pressed.heavy = pressed.dodge = pressed.heal = pressed.lock = pressed.a = pressed.b = pressed.x = pressed.y = false;
       this.acc -= TUNING.dt;
       n++;
     }
@@ -185,6 +193,7 @@ export class GameSim {
         c.time += dt;
         c.stats.time = c.time;
       }
+      if (c.grapple) updateGrapple(c, input, dt);
       updatePlayer(c, input, dt);
       updateLion(c, dt);
       resolvePlayerAttack(c);

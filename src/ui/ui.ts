@@ -1,6 +1,8 @@
 import type { Settings } from '../core/settings';
 import type { Quality } from '../render/gameScene';
 import type { GameSim } from '../simulation/sim';
+import type { GrappleState, QteButton, QteMode } from '../simulation/state';
+import type { InputDevice } from '../input/input';
 
 export type PanelName = 'settings' | 'controls' | 'credits' | 'pause' | 'death' | 'victory' | 'error';
 
@@ -155,6 +157,14 @@ export class UI {
     slider('master', 'master', (v) => `${Math.round(v * 100)}`);
     slider('sfx', 'sfx', (v) => `${Math.round(v * 100)}`);
     slider('music', 'music', (v) => `${Math.round(v * 100)}`);
+    const rr = $<HTMLInputElement>('rng-rumble');
+    rr.addEventListener('input', () => { s.rumble = parseFloat(rr.value); $('out-rumble').textContent = s.rumble <= 0 ? '끔' : `${Math.round(s.rumble * 100)}%`; this.cb.onSettings(s); });
+    $('seg-qte').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      s.qte = (b as HTMLElement).dataset.v as QteMode;
+      this.syncSettings();
+      this.cb.onSettings(s);
+      this.cb.onClickSound();
+    }));
     $<HTMLInputElement>('chk-invert').addEventListener('change', (e) => { s.invertY = (e.target as HTMLInputElement).checked; this.cb.onSettings(s); });
     $<HTMLInputElement>('chk-fps').addEventListener('change', (e) => { s.showFps = (e.target as HTMLInputElement).checked; this.cb.onSettings(s); });
     this.syncSettings();
@@ -172,6 +182,9 @@ export class UI {
     set('master', s.master, (v) => `${Math.round(v * 100)}`);
     set('sfx', s.sfx, (v) => `${Math.round(v * 100)}`);
     set('music', s.music, (v) => `${Math.round(v * 100)}`);
+    $<HTMLInputElement>('rng-rumble').value = String(s.rumble);
+    $('out-rumble').textContent = s.rumble <= 0 ? '끔' : `${Math.round(s.rumble * 100)}%`;
+    $('seg-qte').querySelectorAll('button').forEach((b) => b.classList.toggle('on', (b as HTMLElement).dataset.v === s.qte));
     $<HTMLInputElement>('chk-invert').checked = s.invertY;
     $<HTMLInputElement>('chk-fps').checked = s.showFps;
   }
@@ -182,12 +195,12 @@ export class UI {
     $('death-sub').textContent = sub;
     this.openPanel('death');
   }
-  showVictory(stats: { time: number; damageTaken: number; dodges: number; blocks: number; hitsLanded: number; heals: number; attempts: number }) {
+  showVictory(stats: { time: number; damageTaken: number; dodges: number; blocks: number; hitsLanded: number; heals: number; attempts: number; qteSuccess?: number }) {
     this.hideHint();
     const dl = $('victory-stats');
     const rows: [string, string][] = [
       ['전투 시간', fmtTime(stats.time)], ['받은 피해', `${Math.round(stats.damageTaken)}`], ['회피 성공', `${stats.dodges}`],
-      ['방어 성공', `${stats.blocks}`], ['적중 횟수', `${stats.hitsLanded}`], ['회복 사용', `${stats.heals}`], ['도전 횟수', `${stats.attempts}`],
+      ['방어 성공', `${stats.blocks}`], ['적중 횟수', `${stats.hitsLanded}`], ['회복 사용', `${stats.heals}`], ['물어뜯기 막기', `${stats.qteSuccess ?? 0}`], ['도전 횟수', `${stats.attempts}`],
     ];
     dl.innerHTML = '';
     for (const [k, v] of rows) {
@@ -298,6 +311,83 @@ export class UI {
     }
   }
 
+  // ── 입력 장치 / 상호작용(QTE) ──
+  private device: InputDevice = 'kbm';
+  private toastTimer = 0;
+  private qteLastKey = '';
+  private qteTitleT = 0;
+
+  setDevice(d: InputDevice) {
+    this.device = d;
+    document.body.classList.toggle('dev-pad', d === 'pad');
+    this.qteLastKey = '';
+  }
+  get deviceNow() { return this.device; }
+
+  /** 컨트롤러 연결/해제 알림 */
+  padToast(text: string, ms = 2600) {
+    const t = $('pad-toast');
+    t.textContent = text;
+    t.classList.remove('hidden');
+    this.toastTimer = ms / 1000;
+  }
+
+  private static KEYS: Record<QteButton, string> = { A: 'SPACE', B: 'Q', X: 'E', Y: 'F' };
+
+  /** 포획 상호작용 오버레이 갱신 (매 프레임, 시뮬레이션 상태를 읽기만 한다) */
+  updateQte(g: GrappleState | null, dt: number) {
+    const root = $('qte');
+    if (this.toastTimer > 0) { this.toastTimer -= dt; if (this.toastTimer <= 0) $('pad-toast').classList.add('hidden'); }
+    if (this.qteTitleT > 0) { this.qteTitleT -= dt; if (this.qteTitleT <= 0 && g) $('qte-title').textContent = ''; }
+    if (!g) { if (!root.classList.contains('hidden')) root.classList.add('hidden'); return; }
+    root.classList.remove('hidden');
+    const btn = $('qte-btn'), ring = $('qte-ring'), glyph = $('qte-glyph'), label = $('qte-label');
+    const pips = $('qte-pips').children;
+    for (let i = 0; i < pips.length; i++) (pips[i] as HTMLElement).className = g.results[i] && g.results[i] !== 'pending' ? g.results[i] : '';
+    if (g.phase === 'intro') {
+      btn.style.visibility = 'hidden'; label.textContent = '';
+      if (this.qteTitleT <= 0) this.qteTitle('물렸다!', '');
+      return;
+    }
+    btn.style.visibility = 'visible';
+    const b: QteButton = g.phase === 'counter' ? g.counterBtn : g.prompts[g.idx];
+    const key = `${b}|${this.device}`;
+    if (key !== this.qteLastKey) {
+      this.qteLastKey = key;
+      glyph.className = `qte-glyph ${b}${this.device === 'kbm' ? ' key' : ''}`;
+      glyph.textContent = this.device === 'kbm' ? UI.KEYS[b] : b;
+    }
+    if (g.phase === 'bite') {
+      const inWin = g.t >= g.winStart && g.t <= g.winEnd && !g.resolved;
+      const span = Math.max(0.05, g.winEnd - 0.05);
+      const u = Math.min(1, Math.max(0, (g.winEnd - g.t) / span));
+      ring.style.transform = `scale(${(1 + 1.5 * u).toFixed(3)})`;
+      ring.style.opacity = g.resolved ? '0' : '0.95';
+      btn.classList.toggle('go', inWin);
+      label.textContent = g.resolved ? '' : `${g.idx + 1} / ${g.prompts.length}`;
+      if (!g.resolved && this.qteTitleT <= 0) this.qteTitle('막아라!', '');
+    } else {
+      const pulse = 1 + 0.35 * (0.5 + 0.5 * Math.sin(g.t * 14));
+      ring.style.transform = `scale(${pulse.toFixed(3)})`;
+      ring.style.opacity = '0.95';
+      btn.classList.add('go');
+      label.textContent = '';
+      this.qteTitle('반격!', 'perfect', 0.5);
+    }
+  }
+
+  private qteTitle(text: string, cls: string, hold = 0.4) {
+    const t = $('qte-title');
+    t.textContent = text;
+    t.className = `qte-title ${cls}`;
+    this.qteTitleT = hold;
+  }
+
+  /** 한 번의 물기 결과 표시 */
+  qteResult(ok: boolean, perfect: boolean) {
+    this.qteTitle(ok ? (perfect ? '완벽!' : '막았다!') : '물렸다', ok ? (perfect ? 'perfect' : 'ok') : 'miss', 0.7);
+  }
+
   resetHud() {
     this.hpGhost = 1;
     this.bossGhost = 1;
@@ -306,5 +396,6 @@ export class UI {
     this.hideHint();
     this.el.vignette.classList.remove('flash', 'low');
     this.el.vignette.style.opacity = '0';
+    $('qte').classList.add('hidden');
   }
 }

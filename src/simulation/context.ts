@@ -1,6 +1,6 @@
 import type { Physics } from '../physics/types';
 import type { Rng } from './math';
-import type { GamePhase, LionState, PlayerState, SimEvent, Stats } from './state';
+import type { GamePhase, GrappleState, LionState, PlayerState, QteMode, SimEvent, Stats } from './state';
 
 export interface SimContext {
   player: PlayerState;
@@ -15,4 +15,7 @@ export interface SimContext {
   /** 입장 연출 종료 후 일정 시간까지 사자는 공격하지 않는다 */
   graceUntil: number;
   controlEnabled: boolean;
+  /** 상호작용 연출(물어뜯기 포획) 설정/상태 */
+  qteMode: QteMode;
+  grapple: GrappleState | null;
 }

@@ -4,6 +4,7 @@ import { activeWindowIndex, attackIsActive, addLionPoise, interruptLionAttack, l
 import { angleDiff, clamp, forward, norm2, segPointDist, segSegDist2, v2, yawOf, type V3 } from './math';
 import { bladeActive, isDodgeInvulnerable, isGuardUp, playerBladeSegment, setMode } from './player';
 import { TUNING } from './tuning';
+import { startGrapple } from './grapple';
 
 const T = TUNING.player;
 const norm3 = (v: V3): V3 => { const l = Math.hypot(v.x, v.y, v.z) || 1; return { x: v.x / l, y: v.y / l, z: v.z / l }; };
@@ -101,6 +102,7 @@ export function resolveLionAttack(ctx: SimContext) {
   const l = ctx.lion;
   const p = ctx.player;
   const a = l.attack;
+  if (ctx.grapple) return; // 포획 중에는 grapple.ts 가 물기 판정을 직접 처리한다
   if (!a || ctx.phase !== 'fight' || p.mode === 'dead') {
     if (a) a.prevVol = null;
     return;
@@ -206,12 +208,14 @@ export function resolveLionAttack(ctx: SimContext) {
     ctx.hitstop = Math.max(ctx.hitstop, parry ? TUNING.parry.hitstop : perfect ? 0.1 : def.heavyHit ? 0.07 : 0.045);
     return;
   }
+  // 도약 명중 → 물어뜯기 포획 상호작용 (끄면 일반 피해)
+  if (a.id === 'pounce' && startGrapple(ctx)) { l.attack = null; return; }
   const kb = def.heavyHit ? 7 : 3.6;
   p.knock = { x: away.x * kb, z: away.z * kb };
   applyPlayerDamage(ctx, dmg, contact, def.heavyHit, a.id, true);
 }
 
-function applyPlayerDamage(ctx: SimContext, dmg: number, pos: V3, heavy: boolean, attack: import('../combat/attackData').LionAttackId, stagger: boolean) {
+export function applyPlayerDamage(ctx: SimContext, dmg: number, pos: V3, heavy: boolean, attack: import('../combat/attackData').LionAttackId, stagger: boolean) {
   const p = ctx.player;
   p.hp = Math.max(0, p.hp - dmg);
   ctx.stats.damageTaken += dmg;

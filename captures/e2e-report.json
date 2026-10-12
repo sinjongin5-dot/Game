@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-12T09:43:53.441Z",
+  "startedAt": "2026-10-12T10:47:38.970Z",
   "checks": [
     {
       "name": "설정 패널 열림",
@@ -9,7 +9,7 @@
     {
       "name": "설정이 localStorage 에 저장됨",
       "ok": true,
-      "detail": "{\"quality\":\"low\",\"sensitivity\":1.5,\"shake\":0.7,\"invertY\":false,\"master\":0.8,\"sfx\":0.9,\"music\":0.6,\"tutorialSeen\":false,\"showFps\":false}"
+      "detail": "{\"quality\":\"low\",\"sensitivity\":1.5,\"shake\":0.7,\"invertY\":false,\"master\":0.8,\"sfx\":0.9,\"music\":0.6,\"tutorialSeen\":false,\"showFps\":false,\"rumble\":1,\"qte\":\"normal\"}"
     },
     {
       "name": "설정 뒤로가기",
@@ -74,7 +74,7 @@
     {
       "name": "W 키로 전진",
       "ok": true,
-      "detail": "moved 4.90m"
+      "detail": "moved 5.00m"
     },
     {
       "name": "F 로 락온",
@@ -179,12 +179,12 @@
     {
       "name": "재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음",
       "ok": true,
-      "detail": "[{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":2},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":1},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":2}]"
+      "detail": "[{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":1},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":1},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":2}]"
     },
     {
       "name": "오디오 소스가 누적되지 않음",
       "ok": true,
-      "detail": "[2,1,2]"
+      "detail": "[1,1,2]"
     },
     {
       "name": "봇 전투가 승리 또는 사망으로 종료",
@@ -247,6 +247,126 @@
       "detail": "{\"size\":3,\"children\":3,\"root\":16,\"objs0\":16}"
     },
     {
+      "name": "컨트롤러 입력으로 장치가 전환되고 커서가 숨는 모드가 됨",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "타이틀: D-패드로 선택 항목 이동",
+      "ok": true,
+      "detail": "btn-settings"
+    },
+    {
+      "name": "타이틀: A 로 설정 패널 열림",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "설정: D-패드로 진동 슬라이더까지 이동",
+      "ok": true,
+      "detail": "rng-rumble"
+    },
+    {
+      "name": "설정: 좌/우로 슬라이더 값을 바꾸고 저장됨",
+      "ok": true,
+      "detail": "0.9/0.9"
+    },
+    {
+      "name": "설정: B 로 뒤로 (타이틀 복귀)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "컨트롤러 A 로 결투 시작 (입장 연출)",
+      "ok": true,
+      "detail": "intro"
+    },
+    {
+      "name": "입장 연출을 A 로 건너뛰고 전투 시작",
+      "ok": true,
+      "detail": "fight"
+    },
+    {
+      "name": "컨트롤러 플레이 중에는 포인터 잠금을 요구하지 않음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "왼쪽 스틱으로 이동",
+      "ok": true,
+      "detail": "1.16m"
+    },
+    {
+      "name": "오른쪽 스틱으로 카메라 회전",
+      "ok": true,
+      "detail": "-1.67rad"
+    },
+    {
+      "name": "RB 약공격",
+      "ok": true,
+      "detail": "attack 82"
+    },
+    {
+      "name": "LB 유지 = 방패 방어",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B 회피",
+      "ok": true,
+      "detail": "dodge"
+    },
+    {
+      "name": "피격 시 컨트롤러 진동이 dual-rumble 로 전달됨",
+      "ok": true,
+      "detail": "hit=true 1회 최대 strong=0.74"
+    },
+    {
+      "name": "피격 진동은 저주파(strong) 모터가 강하다",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "진동 세기를 0 으로 하면 컨트롤러에 아무것도 보내지 않음",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Start 로 일시정지",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "일시정지 메뉴에서 Start 로 계속하기",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "물어뜯기 막기: 컨트롤러 A/B/X/Y 입력으로 세 번 모두 막고 피해 없음",
+      "ok": true,
+      "detail": "{\"s\":3,\"hp\":1000}"
+    },
+    {
+      "name": "물어뜯기 막기: 화면에 버튼 프롬프트가 표시되고 컨트롤러 글리프(A/B/X/Y)를 쓴다",
+      "ok": true,
+      "detail": "[\"A\",\"X\"]"
+    },
+    {
+      "name": "물어뜯기 막기: 반격(Y) 성공 → 사자를 밀치고 처형 일격 시작",
+      "ok": true,
+      "detail": "{\"c\":true,\"n\":1,\"lion\":900,\"ev\":\"grappleStart,qtePrompt,qteResult:true,qtePrompt,qteResult:true,qtePrompt,qteResult:true,grappleCounterPrompt,grappleCounter,grappleEnd:counter,executionStart\"}"
+    },
+    {
+      "name": "물어뜯기 막기 중 진동이 여러 번 발생",
+      "ok": true,
+      "detail": "8회"
+    },
+    {
+      "name": "키보드 입력으로 되돌아오면 컨트롤러 전용 표시가 사라짐",
+      "ok": true,
+      "detail": ""
+    },
+    {
       "name": "콘솔 오류/예외 없음",
       "ok": true,
       "detail": ""
@@ -264,7 +384,7 @@
           "objects": 16,
           "geometries": 136,
           "textures": 11,
-          "audioActive": 2
+          "audioActive": 1
         },
         {
           "objects": 16,

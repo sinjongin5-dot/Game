@@ -3,6 +3,8 @@ import { AudioDirector } from './audio/director';
 import { AudioEngine } from './audio/audioEngine';
 import { loadSettings, saveSettings, type Settings } from './core/settings';
 import { Input } from './input/input';
+import { Haptics, HapticsDirector, PATTERNS, type ActuatorLike } from './input/haptics';
+import { MenuNav } from './ui/menuNav';
 import { loadAssets, type LoadedAssets } from './render/assets';
 import { GameScene, type SceneStats } from './render/gameScene';
 import { RapierPhysics } from './physics/rapierPhysics';
@@ -32,11 +34,15 @@ export class Game {
   input!: Input;
   audio = new AudioEngine();
   director = new AudioDirector(this.audio);
+  haptics = new Haptics(() => this.rumbleActuator());
+  hapticDirector = new HapticsDirector(this.haptics);
+  menuNav!: MenuNav;
   scene!: GameScene;
   sim!: GameSim;
   assets!: LoadedAssets;
   private canvas: HTMLCanvasElement;
   private last = 0;
+  private hintGrapple = false;
   private debugOn = false;
   private lastStats: SceneStats = { fps: 0, frameMs: 0, calls: 0, tris: 0, geometries: 0, textures: 0 };
   private rafId = 0;
@@ -79,6 +85,15 @@ export class Game {
     this.input.onSkip = () => { if (this.state === 'intro') this.skipIntro(); };
     this.input.debugToggle = () => this.toggleDebug();
     this.input.onAnyKeyDown = () => { void this.audio.resume(); };
+    // 컨트롤러: 장치 전환 표시, 메뉴 탐색, 연결 알림
+    this.menuNav = new MenuNav({
+      onMove: () => { this.audio.play('ui_hover', { volume: 0.5, reverb: 0 }); this.haptics.play(PATTERNS.menuTick); },
+      onConfirm: () => { void this.audio.resume(); this.haptics.play(PATTERNS.menuConfirm); },
+    });
+    this.input.onDeviceChange = (d) => { this.ui.setDevice(d); if (d === 'kbm') this.menuNav.deactivate(); };
+    this.input.pad.onConnect = (id) => { this.ui.padToast(`컨트롤러 연결됨 — ${id.replace(/\(.*\)/, '').trim().slice(0, 40) || 'Gamepad'}`); this.haptics.play(PATTERNS.menuConfirm); };
+    this.input.pad.onDisconnect = () => { this.ui.padToast('컨트롤러 연결이 끊어졌습니다'); if (this.state === 'fight' || this.state === 'intro') this.pause(); };
+    this.haptics.intensity = this.settings.rumble;
     window.addEventListener('pointerdown', () => { void this.audio.resume(); }, { capture: true });
     window.addEventListener('resize', () => this.onResize());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
@@ -101,7 +116,7 @@ export class Game {
     this.ui.setProgress(0, '에셋을 불러오는 중…');
     let glFrac = { loaded: 0, total: 1 };
     let audioDone = 0;
-    const audioTotal = 51;
+    const audioTotal = 52;
     let rapierDone = 0;
     const update = (label: string) => {
       const total = glFrac.total + audioTotal * AUDIO_UNIT + 100000;
@@ -131,7 +146,7 @@ export class Game {
         this.slowT = Math.max(this.slowT, dur);
       };
       this.scene.resize(window.innerWidth, window.innerHeight);
-      this.sim = new GameSim(physics, { skipIntro: false });
+      this.sim = new GameSim(physics, { skipIntro: false, qte: this.settings.qte });
       this.scene.resetForNewAttempt(this.sim);
       this.scene.setMode('title');
       this.scene.setDebug(this.debugOn);
@@ -172,6 +187,7 @@ export class Game {
     void this.audio.resume();
     this.sim.reset({ skipIntro: false, attempts: 1 });
     this.director.reset();
+    this.hapticDirector.reset();
     this.slowT = 0;
     this.scene.resetForNewAttempt(this.sim);
     this.scene.setMode('game');
@@ -181,7 +197,7 @@ export class Game {
     this.ui.showHud(false);
     this.ui.showIntroHint(true);
     this.input.setEnabled(true);
-    this.input.requestLock();
+    this.lockIfMouse();
     this.state = 'intro';
     this.fightClock = 0;
     this.resultShown = false;
@@ -189,6 +205,14 @@ export class Game {
     this.hintQueue = [];
     this.audio.setMusic('music_calm', 0.8, 1.5);
     this.audio.startLoop('crowd_loop', 'crowd', 1, 1);
+  }
+
+  /** 마우스 시점이 필요할 때만 포인터를 잠근다 (컨트롤러로 하는 중에는 커서 잠금이 필요 없다) */
+  private lockIfMouse() { if (this.input.lastDevice !== 'pad') this.input.requestLock(); }
+
+  private rumbleActuator(): ActuatorLike | null {
+    const g = this.input?.pad.current() as (Gamepad & { vibrationActuator?: ActuatorLike }) | null;
+    return g?.vibrationActuator ?? null;
   }
 
   skipIntro() {
@@ -209,6 +233,7 @@ export class Game {
     this.ui.closeAllPanels();
     this.sim.reset({ skipIntro: true });
     this.director.reset();
+    this.hapticDirector.reset();
     this.slowT = 0;
     this.scene.resetForNewAttempt(this.sim);
     this.scene.cam.reset(this.sim);
@@ -218,7 +243,7 @@ export class Game {
     this.ui.showIntroHint(false);
     this.ui.showClickCatch(false);
     this.input.setEnabled(true);
-    this.input.requestLock();
+    this.lockIfMouse();
     this.state = 'fight';
     this.fightClock = 0;
     this.resultShown = false;
@@ -232,6 +257,7 @@ export class Game {
     this.ui.closeAllPanels();
     this.sim.reset({ skipIntro: false, attempts: 1 });
     this.director.reset();
+    this.hapticDirector.reset();
     this.slowT = 0;
     this.scene.resetForNewAttempt(this.sim);
     this.scene.setMode('title');
@@ -262,6 +288,7 @@ export class Game {
     this.prevState = this.state;
     this.state = 'paused';
     this.input.setEnabled(false);
+    this.haptics.stop();
     this.ui.openPanel('pause');
     void this.audio.ctx?.suspend();
   }
@@ -271,7 +298,7 @@ export class Game {
     this.ui.closeAllPanels();
     this.state = this.prevState;
     this.input.setEnabled(true);
-    this.input.requestLock();
+    this.lockIfMouse();
     void this.audio.ctx?.resume();
     this.last = performance.now();
   }
@@ -285,6 +312,9 @@ export class Game {
       this.scene.cam.settings.shake = s.shake;
       this.scene.cam.settings.invertY = s.invertY;
     }
+    this.haptics.intensity = s.rumble;
+    if (s.rumble > 0) this.haptics.play(PATTERNS.menuConfirm);
+    if (this.sim) this.sim.setQte(s.qte);
     this.ui.setFps(s.showFps ? '' : null);
   }
 
@@ -328,6 +358,13 @@ export class Game {
     const dt = rawDt * this.timeScale * (this.slowT > 0 ? this.slowScale : 1);
     if (this.state === 'error' || this.state === 'loading' || this.state === 'boot') return;
     const sim = this.sim;
+    // 컨트롤러 폴링 (메뉴 중에도): 전투 입력은 input.frame()/consumeLook() 이 가져가고, 메뉴 입력은 여기서 처리한다
+    const pf = this.input.pollPad(rawDt, this.settings.sensitivity, this.settings.invertY);
+    const stateBefore = this.state;
+    if (this.input.lastDevice === 'pad' && !this.input.enabled) this.menuNav.update(pf);
+    // Start: 전투 중이면 일시정지 (같은 눌림이 방금 메뉴에서 '계속하기'로 쓰였다면 다시 멈추지 않는다)
+    if (pf.menu.start && (stateBefore === 'fight' || stateBefore === 'intro')) this.pause();
+    this.haptics.tick(rawDt);
     const sc = this.scene;
 
     if (!sc.contextLost && this.ctxErrorShown) {
@@ -353,17 +390,19 @@ export class Game {
         sim.update(dt, this.inputOverride);
       } else {
         const f = this.input.enabled ? this.input.frame(sc.cam.yaw) : { ...emptyInput(), cameraYaw: sc.cam.yaw };
-        if (this.state === 'intro' && (f.pressed.dodge || f.pressed.light || f.pressed.heal)) this.skipIntro();
+        if (this.state === 'intro' && (f.pressed.dodge || f.pressed.light || f.pressed.heal || f.pressed.a)) this.skipIntro();
         sim.update(dt, f);
       }
     }
     const events = sim.drainEvents();
     if (events.length) {
       this.director.handle(events, sim);
+      this.hapticDirector.handle(events, sim);
       sc.handleEvents(events, sim);
       this.handleFlowEvents(events);
     }
     this.director.tick(dt);
+    if (live) { this.hapticDirector.update(rawDt, sim); this.ui.updateQte(sim.ctx.grapple, rawDt); }
     sc.update(sim, dt, live ? sim.alpha : 0, look, this.state === 'fight');
     this.director.footsteps(sc.footFx, sim);
     this.director.ambience(sim, sc.cam.camera, sim.phase);
@@ -409,6 +448,8 @@ export class Game {
         this.ui.hint('사자의 준비 동작을 읽으세요 — Space 로 회피하거나, 우클릭을 유지해 방패로 막습니다.', 5200);
       }
       if (e.type === 'phase2') this.ui.hint('사자가 더욱 사나워졌다', 3200);
+      if (e.type === 'qteResult') this.ui.qteResult(e.ok, e.perfect);
+      if (e.type === 'grappleStart' && !this.hintGrapple && !this.settings.tutorialSeen) { this.hintGrapple = true; this.ui.hint('물렸다! 화면의 버튼을 고리가 모이는 순간에 누르세요 — 세 번 다 막으면 반격!', 4200); }
       if (e.type === 'playerBlocked' && e.parry && !this.hints.parry) {
         this.hints.parry = true;
         this.ui.hint('패링 성공 — 사자가 휘청거립니다. 지금 반격하세요!', 3600);

@@ -133,4 +133,9 @@ lt = bp(noise(n), 350, 1700) * np.sin(np.pi * np.clip(t / dur, 0, 1)) ** 1.5 * 0
 lt += lp(noise(n), 160) * np.sin(np.pi * np.clip(t / dur, 0, 1)) * 0.8
 lt += thump(dur, 60, 40, 0.5) * 0.25
 save('lion_tell', fade(lt, 0.03, 0.08), 0.6)
+# ── 상호작용 프롬프트: 짧고 또렷한 두 음 틱 ──
+dur = 0.16; n = int(SR * dur); t = t_(dur)
+qp = (np.sin(2 * np.pi * 880 * t) * np.exp(-t / 0.05) + 0.6 * np.sin(2 * np.pi * 1320 * np.maximum(t - 0.05, 0)) * (t > 0.05) * np.exp(-np.maximum(t - 0.05, 0) / 0.05)) * 0.8
+qp += hp(noise(n), 3000) * env_ad(n, 0.0005, 0.01) * 0.25
+save('qte_prompt', fade(qp, 0.002, 0.02), 0.6)
 print('done')
