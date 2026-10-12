@@ -18,4 +18,6 @@ export interface SimContext {
   /** 상호작용 연출(물어뜯기 포획) 설정/상태 */
   qteMode: QteMode;
   grapple: GrappleState | null;
+  /** 완벽 회피 직후 사자의 시간이 느려지는 남은 시간(초) */
+  witchT: number;
 }

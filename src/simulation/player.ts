@@ -7,6 +7,7 @@ import {
 import { TUNING } from './tuning';
 import { canExecute } from './execution';
 import { holdPlayerInGrapple } from './grapple';
+import { tryStartFury } from './momentum';
 import type { InputFrame, PlayerState } from './state';
 
 const T = TUNING.player;
@@ -20,7 +21,7 @@ export function createPlayer(): PlayerState {
     guardHeld: false, guardUpT: 0, guardImpact: 0, healApplied: false,
     hitDir: v2(0, -1), hitHeavy: false, invulnT: 0, knock: v2(), lockOn: false, running: false, speed: 0,
     moveLocal: v2(), buffer: { action: null, t: 0 }, prevBlade: null, swingFired: false, lowStaminaFlash: 0, lastDodgeStart: -10,
-    executing: false, runAttack: false, riposteUntil: -1,
+    executing: false, runAttack: false, riposteUntil: -1, momentum: 0, furyT: 0, momentumIdle: 0, combo: 0, comboT: 99,
   };
 }
 
@@ -41,6 +42,7 @@ export function isGuardUp(p: PlayerState): boolean {
 }
 
 function spend(ctx: SimContext, p: PlayerState, cost: number): boolean {
+  if (p.furyT > 0) cost *= TUNING.fury.costMul;
   if (p.stamina < cost) {
     p.lowStaminaFlash = 0.5;
     ctx.events.push({ type: 'staminaDenied' });
@@ -224,6 +226,7 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
     if (input.pressed.heavy) bufferAction(p, 'heavy');
     if (input.pressed.dodge) bufferAction(p, 'dodge');
     if (input.pressed.heal) bufferAction(p, 'heal');
+    if (input.pressed.fury) tryStartFury(ctx);
   }
   const wasGuard = p.guardHeld;
   p.guardHeld = canAct && input.guard;
@@ -235,7 +238,7 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
   if (!dead) {
     p.staminaDelay = Math.max(0, p.staminaDelay - dt);
     if (p.staminaDelay <= 0) {
-      let rate = T.staminaRegen;
+      let rate = T.staminaRegen * (p.furyT > 0 ? TUNING.fury.regenMul : 1);
       if (p.guardHeld) rate *= T.guardRegenMul;
       if (p.mode === 'heal') rate *= 0.4;
       p.stamina = Math.min(p.staminaMax, p.stamina + rate * dt);
@@ -256,6 +259,7 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       if (a === 'heal') { if (!startHeal(ctx, p)) p.buffer.action = null; else break; }
       if (a === 'heavy' && startExecution(ctx, p)) break;
       if (a === 'heavy' && startAttack(ctx, p, 'heavy', 0, input)) break;
+      if (a === 'light' && p.guardHeld && startAttack(ctx, p, 'bash', 0, input)) break;
       if (a === 'light') {
         // 직전 공격 직후 짧은 시간 안이면 연계 이어감 (마지막 타 이후엔 처음부터)
         const chainContinue = ctx.time - p.lastAttackEnd < 0.0;

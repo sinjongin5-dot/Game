@@ -1,7 +1,7 @@
 import type { Settings } from '../core/settings';
 import type { Quality } from '../render/gameScene';
 import type { GameSim } from '../simulation/sim';
-import type { GrappleState, QteButton, QteMode } from '../simulation/state';
+import type { CalloutKind, GrappleState, PlayerState, QteButton, QteMode } from '../simulation/state';
 import type { InputDevice } from '../input/input';
 
 export type PanelName = 'settings' | 'controls' | 'credits' | 'pause' | 'death' | 'victory' | 'error';
@@ -195,12 +195,12 @@ export class UI {
     $('death-sub').textContent = sub;
     this.openPanel('death');
   }
-  showVictory(stats: { time: number; damageTaken: number; dodges: number; blocks: number; hitsLanded: number; heals: number; attempts: number; qteSuccess?: number }) {
+  showVictory(stats: { time: number; damageTaken: number; dodges: number; blocks: number; hitsLanded: number; heals: number; attempts: number; qteSuccess?: number; maxCombo?: number; perfectDodges?: number }) {
     this.hideHint();
     const dl = $('victory-stats');
     const rows: [string, string][] = [
       ['전투 시간', fmtTime(stats.time)], ['받은 피해', `${Math.round(stats.damageTaken)}`], ['회피 성공', `${stats.dodges}`],
-      ['방어 성공', `${stats.blocks}`], ['적중 횟수', `${stats.hitsLanded}`], ['회복 사용', `${stats.heals}`], ['물어뜯기 막기', `${stats.qteSuccess ?? 0}`], ['도전 횟수', `${stats.attempts}`],
+      ['방어 성공', `${stats.blocks}`], ['적중 횟수', `${stats.hitsLanded}`], ['회복 사용', `${stats.heals}`], ['물어뜯기 막기', `${stats.qteSuccess ?? 0}`], ['최대 연타', `${stats.maxCombo ?? 0}`], ['완벽 회피', `${stats.perfectDodges ?? 0}`], ['도전 횟수', `${stats.attempts}`],
     ];
     dl.innerHTML = '';
     for (const [k, v] of rows) {
@@ -311,6 +311,51 @@ export class UI {
     }
   }
 
+  // ── 기세 / 콜아웃 / 연속 타격 ──
+  private static CALLOUT: Record<CalloutKind, string> = {
+    parry: '패링!', dodge: '완벽한 회피!', clash: '받아치기!', bash: '방패 밀치기!', combo: '', fury: '기세 폭발!', execute: '처형!', counter: '반격!', riposte: '반격 적중',
+  };
+  private lastCombo = 0;
+  private lastMoKey = '';
+
+  callout(kind: CalloutKind, n?: number) {
+    const box = $('callouts');
+    while (box.children.length >= 3) box.firstElementChild?.remove();
+    const el = document.createElement('div');
+    el.className = `callout ${kind}`;
+    el.textContent = kind === 'combo' ? `${n} 연타!` : UI.CALLOUT[kind];
+    box.append(el);
+    setTimeout(() => el.remove(), 1200);
+  }
+
+  /** 기세 게이지, 폭발 안내, 연속 타격 수, 완벽 회피 비네트를 갱신 (매 프레임) */
+  updateCombat(p: PlayerState, witch: boolean) {
+    const mo = $('bar-mo');
+    const fill = mo.querySelector('.fill') as HTMLElement;
+    const frac = Math.max(0, Math.min(1, p.momentum / 100));
+    const fury = p.furyT > 0, ready = !fury && frac >= 1;
+    const key = `${frac.toFixed(3)}|${fury}|${ready}|${this.device}`;
+    if (key !== this.lastMoKey) {
+      this.lastMoKey = key;
+      fill.style.transform = `scaleX(${frac})`;
+      mo.classList.toggle('fury', fury);
+      mo.classList.toggle('ready', ready);
+      const hint = $('mo-hint');
+      hint.classList.toggle('hidden', !ready);
+      if (ready) hint.textContent = this.device === 'pad' ? '기세 폭발 — 방향키 ↑' : '기세 폭발 — R';
+    }
+    const c = $('combo');
+    if (p.combo !== this.lastCombo) {
+      this.lastCombo = p.combo;
+      c.classList.toggle('hidden', p.combo < 2);
+      if (p.combo >= 2) {
+        $('combo-n').textContent = String(p.combo);
+        c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump');
+      }
+    }
+    $('witch-vig').classList.toggle('on', witch);
+  }
+
   // ── 입력 장치 / 상호작용(QTE) ──
   private device: InputDevice = 'kbm';
   private toastTimer = 0;
@@ -397,5 +442,9 @@ export class UI {
     this.el.vignette.classList.remove('flash', 'low');
     this.el.vignette.style.opacity = '0';
     $('qte').classList.add('hidden');
+    $('callouts').innerHTML = '';
+    this.lastCombo = 0; this.lastMoKey = '';
+    $('combo').classList.add('hidden');
+    $('witch-vig').classList.remove('on');
   }
 }

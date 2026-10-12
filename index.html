@@ -19,12 +19,17 @@
       <div class="hud-tl">
         <div class="bar hp" id="bar-hp"><div class="ghost"></div><div class="fill"></div><span class="num" id="num-hp"></span></div>
         <div class="bar st" id="bar-st"><div class="fill"></div></div>
+        <div class="bar mo" id="bar-mo"><div class="fill"></div></div>
+        <div id="mo-hint" class="hidden"></div>
         <div class="flasks" id="flasks"></div>
       </div>
       <div class="hud-boss" id="boss">
         <div class="boss-name">황금갈기 · 콜로세움의 숫사자</div>
         <div class="bar boss-bar"><div class="ghost"></div><div class="fill"></div><i class="tick" style="left:55%"></i></div>
       </div>
+      <div id="callouts"></div>
+      <div id="combo" class="hidden"><b id="combo-n">0</b><span>HIT</span></div>
+      <div id="witch-vig"></div>
       <div id="reticle"></div>
       <div id="hint"></div>
       <div id="fps"></div>
@@ -101,7 +106,8 @@
           <div><kbd>마우스</kbd><span>카메라 회전</span></div>
           <div><kbd>좌클릭</kbd><span>약공격 (3연계)</span></div>
           <div><kbd>Q</kbd><span>강공격 (느리지만 큰 피해·경직)</span></div>
-          <div><kbd>우클릭 유지</kbd><span>방패 방어 (전방만 막음)</span></div>
+          <div><kbd>우클릭 유지</kbd><span>방패 방어 (전방만 막음) · 유지한 채 좌클릭 = 방패 밀치기</span></div>
+          <div><kbd>R</kbd><span>기세 폭발 (게이지가 가득 찼을 때)</span></div>
           <div><kbd>Space</kbd><span>회피 (입력 방향, 무입력 시 뒤로)</span></div>
           <div><kbd>Shift 유지</kbd><span>달리기 (스태미나 소모)</span></div>
           <div><kbd>E</kbd><span>회복 (2회 · 시간이 걸리며 피격 시 끊김)</span></div>
@@ -114,7 +120,8 @@
           <div><kbd>오른쪽 스틱</kbd><span>카메라 회전</span></div>
           <div><kbd>RB</kbd><span>약공격 (3연계)</span></div>
           <div><kbd>RT / Y</kbd><span>강공격 · 사자가 쓰러졌을 때 처형</span></div>
-          <div><kbd>LB / LT 유지</kbd><span>방패 방어 · 패링</span></div>
+          <div><kbd>LB / LT 유지</kbd><span>방패 방어 · 패링 · 유지한 채 RB = 방패 밀치기</span></div>
+          <div><kbd>D-패드 ↑</kbd><span>기세 폭발 (게이지가 가득 찼을 때)</span></div>
           <div><kbd>B</kbd><span>회피</span></div>
           <div><kbd>A 유지</kbd><span>달리기</span></div>
           <div><kbd>X</kbd><span>회복</span></div>
@@ -130,6 +137,10 @@
           <li>방패를 든 동안에는 스태미나 회복이 느려집니다.</li>
           <li><b>패링</b>: 사자의 앞발·물기가 닿기 직전(방패를 든 뒤 약 0.3초 안)에 막으면 공격이 끊기고 사자가 휘청거립니다. 직후 반격은 더 큰 피해를 줍니다. 도약·돌진·충격파·회전 같은 큰 기술은 끊기지 않습니다.</li>
           <li><b>자세 붕괴와 처형</b>: 경직 게이지가 가득 차거나 벽에 부딪혀 사자가 쓰러지면, 가까이에서 <kbd>Q</kbd> 로 처형(스태미나 소모 없음·동작 중 무적)할 수 있습니다. 한 번의 경직 동안 한 번만 가능합니다.</li>
+          <li><b>완벽 회피</b>: 사자의 공격이 닿기 직전에 구르면 약 1.2초 동안 사자의 시간만 느려집니다. 이때의 공격은 피해·경직이 더 큽니다.</li>
+          <li><b>방패 밀치기</b>: 방패를 든 채 약공격(<kbd>우클릭</kbd> 유지 + <kbd>좌클릭</kbd> / 컨트롤러 <kbd>LB</kbd> + <kbd>RB</kbd>). 방패 앞 부채꼴의 사자를 밀어내 가벼운 공격을 끊고 경직 게이지를 크게 쌓습니다. 큰 기술은 끊지 못합니다.</li>
+          <li><b>받아치기</b>: 사자의 앞발·물기가 닿기 직전에 먼저 맞추면 그 공격이 끊기고 피해를 입지 않습니다.</li>
+          <li><b>기세</b>: 맞추고, 막고, 피하고, 패링할수록 게이지(스태미나 아래의 금색 줄)가 찹니다. 가득 차면 <kbd>R</kbd> / 컨트롤러 D-패드 ↑ 로 <b>폭발</b> — 9초 동안 피해 +25%, 스태미나 소모 절반, 회복 가속, 명중마다 체력 조금 회복. 맞으면 기세가 깎입니다.</li>
           <li>달리다가 처음 휘두르는 약공격은 달리기 공격이 되어 피해가 조금 더 큽니다.</li>
           <li><b>물어뜯기 막기</b>: 사자의 도약에 맞으면 사자가 달라붙어 세 번 뭅니다. 화면에 뜨는 버튼(컨트롤러 <b class="gl a">A</b><b class="gl b">B</b><b class="gl x">X</b><b class="gl y">Y</b> / 키보드 <kbd>Space</kbd><kbd>Q</kbd><kbd>E</kbd><kbd>F</kbd>)을 고리가 모이는 순간 눌러 한 번씩 막으세요. 세 번을 모두 막으면 <b class="gl y">Y</b> 로 반격해 사자를 밀쳐 내고 처형 일격이 이어집니다. 틀리거나 놓치면 그 물기는 피해를 입습니다. 설정에서 끄거나 입력 여유를 늘릴 수 있습니다.</li>
           <li>사자는 준비 동작을 보인 뒤 공격합니다. 공격이 끝난 직후가 반격의 기회입니다.</li>

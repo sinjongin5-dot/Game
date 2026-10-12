@@ -10,11 +10,11 @@ export interface InputFrame {
   guard: boolean;
   cameraYaw: number;
   /** a/b/x/y: 상호작용(물어뜯기 막기) 연출용 얼굴 버튼. 게임패드 A/B/X/Y, 키보드 Space/Q/E/F */
-  pressed: { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean };
+  pressed: { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean; fury: boolean };
 }
 export const emptyInput = (): InputFrame => ({
   moveX: 0, moveY: 0, run: false, guard: false, cameraYaw: 0,
-  pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false },
+  pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false, fury: false },
 });
 
 export type PlayerMode = 'free' | 'attack' | 'dodge' | 'guardBreak' | 'hit' | 'heal' | 'dead' | 'victory' | 'scripted';
@@ -64,6 +64,15 @@ export interface PlayerState {
   runAttack: boolean;
   /** 이 시각(ctx.time)까지 다음 공격이 반격(리포스트) 보너스를 받는다 */
   riposteUntil: number;
+  /** 기세 게이지 0..100 — 맞추고 막고 피할수록 차고, 가득 차면 폭발(fury) 입력으로 발동 */
+  momentum: number;
+  /** 폭발 모드 남은 시간(초) */
+  furyT: number;
+  /** 마지막으로 기세가 오른 뒤 경과(초): 일정 시간 지나면 서서히 식는다 */
+  momentumIdle: number;
+  /** 연속 타격 수 / 마지막 타격 뒤 경과 */
+  combo: number;
+  comboT: number;
 }
 
 export type LionMode =
@@ -146,7 +155,7 @@ export interface LionState {
 export type SimEvent =
   | { type: 'playerSwing'; id: PlayerAttackId }
   | { type: 'playerSlam'; pos: V2; hit: boolean }
-  | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean; dir: V3; killing: boolean; combo: number; execute?: boolean; riposte?: boolean; run?: boolean; finisher?: boolean }
+  | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean; dir: V3; killing: boolean; combo: number; execute?: boolean; riposte?: boolean; run?: boolean; finisher?: boolean; bash?: boolean; witch?: boolean; fury?: boolean }
   | { type: 'executionStart'; pos: V2; dur: number }
   | { type: 'playerBlocked'; strength: number; pos: V3; broke: boolean; attack: LionAttackId; perfect: boolean; parry?: boolean; interrupted?: boolean }
   | { type: 'playerHit'; dmg: number; pos: V3; heavy: boolean; attack: LionAttackId }
@@ -173,12 +182,19 @@ export type SimEvent =
   | { type: 'fightStart' }
   | { type: 'victory' }
   | { type: 'playerDeathScreen' }
+  | { type: 'callout'; kind: CalloutKind; n?: number }
+  | { type: 'witchStart' }
+  | { type: 'clash'; pos: V3; attack: LionAttackId }
+  | { type: 'furyStart' }
+  | { type: 'furyEnd' }
   | { type: 'grappleStart'; pos: V2 }
   | { type: 'qtePrompt'; idx: number; button: QteButton; winStart: number; winEnd: number }
   | { type: 'qteResult'; idx: number; ok: boolean; perfect: boolean; button: QteButton; pos: V3 }
   | { type: 'grappleCounterPrompt'; button: QteButton }
   | { type: 'grappleCounter' }
   | { type: 'grappleEnd'; outcome: 'counter' | 'released' | 'dead' };
+
+export type CalloutKind = 'parry' | 'dodge' | 'clash' | 'bash' | 'combo' | 'fury' | 'execute' | 'counter' | 'riposte';
 
 export type QteButton = 'A' | 'B' | 'X' | 'Y';
 export type QteMode = 'off' | 'easy' | 'normal';
@@ -215,4 +231,8 @@ export interface Stats {
   /** 물어뜯기 막기 성공 횟수 / 반격 성공 횟수 */
   qteSuccess: number;
   counters: number;
+  perfectDodges: number;
+  clashes: number;
+  maxCombo: number;
+  furies: number;
 }

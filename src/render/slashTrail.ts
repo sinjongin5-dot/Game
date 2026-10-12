@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** 검 궤적의 시각 언어. 공격 종류마다 색·두께·잔상 길이가 다르다 (차가운 강철빛이 기본, 따뜻한 색은 강한 공격에서만) */
-export type SlashStyle = 'light' | 'finisher' | 'run' | 'heavy' | 'execute';
+export type SlashStyle = 'light' | 'finisher' | 'run' | 'heavy' | 'execute' | 'fury';
 
 interface StyleDef {
   /** 날 끝(가장 밝은 가장자리) / 날 안쪽(옅은 가장자리) 색 (선형, HDR 허용) */
@@ -23,6 +23,8 @@ export const SLASH_STYLES: Record<SlashStyle, StyleDef> = {
   finisher: { core: [1.15, 1.12, 1.05], edge: [0.55, 0.68, 0.92], life: 0.2, from: 0.3, extend: 0.14, alpha: 0.78, smoke: 0.25 },
   run: { core: [0.95, 1.05, 1.15], edge: [0.35, 0.55, 0.9], life: 0.19, from: 0.5, extend: 0.05, alpha: 0.6, smoke: 0 },
   heavy: { core: [1.55, 1.3, 1.0], edge: [0.62, 0.52, 0.45], life: 0.3, from: 0.0, extend: 0.3, alpha: 0.9, smoke: 0.5 },
+  // 기세 폭발 중: 금색~붉은 불꽃빛 (약공격 첫 타 제외한 모든 공격에 쓰이는 강화된 궤적)
+  fury: { core: [1.7, 1.1, 0.45], edge: [0.8, 0.32, 0.12], life: 0.26, from: 0.15, extend: 0.22, alpha: 0.9, smoke: 0.35 },
   execute: { core: [1.8, 1.55, 1.3], edge: [0.7, 0.72, 0.9], life: 0.42, from: 0.0, extend: 0.4, alpha: 1.0, smoke: 0.6 },
 };
 

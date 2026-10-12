@@ -116,7 +116,7 @@ export class Game {
     this.ui.setProgress(0, '에셋을 불러오는 중…');
     let glFrac = { loaded: 0, total: 1 };
     let audioDone = 0;
-    const audioTotal = 52;
+    const audioTotal = 55;
     let rapierDone = 0;
     const update = (label: string) => {
       const total = glFrac.total + audioTotal * AUDIO_UNIT + 100000;
@@ -402,7 +402,7 @@ export class Game {
       this.handleFlowEvents(events);
     }
     this.director.tick(dt);
-    if (live) { this.hapticDirector.update(rawDt, sim); this.ui.updateQte(sim.ctx.grapple, rawDt); }
+    if (live) { this.hapticDirector.update(rawDt, sim); this.ui.updateQte(sim.ctx.grapple, rawDt); this.ui.updateCombat(sim.player, sim.ctx.witchT > 0); }
     sc.update(sim, dt, live ? sim.alpha : 0, look, this.state === 'fight');
     this.director.footsteps(sc.footFx, sim);
     this.director.ambience(sim, sc.cam.camera, sim.phase);
@@ -449,6 +449,7 @@ export class Game {
       }
       if (e.type === 'phase2') this.ui.hint('사자가 더욱 사나워졌다', 3200);
       if (e.type === 'qteResult') this.ui.qteResult(e.ok, e.perfect);
+      if (e.type === 'callout') this.ui.callout(e.kind, e.n);
       if (e.type === 'grappleStart' && !this.hintGrapple && !this.settings.tutorialSeen) { this.hintGrapple = true; this.ui.hint('물렸다! 화면의 버튼을 고리가 모이는 순간에 누르세요 — 세 번 다 막으면 반격!', 4200); }
       if (e.type === 'playerBlocked' && e.parry && !this.hints.parry) {
         this.hints.parry = true;

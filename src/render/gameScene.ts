@@ -18,6 +18,8 @@ import { SwordTrail } from './swordTrail';
 import { CombatVfx } from './combatVfx';
 import { PostFX, type PostConfig } from './post';
 
+const FURY_EMBER = new THREE.Color(1.7, 0.85, 0.2);
+
 export type Quality = 'low' | 'medium' | 'high' | 'ultra';
 
 const POST_OFF: PostConfig = { enabled: false, msaa: 0, ao: false, aoScale: 0.5, bloom: false, godrays: false, dof: false, grain: false, aberration: false };
@@ -67,6 +69,7 @@ export class GameScene {
   private eyePulse = 0;
   private emberAcc = 0;
   private moteAcc = 0;
+  private furyAcc = 0;
   private ringDustAcc = 0;
   private lastLionWin = -1;
   private sun: THREE.DirectionalLight;
@@ -431,6 +434,14 @@ export class GameScene {
     // 칼 궤적
     this.vfx.updateSlash(sim, this.gladiator.swordBase, this.gladiator.swordTip, dt);
     this.vfx.update(dt, sim);
+    // 기세 폭발 중: 몸에서 금빛 불씨가 계속 피어오른다
+    if (sim.player.furyT > 0 && phase === 'fight') {
+      this.furyAcc += dt * 34 * QUALITY[this.quality].particles;
+      while (this.furyAcc >= 1) {
+        this.furyAcc -= 1;
+        this.particles.ember(new THREE.Vector3(sim.player.pos.x, 0.15, sim.player.pos.z), 1, 0.5, FURY_EMBER);
+      }
+    }
     this.updateLionFx(sim, dt);
 
     // 관중 흥분도
@@ -449,7 +460,7 @@ export class GameScene {
     // 전투 분위기: 보스전이 진행될수록(2페이즈), 사자가 경직했을 때, 처형 연출 중에 더 차갑고 어두워진다
     {
       const stag = l.mode === 'stagger' || l.mode === 'stunned';
-      const target = this.mode === 'title' || phase === 'intro' ? 0 : 0.12 + (l.phase === 2 ? 0.3 : 0) + (stag ? 0.22 : 0) + (this.cam.cineActive ? 0.28 : 0);
+      const target = this.mode === 'title' || phase === 'intro' ? 0 : 0.12 + (l.phase === 2 ? 0.3 : 0) + (stag ? 0.22 : 0) + (this.cam.cineActive ? 0.28 : 0) + (sim.ctx.witchT > 0 ? 0.4 : 0) - (sim.player.furyT > 0 ? 0.1 : 0);
       this.mood += (target - this.mood) * Math.min(1, dt * 2.2);
     }
     // 피사계 심도 초점: 락온이면 사자, 아니면 플레이어 (부드럽게 이동)

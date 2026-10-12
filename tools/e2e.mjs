@@ -1,5 +1,5 @@
 // 실제 브라우저(헤드리스 Chromium, SwiftShader) 종단 간 테스트. 개발 서버(vite)가 5173 에서 실행 중이어야 한다.
-// 사용: node tools/e2e.mjs [ui|input|fight|combat|pad|all]
+// 사용: node tools/e2e.mjs [ui|input|fight|combat|fun|pad|all]
 import fs from 'node:fs';
 import { launch, sleep } from './harness.mjs';
 
@@ -239,6 +239,72 @@ if (section === 'combat' || section === 'all') {
   check('공격 40회 후에도 궤적 풀/씬 오브젝트 수가 늘지 않음', pool.size === 3 && pool.children === 3 && pool.root === objs0, JSON.stringify({ ...pool, objs0 }));
   await page.evaluate(() => { window.__arena.timeScale = 1; });
   await shot('13_combat_vfx');
+  await page.evaluate(() => window.__arena.toTitle()); await sleep(1500);
+}
+
+if (section === 'fun' || section === 'all') {
+  // 재미 요소(완벽 회피 역습 / 방패 밀치기 / 받아치기 / 기세 폭발 / 연속 타격 HUD)를 실제 브라우저(Rapier 물리 + 렌더 + DOM HUD)에서 확인한다.
+  await page.click('#btn-start'); await sleep(600);
+  await page.evaluate(() => window.__arena.simAdvance(11.2)); await sleep(2000);
+  await page.keyboard.press('Enter'); await sleep(1500);
+  const runF = (code) => page.evaluate(async (c) => {
+    const g = window.__arena, sim = g.sim, sc = g.scene;
+    const m = await import('/src/simulation/lion.ts'); const pl = await import('/src/simulation/player.ts');
+    g.timeScale = 0;
+    const idle = { moveX: 0, moveY: 0, run: false, guard: false, cameraYaw: 0, pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false, fury: false } };
+    const P = (o) => ({ ...idle, ...o, pressed: { ...idle.pressed, ...(o.pressed || {}) } });
+    const reset = (px, pz, lz) => {
+      g.inputOverride = null; sim.ctx.phase = 'fight'; pl.setMode(sim.player, 'free'); sim.player.hp = sim.player.hpMax = 1000; sim.ctx.hitstop = 0; sim.ctx.graceUntil = 1e9;
+      sim.player.lockOn = false; sim.player.pos = { x: px, z: pz }; sim.player.yaw = 0; sim.physics.teleport('player', sim.player.pos, 0);
+      sim.lion.attack = null; sim.lion.pos = { x: 0, z: lz }; sim.lion.yaw = Math.PI; sim.physics.teleport('lion', sim.lion.pos, Math.PI);
+      sim.lion.mode = 'idle'; sim.lion.modeT = 0; sim.lion.modeDur = 1e9; sim.lion.y = 0; sim.lion.invuln = false; sim.lion.hp = sim.lion.hpMax; sim.lion.poise = 0; sim.lion.staggerImmune = 0; sim.lion.executed = false;
+      sim.player.stamina = 100; sim.player.exhausted = false; sim.player.invulnT = 0; sim.player.riposteUntil = -1; sim.player.momentum = 0; sim.player.furyT = 0; sim.player.combo = 0; sim.player.comboT = 99; sim.ctx.witchT = 0; sim.ctx.grapple = null;
+      sc.cam.reset(sim); sc.vfx.clear();
+    };
+    const ev = [];
+    const step = (inp) => { sim.step(inp ?? idle); const e = sim.drainEvents(); ev.push(...e); sc.handleEvents(e, sim); for (const x of e) if (x.type === 'callout') g.ui.callout(x.kind, x.n); sc.update(sim, 1 / 60, 1, { dx: 0, dy: 0 }, true); g.ui.updateCombat(sim.player, sim.ctx.witchT > 0); };
+    const out = await (new Function('g', 'sim', 'sc', 'm', 'pl', 'idle', 'P', 'reset', 'step', 'ev', 'return (async()=>{' + c + '})()'))(g, sim, sc, m, pl, idle, P, reset, step, ev);
+    g.timeScale = 1;
+    return out;
+  }, code);
+
+  // 방패 밀치기
+  const bash = await runF(`reset(0, -2.7, -0.2); for (let i = 0; i < 20; i++) step(P({ guard: true }));
+    const m0 = sim.player.momentum; step(P({ guard: true, pressed: { light: true } }));
+    for (let i = 0; i < 40; i++) step(P({ guard: true }));
+    const h = ev.find((e) => e.type === 'playerHitLion');
+    return { bash: !!(h && h.bash), impact: sc.vfx.lastImpact, gain: sim.player.momentum - m0, poise: sim.lion.poise, callout: ev.some((e) => e.type === 'callout' && e.kind === 'bash'), attackId: sim.player.attackId };`);
+  check('방패 밀치기: 방어 중 약공격 = 밀치기, 전용 연출, 기세 상승, 경직 게이지 크게 증가', bash.bash && bash.impact === 'bash' && bash.gain >= 8 && bash.poise >= 28 && bash.callout, JSON.stringify(bash));
+  // 완벽 회피
+  const witch = await runF(`reset(0, -2.2, -0.5); m.startLionAttack(sim.ctx, 'bite'); sim.lion.attack.hold = 0; let d = false, vig = false, t0 = -1, a0 = 0;
+    for (let i = 0; i < 160; i++) { const a = sim.lion.attack; const press = !d && !!a && a.t >= 0.4; if (press) d = true; step(P({ moveX: 1, pressed: { dodge: press } })); if (sim.ctx.witchT > 0 && t0 < 0 && sim.lion.attack) { t0 = i; a0 = sim.lion.attack.t; } if (document.getElementById('witch-vig').classList.contains('on')) vig = true; if (t0 >= 0 && i === t0 + 18) { var da = sim.lion.attack ? sim.lion.attack.t - a0 : -1; break; } }
+    return { witch: ev.some((e) => e.type === 'witchStart'), hp: sim.player.hp, vig, da, perfect: sim.stats.perfectDodges, callout: !!document.querySelector('#callouts .callout.dodge') };`);
+  check('완벽 회피: 시간 감속 구간 시작 + 사자 공격이 느리게 진행 + 푸른 비네트/콜아웃 표시', witch.witch && witch.vig && witch.callout && witch.perfect === 1 && (witch.da < 0 || witch.da < 0.3 * 0.5) && witch.hp === 1000, JSON.stringify(witch));
+  // 받아치기
+  const clash = await runF(`let found = null; const tries = [];
+    for (const [dist, pt] of [[1.8, 0.5], [1.8, 0.44], [1.8, 0.56], [1.5, 0.56], [1.15, 0.38]]) {
+      reset(0, -3, -3 + dist); m.startLionAttack(sim.ctx, 'swipe'); sim.lion.attack.hold = 0; ev.length = 0; let pressed = false, after = 0;
+      for (let i = 0; i < 170; i++) { const a = sim.lion.attack; const press = !pressed && !!a && a.t >= pt; if (press) pressed = true; step(P({ pressed: { light: press } })); if (ev.some((e) => e.type === 'clash') && ++after > 20) break; }
+      tries.push(dist + '/' + pt + ':' + ev.some((e) => e.type === 'clash'));
+      if (ev.some((e) => e.type === 'clash')) { found = { hurtBefore: sim.player.hp, impact: sc.vfx.lastImpact, callout: !!document.querySelector('#callouts .callout.clash'), clashes: sim.stats.clashes }; break; }
+    }
+    return { found, tries };`);
+  check('받아치기: 발톱이 닿기 직전 선제 타격으로 공격을 끊음 (콜아웃, 피해 없음)', clash.found && clash.found.hurtBefore === 1000 && clash.found.callout && clash.found.clashes === 1, JSON.stringify(clash));
+  // 연속 타격 HUD + 기세 폭발(실제 키보드 R)
+  const combo = await runF(`reset(0, -1.5, -0.2); sim.lion.staggerImmune = 99;
+    for (let k = 0; k < 7; k++) { sim.player.stamina = 100; step(P({ pressed: { light: true } })); for (let i = 0; i < 38; i++) step(); }
+    return { combo: sim.player.combo, shown: !document.getElementById('combo').classList.contains('hidden'), n: document.getElementById('combo-n').textContent, mo: Math.round(sim.player.momentum) };`);
+  check('연속 타격: 콤보 카운터 HUD 표시 + 기세 게이지 상승', combo.combo >= 2 && combo.shown && Number(combo.n) === combo.combo && combo.mo > 10, JSON.stringify(combo));
+  await runF(`reset(0, -3, 3); sim.player.momentum = 100; step(); return 1;`);
+  await page.evaluate(() => { const g = window.__arena; g.timeScale = 1; g.sim.lion.mode = 'dormant'; });
+  await sleep(1200);
+  const ready = await page.evaluate(() => ({ cls: document.getElementById('bar-mo').className, hint: !document.getElementById('mo-hint').classList.contains('hidden') }));
+  check('기세가 가득 차면 게이지가 빛나고 폭발 안내(R)가 표시됨', /ready/.test(ready.cls) && ready.hint, JSON.stringify(ready));
+  await page.keyboard.press('KeyR');
+  const furyOn = await waitFor(() => window.__arena.sim.player.furyT > 0, 30000, 200);
+  await sleep(1500);
+  const fz = await page.evaluate(() => ({ cls: document.getElementById('bar-mo').className, callout: [...document.querySelectorAll('#callouts .callout')].map((c) => c.textContent).join('|'), t: window.__arena.sim.player.furyT, stats: window.__arena.sim.stats.furies }));
+  check('키보드 R 로 기세 폭발 발동 (게이지 폭발 모드 표시, 콜아웃)', !!furyOn && /fury/.test(fz.cls) && fz.stats === 1, JSON.stringify(fz));
   await page.evaluate(() => window.__arena.toTitle()); await sleep(1500);
 }
 

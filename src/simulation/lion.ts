@@ -156,9 +156,11 @@ export function startLionAttack(ctx: SimContext, id: LionAttackId, chained = fal
   const rel = angleDiff(yawOf(toP), l.yaw);
   const phase2 = l.phase === 2;
   let combo: LionAttackId | null = null;
-  if (phase2 && !chained) {
-    if (id === 'swipe' && ctx.rng.next() < 0.5) combo = 'swipeBite';
-    if (id === 'pounce' && ctx.rng.next() < 0.55) combo = 'pounceSwat';
+  // 연계: 2페이즈에서 더 자주, 1페이즈에서도 가끔 이어 쳐서 주고받는 호흡을 만든다 (끊기/막기 기회도 함께 늘어난다)
+  if (!chained) {
+    if (id === 'swipe' && ctx.rng.next() < (phase2 ? 0.5 : 0.22)) combo = 'swipeBite';
+    if (id === 'pounce' && ctx.rng.next() < (phase2 ? 0.55 : 0.2)) combo = 'pounceSwat';
+    if (id === 'bite' && !combo && ctx.rng.next() < (phase2 ? 0.4 : 0.18)) combo = 'pounceSwat';
   }
   if (id === 'backHop') combo = 'pounce';
   // 전조 정지(페인트): 박자를 읽고 구르면 빗나가게 만든다. 가끔만, 2페이즈에서 더 자주.
@@ -190,7 +192,7 @@ function endAttack(ctx: SimContext) {
   l.y = 0;
   // 큰 기술은 끝난 뒤 빈틈이 길다 (반격 기회)
   const extra = a.id === 'quake' ? 0.55 : a.id === 'whirl' ? 0.5 : a.id === 'dashBite' ? 0.35 : a.id === 'flurry' ? 0.3 : 0;
-  setLionMode(l, 'recover', (l.phase === 2 ? 0.2 + ctx.rng.next() * 0.2 : 0.35 + ctx.rng.next() * 0.3) + extra);
+  setLionMode(l, 'recover', (l.phase === 2 ? 0.2 + ctx.rng.next() * 0.2 : 0.3 + ctx.rng.next() * 0.26) + extra);
 }
 
 function beginPhase2(ctx: SimContext) {

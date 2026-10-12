@@ -9,6 +9,7 @@ import { Rng, clamp, v2 } from './math';
 import { createPlayer, setMode, updatePlayer, bufferDuringHitstop } from './player';
 import { emptyInput, type InputFrame, type QteMode, type SimEvent, type Stats } from './state';
 import { updateGrapple } from './grapple';
+import { updateMomentum } from './momentum';
 import { TUNING } from './tuning';
 
 export interface SimOptions {
@@ -59,10 +60,10 @@ export class GameSim {
   }
 
   private makeContext(): SimContext {
-    const stats: Stats = { time: 0, damageTaken: 0, dodges: 0, blocks: 0, hitsLanded: 0, heals: 0, attempts: 0, qteSuccess: 0, counters: 0 };
+    const stats: Stats = { time: 0, damageTaken: 0, dodges: 0, blocks: 0, hitsLanded: 0, heals: 0, attempts: 0, qteSuccess: 0, counters: 0, perfectDodges: 0, clashes: 0, maxCombo: 0, furies: 0 };
     return {
       player: createPlayer(), lion: createLion(), physics: this.physics, rng: new Rng(this.attemptSeed), events: [],
-      stats, time: 0, phase: 'intro', hitstop: 0, graceUntil: 0, controlEnabled: false, qteMode: this.qteMode, grapple: null,
+      stats, time: 0, phase: 'intro', hitstop: 0, graceUntil: 0, controlEnabled: false, qteMode: this.qteMode, grapple: null, witchT: 0,
     };
   }
 
@@ -162,7 +163,7 @@ export class GameSim {
       if (fn) this.step(fn(), TUNING.dt);
       else this.step({ ...(input as InputFrame), pressed: { ...pressed } }, TUNING.dt);
       // 한 번 발생한 눌림 이벤트는 첫 스텝에서만 소비
-      pressed.light = pressed.heavy = pressed.dodge = pressed.heal = pressed.lock = pressed.a = pressed.b = pressed.x = pressed.y = false;
+      pressed.light = pressed.heavy = pressed.dodge = pressed.heal = pressed.lock = pressed.a = pressed.b = pressed.x = pressed.y = pressed.fury = false;
       this.acc -= TUNING.dt;
       n++;
     }
@@ -195,7 +196,11 @@ export class GameSim {
       }
       if (c.grapple) updateGrapple(c, input, dt);
       updatePlayer(c, input, dt);
-      updateLion(c, dt);
+      // 완벽 회피 직후에는 사자의 시간만 느려진다 (플레이어는 그대로 — 역습 기회)
+      const lionDt = c.witchT > 0 ? dt * TUNING.witch.scale : dt;
+      c.witchT = Math.max(0, c.witchT - dt);
+      updateLion(c, lionDt);
+      updateMomentum(c, dt);
       resolvePlayerAttack(c);
       resolveLionAttack(c);
       c.lion.execReady = canExecute(c);

@@ -185,3 +185,29 @@ input.gp-focus { outline: 2px solid var(--bronze-hi); outline-offset: 3px; }
 .qte-pips { display: flex; gap: 10px; margin-top: 4px; }
 .qte-pips i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(234,223,198,0.7); background: rgba(0,0,0,0.5); }
 .qte-pips i.success { background: #9be07a; border-color: #9be07a; } .qte-pips i.perfect { background: #ffe27a; border-color: #ffe27a; } .qte-pips i.miss { background: #d9473a; border-color: #d9473a; }
+
+/* ── 기세 / 콜아웃 / 연속 타격 ── */
+.bar.mo { height: 7px; margin-top: 5px; width: 250px; border-radius: 0; }
+.bar.mo .fill { background: linear-gradient(to right, #8a6b24, #e2b94a); transform-origin: left; transition: none; }
+.bar.mo.ready .fill { background: linear-gradient(to right, #f0c850, #fff2b8); animation: moPulse 0.7s ease-in-out infinite alternate; }
+.bar.mo.fury .fill { background: linear-gradient(to right, #c4382c, #ffb347); box-shadow: 0 0 10px 2px rgba(255,160,70,0.8); }
+@keyframes moPulse { from { filter: brightness(0.9); } to { filter: brightness(1.5); box-shadow: 0 0 12px 3px rgba(255,226,140,0.9); } }
+#mo-hint { margin-top: 5px; font-size: 12px; letter-spacing: 0.18em; color: #ffe08a; text-shadow: 0 1px 3px #000; animation: moPulse 0.7s ease-in-out infinite alternate; }
+#mo-hint.hidden { display: none; }
+#callouts { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 8; }
+.callout { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 3.2vw, 38px); letter-spacing: 0.22em; padding-left: 0.22em; color: #fff3d8; text-shadow: 0 0 14px rgba(0,0,0,0.9), 0 2px 0 #000; animation: calloutIn 1.15s cubic-bezier(0.2, 0.9, 0.2, 1) forwards; white-space: nowrap; }
+.callout.parry, .callout.clash { color: #cfe6ff; text-shadow: 0 0 18px rgba(130,190,255,0.8), 0 2px 0 #000; }
+.callout.dodge { color: #b6dcff; text-shadow: 0 0 18px rgba(110,170,255,0.9), 0 2px 0 #000; }
+.callout.fury { color: #ffcf6a; font-size: clamp(28px, 4.2vw, 52px); text-shadow: 0 0 22px rgba(255,140,40,0.95), 0 2px 0 #000; }
+.callout.execute, .callout.counter { color: #ffd98a; text-shadow: 0 0 20px rgba(255,170,60,0.9), 0 2px 0 #000; }
+.callout.combo { color: #ffe9a8; font-size: clamp(18px, 2.6vw, 30px); }
+.callout.bash, .callout.riposte { color: #f2e6cc; }
+@keyframes calloutIn { 0% { opacity: 0; transform: translateY(14px) scale(1.5); } 12% { opacity: 1; transform: translateY(0) scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px) scale(0.96); } }
+#combo { position: absolute; right: clamp(20px, 4vw, 70px); top: 34%; text-align: right; font-family: var(--font-display); color: #ffe9a8; text-shadow: 0 0 12px rgba(0,0,0,0.9); pointer-events: none; z-index: 8; }
+#combo.hidden { display: none; }
+#combo b { font-size: clamp(34px, 5vw, 64px); display: inline-block; }
+#combo span { margin-left: 8px; font-size: 18px; letter-spacing: 0.3em; color: var(--bronze-hi); }
+#combo.bump b { animation: comboBump 0.18s ease-out; }
+@keyframes comboBump { from { transform: scale(1.5); } to { transform: scale(1); } }
+#witch-vig { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; transition: opacity 0.25s; background: radial-gradient(ellipse at center, rgba(120,170,255,0) 45%, rgba(90,140,255,0.38) 100%); mix-blend-mode: screen; }
+#witch-vig.on { opacity: 1; }

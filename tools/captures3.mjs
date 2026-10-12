@@ -17,7 +17,7 @@ const setup = (code) => page.evaluate(async (c) => {
   await (new Function('g', 'm', 'pl', 'return (async()=>{' + c + '})()'))(g, m, pl);
 }, code);
 const base = (px, pz, lz, extra = '') => `g.timeScale = 1; g.inputOverride = null; g.sim.ctx.phase = 'fight'; g.sim.victoryT = 0; pl.setMode(g.sim.player, 'free'); g.sim.player.hp = g.sim.player.hpMax = 1000; g.sim.ctx.hitstop = 0; g.sim.ctx.graceUntil = 1e9; g.sim.player.lockOn = true; g.sim.player.pos={x:${px},z:${pz}}; g.sim.player.yaw=0; g.sim.physics.teleport('player', g.sim.player.pos, 0);
-  g.sim.lion.attack=null; g.sim.lion.pos={x:0,z:${lz}}; g.sim.lion.yaw=Math.PI; g.sim.physics.teleport('lion', g.sim.lion.pos, Math.PI); g.sim.lion.mode='idle'; g.sim.lion.modeT=0; g.sim.lion.modeDur=1e9; g.sim.lion.y=0; g.sim.lion.invuln=false; g.sim.lion.hp = g.sim.lion.hpMax; g.sim.lion.poise = 0; g.sim.lion.staggerImmune = 0; g.sim.lion.executed = false; g.sim.ctx.grapple = null; g.sim.lion.phase = 1; g.sim.player.stamina = 100; g.sim.player.exhausted = false; g.sim.player.invulnT = 0; g.sim.player.riposteUntil = -1; g.__h0 = g.sim.stats.hitsLanded; g.__b0 = g.sim.stats.blocks; g.scene.cam.reset(g.sim); g.scene.vfx.clear(); ${extra}`;
+  g.sim.lion.attack=null; g.sim.lion.pos={x:0,z:${lz}}; g.sim.lion.yaw=Math.PI; g.sim.physics.teleport('lion', g.sim.lion.pos, Math.PI); g.sim.lion.mode='idle'; g.sim.lion.modeT=0; g.sim.lion.modeDur=1e9; g.sim.lion.y=0; g.sim.lion.invuln=false; g.sim.lion.hp = g.sim.lion.hpMax; g.sim.lion.poise = 0; g.sim.lion.staggerImmune = 0; g.sim.lion.executed = false; g.sim.ctx.grapple = null; g.sim.lion.phase = 1; g.sim.player.stamina = 100; g.sim.player.exhausted = false; g.sim.player.invulnT = 0; g.sim.player.riposteUntil = -1; g.sim.player.momentum = 0; g.sim.player.furyT = 0; g.sim.player.combo = 0; g.sim.ctx.witchT = 0; g.__c0 = g.sim.stats.clashes; g.__h0 = g.sim.stats.hitsLanded; g.__b0 = g.sim.stats.blocks; g.scene.cam.reset(g.sim); g.scene.vfx.clear(); ${extra}`;
 
 /**
  * 가상 60Hz 진행: 실제 게임 루프 대신 시뮬레이션과 장면 갱신을 1/60초씩 직접 돌려, 소프트웨어 렌더링(≈2fps)에서도
@@ -30,7 +30,7 @@ async function capture(name, setupCode, cond, { extra = 0, side = { d: 6.5, h: 2
     const g = window.__arena, sim = g.sim, sc = g.scene;
     g.timeScale = 0;
     const idle = { moveX: 0, moveY: 0, run: false, guard: false, cameraYaw: 0, pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false } };
-    const step = () => { sim.step(g.inputOverride ? g.inputOverride() : idle); sc.handleEvents(sim.drainEvents(), sim); sc.update(sim, 1 / 60, 1, { dx: 0, dy: 0 }, true); g.ui.updateQte(sim.ctx.grapple, 1 / 60); };
+    const step = () => { sim.step(g.inputOverride ? g.inputOverride() : idle); const evs = sim.drainEvents(); sc.handleEvents(evs, sim); for (const x of evs) if (x.type === 'callout') g.ui.callout(x.kind, x.n); sc.update(sim, 1 / 60, 1, { dx: 0, dy: 0 }, true); g.ui.updateQte(sim.ctx.grapple, 1 / 60); g.ui.updateCombat(sim.player, sim.ctx.witchT > 0); };
     const test = new Function('g', 'return ' + cond);
     let n = 0;
     while (!test(g) && n < maxSec * 60) { step(); n++; }
@@ -83,5 +83,11 @@ await capture('fx4_grapple_prompt_key', grapple('kbm'), 'g.sim.ctx.grapple && g.
 await capture('fx4_grapple_block', grapple('pad', pressRight), 'g.sim.ctx.grapple && g.sim.ctx.grapple.results[0] !== "pending"', { extra: 4, side: { d: 3.2, h: 1.3, focus: true } });
 await capture('fx4_grapple_miss', grapple('pad'), 'g.sim.ctx.grapple && g.sim.ctx.grapple.results[0] === "miss"', { extra: 4, side: null });
 await capture('fx4_grapple_counter_prompt', grapple('pad', pressRight), 'g.sim.ctx.grapple && g.sim.ctx.grapple.phase === "counter" && g.sim.ctx.grapple.t > 0.45', { maxSec: 12, side: null });
+// ── 재미 요소: 방패 밀치기 / 완벽 회피 / 받아치기 / 기세 폭발 ──
+const gin = (extra) => `{moveX:0,moveY:0,run:false,guard:true,cameraYaw:0,pressed:{light:false,heavy:false,dodge:false,heal:false,lock:false${extra}}}`;
+await capture('fx5_bash', `${base(0, -2.0, -0.7)} g.sim.step(${gin(',light:true').replace('light:false,', '')});`, 'g.sim.stats.hitsLanded > g.__h0', { extra: 3, side: { d: 3.4, h: 1.3, focus: true } });
+await capture('fx5_witch', `${base(0, -2.2, -0.5, "m.startLionAttack(g.sim.ctx,'bite'); g.sim.lion.attack.hold = 0; g.inputOverride = () => ({moveX:1,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:false,heavy:false,dodge:!!(g.sim.lion.attack && g.sim.lion.attack.t >= 0.4 && !g.__d),heal:false,lock:false}}); ")}`, 'g.sim.ctx.witchT > 0.9', { extra: 8, side: { d: 4, h: 1.5, focus: true } });
+await capture('fx5_clash', `${base(0, -2.5, -0.7, "m.startLionAttack(g.sim.ctx,'swipe'); g.sim.lion.attack.hold = 0; g.sim.player.lockOn = false; g.__p = false; g.inputOverride = () => { const a = g.sim.lion.attack; const press = !g.__p && !!a && a.t >= 0.5; if (press) g.__p = true; return {moveX:0,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:press,heavy:false,dodge:false,heal:false,lock:false}}; }; ")}`, 'g.sim.stats.clashes > g.__c0', { extra: 3, side: { d: 3.6, h: 1.3, focus: true } });
+await capture('fx5_fury', `${base(0, -2.0, -0.7)} g.sim.player.momentum = 100; g.sim.step({moveX:0,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:false,heavy:false,dodge:false,heal:false,lock:false,fury:true}}); g.inputOverride = () => ({moveX:0,moveY:0,run:false,guard:false,cameraYaw:0,pressed:{light:g.sim.player.mode==='free',heavy:false,dodge:false,heal:false,lock:false}}); g.sim.lion.staggerImmune = 99;`, 'g.sim.player.furyT > 0 && g.sim.stats.hitsLanded > g.__h0 + 2', { extra: 4, maxSec: 9, side: { d: 3.6, h: 1.3, focus: true } });
 console.log(logs.filter((l) => !/KHR_parallel_shader_compile/.test(l)).join('\n') || '(콘솔 오류 없음)');
 await browser.close();

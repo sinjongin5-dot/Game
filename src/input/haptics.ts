@@ -145,6 +145,10 @@ export const PATTERNS = {
   qtePerfect: [{ dur: 0.05, weak: 1, strong: 0.7 }, { delay: 0.06, dur: 0.07, weak: 0.6, strong: 0.9, curve: 'decay' }] as Rumble[],
   qteMiss: [{ dur: 0.3, weak: 0.5, strong: 1, curve: 'decay' }] as Rumble[],
   counter: [{ dur: 0.5, weak: 1, strong: 1, curve: 'decay' }] as Rumble[],
+  witch: [{ dur: 0.18, weak: 0.4, strong: 0.15 }, { delay: 0.2, dur: 0.9, weak: 0.1, strong: 0.2, curve: 'decay' }] as Rumble[],
+  clash: [{ dur: 0.06, weak: 1, strong: 0.5 }, { delay: 0.08, dur: 0.14, weak: 0.5, strong: 0.8, curve: 'decay' }] as Rumble[],
+  bash: [{ dur: 0.16, weak: 0.5, strong: 0.9, curve: 'decay' }] as Rumble[],
+  furyStart: [{ dur: 0.9, weak: 0.5, strong: 1, curve: 'decay' }, { delay: 0.05, dur: 0.4, weak: 1, strong: 0.4 }] as Rumble[],
   heartbeat: [{ dur: 0.09, weak: 0.1, strong: 0.55, curve: 'decay' }, { delay: 0.16, dur: 0.08, weak: 0.08, strong: 0.4, curve: 'decay' }] as Rumble[],
 };
 
@@ -171,6 +175,7 @@ export class HapticsDirector {
         case 'playerSwing': h.play(e.id === 'heavy' ? P.swingHeavy : P.swingLight); break;
         case 'playerHitLion':
           if (e.invuln) { h.play(P.guard); break; }
+          if (e.bash) { h.play(P.bash); break; }
           if (e.execute) h.play(P.hitExecute);
           else if (e.heavy) h.play(P.hitHeavy);
           else if (e.finisher || e.riposte) h.play(P.hitFinisher);
@@ -183,6 +188,9 @@ export class HapticsDirector {
           break;
         case 'playerHit': h.play(e.heavy ? P.playerHitHeavy : P.playerHit); break;
         case 'dodgeSuccess': h.play(P.dodgeSuccess); break;
+        case 'witchStart': h.play(P.witch); break;
+        case 'clash': h.play(P.clash); break;
+        case 'furyStart': h.play(P.furyStart); break;
         case 'lionStagger': h.play(P.stagger); break;
         case 'lionRoar': h.play(this.scaled(P.roar, e.phase2 ? 1 : 0.7)); break;
         case 'lionSlam': h.play(this.scaled([{ dur: 0.5, weak: 0.5, strong: 1, curve: 'decay' }, { delay: 0.12, dur: 0.3, weak: 0.3, strong: 0.7 }], near(dist(e.pos.x, e.pos.z)) * 1.4)); break;

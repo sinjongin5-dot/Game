@@ -47,6 +47,7 @@ export class AudioDirector {
     for (const e of events) {
       switch (e.type) {
         case 'playerSwing': {
+          if (e.id === 'bash') { a.play('dodge_roll', { volume: 0.5, rate: 0.7, pos: this.playerPos(sim) }); break; }
           const run = sim.player.runAttack && e.id !== 'heavy';
           const name: SoundName = e.id === 'heavy' ? 'swing_heavy' : run ? 'swing_run' : this.variant<SoundName>('swing', ['swing_light', 'swing_light_b', 'swing_light_c']);
           // 3타(마무리)는 낮고 묵직하게, 나머지는 빠르고 날카롭게
@@ -65,6 +66,7 @@ export class AudioDirector {
             this.cheer(1);
             break;
           }
+          if (e.bash) { a.play('shield_bash', { volume: 1, rate: rr(0.95, 1.06), pos: e.pos }); a.play('hit_flesh', { volume: 0.55, rate: 0.9, pos: e.pos }); break; }
           a.play(e.heavy ? 'hit_flesh_heavy' : this.variant<SoundName>('flesh', ['hit_flesh', 'hit_flesh_b', 'hit_flesh_c']), { volume: rr(0.88, 1.0), rate: rr(0.94, 1.08), pos: e.pos, delay: rr(0, 0.012) });
           if (e.riposte) a.play('parry_clang', { volume: 0.5, rate: rr(0.9, 1.0), pos: e.pos });
           // 저음 충격을 겹쳐 묵직하게 (강타/머리/연계 마지막 타일수록 크게)
@@ -196,6 +198,21 @@ export class AudioDirector {
         case 'grappleCounter':
           a.play('execute_whoosh', { volume: 0.8, pos: this.playerPos(sim) });
           a.play('impact_boom', { volume: 0.8, rate: 1.1, pos: this.playerPos(sim) });
+          break;
+        case 'witchStart':
+          a.play('slowmo_whoosh', { volume: 0.7, rate: 0.85, bus: 'sfx' });
+          a.play('impact_boom', { volume: 0.35, rate: 1.3, pos: this.playerPos(sim) });
+          a.duck(0.3, 0.8);
+          break;
+        case 'clash':
+          a.play('clash_clang', { volume: 1, rate: rr(0.95, 1.08), pos: e.pos });
+          a.play('impact_boom', { volume: 0.4, rate: 1.2, pos: e.pos });
+          this.cheer(0.35);
+          break;
+        case 'furyStart':
+          a.play('fury_start', { volume: 1, pos: this.playerPos(sim), reverb: 0.25 });
+          a.duck(0.4, 1.2);
+          this.cheer(0.9);
           break;
         case 'executionStart':
           a.play('execute_whoosh', { volume: 0.75, pos: this.playerPos(sim) });

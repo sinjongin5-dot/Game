@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-12T10:55:23.520Z",
+  "startedAt": "2026-10-12T11:44:50.253Z",
   "checks": [
     {
       "name": "설정 패널 열림",
@@ -179,12 +179,12 @@
     {
       "name": "재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음",
       "ok": true,
-      "detail": "[{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":1},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":1},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":2}]"
+      "detail": "[{\"objects\":16,\"geometries\":138,\"textures\":11,\"audioActive\":2},{\"objects\":16,\"geometries\":138,\"textures\":11,\"audioActive\":3},{\"objects\":16,\"geometries\":138,\"textures\":11,\"audioActive\":3}]"
     },
     {
       "name": "오디오 소스가 누적되지 않음",
       "ok": true,
-      "detail": "[1,1,2]"
+      "detail": "[2,3,3]"
     },
     {
       "name": "봇 전투가 승리 또는 사망으로 종료",
@@ -239,12 +239,42 @@
     {
       "name": "충격 4초 후 카메라 흔들림/FOV 펀치/화면 펄스/순간 조명이 모두 0 으로 복귀",
       "ok": true,
-      "detail": "{\"trauma\":0,\"fov\":0.0017143683885847618,\"light\":0,\"pulse\":0,\"tension\":0.5918044945097996,\"trails\":0}"
+      "detail": "{\"trauma\":0,\"fov\":-2.557882108072542e-10,\"light\":0,\"pulse\":0,\"tension\":0.03481893577226789,\"trails\":0}"
     },
     {
       "name": "공격 40회 후에도 궤적 풀/씬 오브젝트 수가 늘지 않음",
       "ok": true,
       "detail": "{\"size\":3,\"children\":3,\"root\":16,\"objs0\":16}"
+    },
+    {
+      "name": "방패 밀치기: 방어 중 약공격 = 밀치기, 전용 연출, 기세 상승, 경직 게이지 크게 증가",
+      "ok": true,
+      "detail": "{\"bash\":true,\"impact\":\"bash\",\"gain\":10,\"poise\":34,\"callout\":true,\"attackId\":null}"
+    },
+    {
+      "name": "완벽 회피: 시간 감속 구간 시작 + 사자 공격이 느리게 진행 + 푸른 비네트/콜아웃 표시",
+      "ok": true,
+      "detail": "{\"witch\":true,\"hp\":1000,\"vig\":true,\"da\":0.08400000000000074,\"perfect\":1,\"callout\":true}"
+    },
+    {
+      "name": "받아치기: 발톱이 닿기 직전 선제 타격으로 공격을 끊음 (콜아웃, 피해 없음)",
+      "ok": true,
+      "detail": "{\"found\":{\"hurtBefore\":1000,\"impact\":\"light\",\"callout\":true,\"clashes\":1},\"tries\":[\"1.8/0.5:true\"]}"
+    },
+    {
+      "name": "연속 타격: 콤보 카운터 HUD 표시 + 기세 게이지 상승",
+      "ok": true,
+      "detail": "{\"combo\":7,\"shown\":true,\"n\":\"7\",\"mo\":35}"
+    },
+    {
+      "name": "기세가 가득 차면 게이지가 빛나고 폭발 안내(R)가 표시됨",
+      "ok": true,
+      "detail": "{\"cls\":\"bar mo ready\",\"hint\":true}"
+    },
+    {
+      "name": "키보드 R 로 기세 폭발 발동 (게이지 폭발 모드 표시, 콜아웃)",
+      "ok": true,
+      "detail": "{\"cls\":\"bar mo fury\",\"callout\":\"\",\"t\":8.79999999999999,\"stats\":1}"
     },
     {
       "name": "컨트롤러 입력으로 장치가 전환되고 커서가 숨는 모드가 됨",
@@ -349,7 +379,7 @@
     {
       "name": "물어뜯기 막기: 화면에 버튼 프롬프트가 표시되고 컨트롤러 글리프(A/B/X/Y)를 쓴다",
       "ok": true,
-      "detail": "[\"A\",\"X\"]"
+      "detail": "[\"A\",\"Y\",\"B\"]"
     },
     {
       "name": "물어뜯기 막기: 반격(Y) 성공 → 사자를 밀치고 처형 일격 시작",
@@ -382,21 +412,21 @@
       "objCounts": [
         {
           "objects": 16,
-          "geometries": 136,
-          "textures": 11,
-          "audioActive": 1
-        },
-        {
-          "objects": 16,
-          "geometries": 136,
-          "textures": 11,
-          "audioActive": 1
-        },
-        {
-          "objects": 16,
-          "geometries": 136,
+          "geometries": 138,
           "textures": 11,
           "audioActive": 2
+        },
+        {
+          "objects": 16,
+          "geometries": 138,
+          "textures": 11,
+          "audioActive": 3
+        },
+        {
+          "objects": 16,
+          "geometries": 138,
+          "textures": 11,
+          "audioActive": 3
         }
       ]
     },

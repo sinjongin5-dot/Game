@@ -5,7 +5,7 @@
 import type { V3 } from '../simulation/math';
 import { MOCAP } from '../animation/mocapData';
 
-export type PlayerAttackId = 'light1' | 'light2' | 'light3' | 'heavy';
+export type PlayerAttackId = 'light1' | 'light2' | 'light3' | 'heavy' | 'bash';
 
 export interface SwordKey {
   t: number;
@@ -87,6 +87,18 @@ export const PLAYER_ATTACKS: Record<PlayerAttackId, PlayerAttackDef> = {
       { t: 0.54, hand: [-0.08, 1.08, 0.66], dir: [0.0, -0.6, 1.0], twist: 0.25, lean: 0.48 },
       { t: 0.7, hand: [-0.15, 1.04, 0.5], dir: [0.0, 0.1, 1], twist: 0.1, lean: 0.22 },
       { t: 0.88, hand: [-0.27, 1.02, 0.4], dir: [0.05, 0.25, 1], twist: 0, lean: 0 },
+    ],
+  },
+  // 방패 밀치기: 검은 낮게 거두고 방패로 앞을 밀어낸다 (판정은 검이 아니라 방패 앞 부채꼴 — combat.ts resolveBash)
+  bash: {
+    id: 'bash', duration: 0.5, cost: 14, damage: 10, poise: 34,
+    activeStart: 0.12, activeEnd: 0.24, comboAt: 9, cancelAt: 0.34,
+    lunge: { start: 0.04, end: 0.2, distance: 0.75 }, trackUntil: 0.1, hitstop: 0.08, swingSound: 0.08,
+    keys: [
+      { t: 0.0, hand: [-0.27, 1.02, 0.4], dir: [0.05, 0.25, 1], twist: 0, lean: 0 },
+      { t: 0.12, hand: [-0.34, 0.98, 0.34], dir: [0.1, 0.1, 1], twist: -0.12, lean: 0.14 },
+      { t: 0.24, hand: [-0.34, 0.98, 0.34], dir: [0.1, 0.1, 1], twist: -0.18, lean: 0.24 },
+      { t: 0.5, hand: [-0.27, 1.02, 0.4], dir: [0.05, 0.25, 1], twist: 0, lean: 0 },
     ],
   },
   heavy: {

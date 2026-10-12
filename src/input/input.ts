@@ -1,8 +1,8 @@
 import type { InputFrame } from '../simulation/state';
 import { emptyPadFrame, GamepadInput, type PadFrame } from './gamepad';
 
-export interface PressedFlags { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean }
-const noPressed = (): PressedFlags => ({ light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false });
+export interface PressedFlags { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean; fury: boolean }
+const noPressed = (): PressedFlags => ({ light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false, fury: false });
 
 export type InputDevice = 'kbm' | 'pad';
 
@@ -109,6 +109,7 @@ export class Input {
       case 'Space': this.pressed.dodge = true; this.pressed.a = true; break;
       case 'KeyE': this.pressed.heal = true; this.pressed.x = true; break;
       case 'KeyF': this.pressed.lock = true; this.pressed.y = true; break;
+      case 'KeyR': this.pressed.fury = true; break;
       default: break;
     }
   }
@@ -151,7 +152,7 @@ export class Input {
       cameraYaw,
       pressed: {
         light: this.pressed.light || pp.light, heavy: this.pressed.heavy || pp.heavy, dodge: this.pressed.dodge || pp.dodge, heal: this.pressed.heal || pp.heal, lock: this.pressed.lock || pp.lock,
-        a: this.pressed.a || pp.a, b: this.pressed.b || pp.b, x: this.pressed.x || pp.x, y: this.pressed.y || pp.y,
+        a: this.pressed.a || pp.a, b: this.pressed.b || pp.b, x: this.pressed.x || pp.x, y: this.pressed.y || pp.y, fury: this.pressed.fury || pp.fury,
       },
     };
     this.pressed = noPressed();

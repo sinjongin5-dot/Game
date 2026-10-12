@@ -138,4 +138,21 @@ dur = 0.16; n = int(SR * dur); t = t_(dur)
 qp = (np.sin(2 * np.pi * 880 * t) * np.exp(-t / 0.05) + 0.6 * np.sin(2 * np.pi * 1320 * np.maximum(t - 0.05, 0)) * (t > 0.05) * np.exp(-np.maximum(t - 0.05, 0) / 0.05)) * 0.8
 qp += hp(noise(n), 3000) * env_ad(n, 0.0005, 0.01) * 0.25
 save('qte_prompt', fade(qp, 0.002, 0.02), 0.6)
+# ── 기세 폭발: 상승하는 울림 + 묵직한 일격 ──
+dur = 1.4; n = int(SR * dur); t = t_(dur)
+fs = np.sin(2 * np.pi * np.cumsum(90 + 520 * (t / dur) ** 1.8) / SR) * (t / dur) ** 1.2 * 0.5
+fs += lp(noise(n), 900) * (t / dur) ** 1.5 * 0.3
+boom = thump(dur, 80, 26, 0.45) * np.where(t > 0.5, 1.0, 0.0) * 1.5
+shim = sum(0.1 * np.sin(2 * np.pi * f * t) * np.exp(-np.maximum(t - 0.5, 0) / 0.5) * (t > 0.5) for f in [660, 990, 1320, 1980])
+save('fury_start', fade(fs + boom + shim, 0.02, 0.15), 0.9)
+
+# ── 받아치기: 쇳소리 긁힘 + 짧은 충돌 ──
+dur = 0.6; n = int(SR * dur); t = t_(dur)
+cc = clang(dur, 980, 1.0, 1.3) * 0.8 + sweep_bp(noise(n), 6500, 2500, q=3.0) * env_ad(n, 0.002, 0.07) * 0.7 + thump(dur, 120, 45, 0.08) * 0.6
+save('clash_clang', fade(cc), 0.9)
+
+# ── 방패 밀치기: 둔탁한 금속 + 가죽/나무 울림 ──
+dur = 0.55; n = int(SR * dur)
+sb2 = thump(dur, 110, 38, 0.14) * 1.2 + bp(noise(n), 300, 1800) * env_ad(n, 0.002, 0.05) * 0.8 + clang(dur, 260, 0.6) * 0.5
+save('shield_bash', fade(sb2), 0.9)
 print('done')

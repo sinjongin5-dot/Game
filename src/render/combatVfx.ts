@@ -14,7 +14,7 @@ import { SlashTrailPool, type SlashStyle } from './slashTrail';
  *
  * 색 규칙(다크 판타지): 기본은 차가운 강철빛(청백). 따뜻한 색은 강한 타격·금속 불꽃에만, 붉은색은 살점/핏방울에만 쓴다.
  */
-export type ImpactKind = 'light' | 'finisher' | 'run' | 'heavy' | 'riposte' | 'execute' | 'clang' | 'parry' | 'perfectGuard' | 'guard' | 'guardBreak';
+export type ImpactKind = 'bash' | 'clash' | 'light' | 'finisher' | 'run' | 'heavy' | 'riposte' | 'execute' | 'clang' | 'parry' | 'perfectGuard' | 'guard' | 'guardBreak';
 
 interface CamKick { trauma: number; kick: number; fov: number; roll?: number }
 interface Profile {
@@ -39,6 +39,10 @@ interface Profile {
 }
 
 export const IMPACT_PROFILES: Record<ImpactKind, Profile> = {
+  // 방패 밀치기: 둔탁한 금속+먼지, 낮고 묵직한 충격
+  bash: { flash: [1.1, 0xe8e2d2, 0.13], sparks: [10, 4, 0.9, 0.3], dust: 7, shards: 3, cam: { trauma: 0.38, kick: 0.18, fov: 1.2 }, light: [0xf0e8d8, 8, 0.1], pulse: 0.28 },
+  // 받아치기: 발톱이 닿기 전에 끊어낸 순간의 차가운 섬광
+  clash: { flash: [1.8, 0xeaf4ff, 0.18], sparks: [22, 6, 1.0, 0.4], streaks: [2, 2.2, 0.08, 0xffffff, 0.14], light: [0xdfeaff, 20, 0.12], cam: { trauma: 0.4, kick: 0.14, fov: 1.8, roll: 0.02 }, slow: [0.45, 0.12], screen: ['200,226,255', 0.1], pulse: 0.45 },
   // 일반 공격: 짧고 선명, 작은 섬광
   light: { flash: [0.7, 0xf0e8dc, 0.1], droplets: 4, fur: 8, streaks: [1, 1.5, 0.1, 0xdbe8ff, 0.14], cam: { trauma: 0.16, kick: 0.07, fov: 0.7 }, pulse: 0.1 },
   // 3타(마무리): 조금 더 밝고 묵직
@@ -78,6 +82,7 @@ export interface VfxQuality {
 interface Timer { t: number; fn: (() => void) | null }
 
 const V = THREE.Vector3;
+const FURY_EMBER = new THREE.Color(1.6, 0.8, 0.2);
 
 export class CombatVfx {
   readonly trails = new SlashTrailPool(3);
@@ -190,6 +195,7 @@ export class CombatVfx {
   static styleFor(sim: GameSim): SlashStyle {
     const p = sim.player;
     if (p.executing) return 'execute';
+    if (p.furyT > 0) return 'fury';
     if (p.attackId === 'heavy') return 'heavy';
     if (p.runAttack) return 'run';
     if (p.attackId === 'light3') return 'finisher';
@@ -203,7 +209,7 @@ export class CombatVfx {
   updateSlash(sim: GameSim, base: THREE.Vector3, tip: THREE.Vector3, dt: number) {
     const p = sim.player;
     const def = p.mode === 'attack' && p.attackId ? PLAYER_ATTACKS[p.attackId] : null;
-    if (!def) { this.trails.end(); this.hasTip = false; return; }
+    if (!def || def.id === 'bash') { this.trails.end(); this.hasTip = false; return; }
     const heavy = def.id === 'heavy';
     const lead = heavy ? 0.2 : 0.1;
     const tail = heavy ? 0.12 : 0.05;
@@ -301,8 +307,8 @@ export class CombatVfx {
         const dir = this.tmpD.set(e.dir.x, e.dir.y, e.dir.z).clone();
         const kick = this.tmpK.set(l.x - p.x, 0, l.z - p.z).clone();
         if (e.invuln) { this.impact('clang', pos, nrm, dir, kick); return true; }
-        const kind: ImpactKind = e.execute ? 'execute' : e.heavy ? 'heavy' : e.riposte ? 'riposte' : e.run ? 'run' : e.finisher ? 'finisher' : 'light';
-        const scale = e.head && !e.execute ? 1.15 : 1;
+        const kind: ImpactKind = e.execute ? 'execute' : e.bash ? 'bash' : e.heavy ? 'heavy' : e.riposte ? 'riposte' : e.run ? 'run' : e.finisher ? 'finisher' : 'light';
+        const scale = (e.head && !e.execute ? 1.15 : 1) * (e.fury ? 1.2 : 1) * (e.witch ? 1.1 : 1);
         this.impact(kind, pos, nrm, dir, kick, scale);
         HIT_FLASH.lion.value = kind === 'execute' ? 0.55 : kind === 'heavy' ? 0.45 : kind === 'riposte' ? 0.4 : kind === 'finisher' ? 0.35 : 0.28;
         if (e.heavy || e.execute) this.after(0.25, () => this.particles.settleDust(this.tmpP.set(l.x, 0, l.z), 1.4, 8));
@@ -350,6 +356,31 @@ export class CombatVfx {
         this.cam.startCine('execute', d, sim);
         this.hooks().onSlowmo?.(0.7, 0.3);
         this.pulse = Math.max(this.pulse, 0.35);
+        return true;
+      }
+      case 'clash': {
+        const pos = this.tmpP.set(e.pos.x, e.pos.y, e.pos.z).clone();
+        const nrm = this.tmpN.set(p.x - l.x, 0.3, p.z - l.z).normalize().clone();
+        const dir = this.tmpD.set(l.x - p.x, 0, l.z - p.z).normalize().clone();
+        this.impact('clash', pos, nrm, dir, this.tmpK.set(l.x - p.x, 0, l.z - p.z).clone());
+        return true;
+      }
+      case 'witchStart': {
+        // 완벽 회피: 차가운 푸른 번쩍임과 시야 수축. 이후 분위기(mood)는 GameScene 이 witchT 동안 유지한다
+        this.hooks().onScreenFlash?.('120,170,255', 0.16);
+        this.cam.impact({ fov: -2.2, trauma: 0.15 });
+        this.fx.shock(p.x, p.z, 0.2, 3.2, 0.5, 0.25, 0xb6d4ff, 0.5);
+        this.pulse = Math.max(this.pulse, 0.5);
+        return true;
+      }
+      case 'furyStart': {
+        // 기세 폭발: 금빛 불씨가 폭발하듯 솟고 땅에서 충격파가 퍼진다
+        this.particles.ember(this.tmpP.set(p.x, 0.1, p.z), Math.round(60 * this.quality.particles), 0.9, FURY_EMBER);
+        this.fx.shock(p.x, p.z, 0.3, 5.5, 0.6, 0.6, 0xffd27a, 0.7);
+        this.fx.flash(this.tmpP.set(p.x, 1.2, p.z), 1.6, 0xffe2a0, 0.25);
+        this.hooks().onScreenFlash?.('255,200,90', 0.22);
+        this.cam.impact({ fov: 3, trauma: 0.45 });
+        this.pulse = Math.max(this.pulse, 0.8);
         return true;
       }
       case 'grappleStart': {

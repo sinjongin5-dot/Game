@@ -38,6 +38,16 @@ export const TUNING = {
   execute: { range: 4.4, bearing: 1.15, minTime: 0.18, minRemain: 0.45, standDist: 1.9, hpFrac: 0.17, minDamage: 120, hitstop: 0.3, killHitstop: 0.45 },
   /** 물어뜯기 포획: 사자 도약이 명중하면 3번 물어뜯는다. 각 물기에 표시되는 버튼을 창 안에 누르면 막는다 */
   grapple: { intro: 0.55, count: 3, gap: 1.05, hitAt: 0.62, winLen: [0.44, 0.4, 0.36], easyMul: 1.45, perfectFrac: 0.42, damage: 14, counterWin: 1.2, counterAfter: 0.35, dist: 1.3, cooldown: 9, pushBack: 2.3, staminaReward: 25 },
+  /** 완벽 회피(공격 판정 직전 회피 성공) → 사자의 시간이 느려지는 역습 구간 */
+  witch: { dur: 1.15, scale: 0.28, damage: 1.25, poise: 1.3 },
+  /** 기세 게이지: 공격적으로 싸울수록 차고, 가득 차면 폭발 모드 */
+  momentum: {
+    max: 100, idleDelay: 3.5, decay: 5, lossOnHit: 0.35, comboWindow: 2.2,
+    gain: { light: 5, finisher: 8, heavy: 12, run: 7, parry: 22, dodge: 16, clash: 12, bash: 10, bashInterrupt: 14, execute: 30, riposte: 6, qte: 8, qtePerfect: 12, counter: 30, guard: 2 },
+  },
+  fury: { dur: 9, damage: 1.25, poise: 1.3, costMul: 0.5, regenMul: 1.8, healPerHit: 2 },
+  /** 방패 밀치기: 방어 중 약공격 입력 */
+  bash: { range: 1.75, halfAngle: 1.0, interruptWindow: 0.1 },
   runAttack: { minSpeed: 4.4, damageMul: 1.15, poiseMul: 1.25 },
 
   lion: {

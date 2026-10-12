@@ -2,6 +2,7 @@
  * Xbox(표준 매핑) 컨트롤러 입력. 브라우저 Gamepad API 를 매 프레임 읽어 전투 입력/메뉴 탐색 입력으로 바꾼다.
  *
  * 전투: 왼쪽 스틱 이동 · 오른쪽 스틱 시점 · RB 약공격 · RT/Y 강공격(처형) · LB/LT 방패(유지) · B 회피 · X 회복 · A 달리기(유지) · R3 락온 · Start 일시정지
+ * 방패 밀치기: LB 를 누른 채 RB · 기세 폭발: D-패드 위 (게이지가 가득 찼을 때)
  * 상호작용(물어뜯기 막기): 화면에 표시되는 A/B/X/Y 버튼을 정확한 타이밍에 누른다
  * 메뉴: D-패드/왼쪽 스틱 이동 · A 확인 · B 뒤로 · Start 계속하기
  */
@@ -22,7 +23,7 @@ export interface PadFrame {
   lookDy: number;
   run: boolean;
   guard: boolean;
-  pressed: { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean };
+  pressed: { light: boolean; heavy: boolean; dodge: boolean; heal: boolean; lock: boolean; a: boolean; b: boolean; x: boolean; y: boolean; fury: boolean };
   menu: { up: boolean; down: boolean; left: boolean; right: boolean; confirm: boolean; back: boolean; start: boolean };
   /** 어떤 입력이든 이번 프레임에 있었는가 (장치 전환 감지) */
   anyInput: boolean;
@@ -54,7 +55,7 @@ const trig = (s: PadSnapshot, i: number) => (s.buttons[i]?.value ?? (s.buttons[i
 
 export const emptyPadFrame = (): PadFrame => ({
   active: false, moveX: 0, moveY: 0, lookDx: 0, lookDy: 0, run: false, guard: false,
-  pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false },
+  pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false, a: false, b: false, x: false, y: false, fury: false },
   menu: { up: false, down: false, left: false, right: false, confirm: false, back: false, start: false },
   anyInput: false,
 });
@@ -101,6 +102,7 @@ export function mapPad(prev: PadSnapshot | null, cur: PadSnapshot, dt: number, s
   f.pressed.b = edge(PAD.B);
   f.pressed.x = edge(PAD.X);
   f.pressed.y = edge(PAD.Y);
+  f.pressed.fury = edge(PAD.UP); // 기세 폭발: D-패드 위
   f.menu.confirm = edge(PAD.A);
   f.menu.back = edge(PAD.B);
   f.menu.start = edge(PAD.START);

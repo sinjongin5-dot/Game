@@ -435,7 +435,11 @@ export class GladiatorAnimator {
         this.swordArm(V(s.hand.x, s.hand.y, s.hand.z), V(s.dir.x, s.dir.y, s.dir.z));
         // 방패는 낮게 몸 앞에 유지
         const nBlock = v.guardHeld ? 1 : 0.0;
-        this.shieldPoseLow(nBlock, v);
+        if (def.id === 'bash') {
+          // 방패 밀치기: 방패를 가슴 앞에서 앞으로 힘차게 내민다 (유효 구간에서 최대, 이후 되돌아옴)
+          const out = smooth(0.0, def.activeStart, t) * (1 - smooth(def.activeEnd + 0.06, def.duration * 0.85, t));
+          this.shieldArm(V(0.26 - 0.04 * out, 1.28 - 0.04 * out, 0.52 + 0.5 * out), V(0.1, 0.08, 1), V(0, 1, 0.08));
+        } else this.shieldPoseLow(nBlock, v);
         handled = true;
         break;
       }

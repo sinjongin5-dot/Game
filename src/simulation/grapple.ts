@@ -4,6 +4,7 @@ import { norm2, yawOf, type V3 } from './math';
 import { setLionMode, startLionAttack } from './lion';
 import { setMode, startExecution } from './player';
 import { TUNING } from './tuning';
+import { callout, gainMomentum } from './momentum';
 import type { GrappleState, InputFrame, QteButton } from './state';
 
 const G = TUNING.grapple;
@@ -96,6 +97,7 @@ function resolveBite(ctx: SimContext, g: GrappleState, ok: boolean, perfect: boo
   ctx.events.push({ type: 'qteResult', idx: g.idx, ok, perfect, button: g.prompts[g.idx], pos });
   if (ok) {
     ctx.stats.qteSuccess++;
+    gainMomentum(ctx, perfect ? 'qtePerfect' : 'qte');
     p.guardImpact = 1;
     l.attack = null;
     l.mode = 'recover';
@@ -131,6 +133,8 @@ function endGrapple(ctx: SimContext, outcome: 'counter' | 'released' | 'dead') {
     p.stamina = Math.min(p.staminaMax, p.stamina + G.staminaReward);
     p.invulnT = Math.max(p.invulnT, 0.4);
     ctx.stats.counters++;
+    gainMomentum(ctx, 'counter');
+    callout(ctx, 'counter');
     ctx.events.push({ type: 'lionStagger', source: 'parry' });
     startExecution(ctx, p, true);
     return;
