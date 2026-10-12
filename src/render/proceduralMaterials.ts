@@ -45,9 +45,9 @@ export function createSandMaterial(shared: SharedUniforms, ellipse: { a: number;
         float eN = length(vWP.xz / uEll);
         float n1 = fbm3(vec3(vWP.xz * 0.28, 11.0));
         float n2 = fbm3(vec3(vWP.xz * 1.6, 13.0));
-        vec3 sandA = vec3(0.50, 0.33, 0.15);
-        vec3 sandB = vec3(0.38, 0.24, 0.10);
-        vec3 sandC = vec3(0.60, 0.43, 0.22);
+        vec3 sandA = vec3(0.50, 0.37, 0.22);
+        vec3 sandB = vec3(0.37, 0.27, 0.15);
+        vec3 sandC = vec3(0.60, 0.47, 0.30);
         vec3 col = mix(sandB, sandA, smoothstep(0.25, 0.75, n1));
         col = mix(col, sandC, smoothstep(0.55, 0.85, n2) * 0.5);
         // 벽 근처는 어둡게 (먼지/발자국이 많이 쌓임), 중앙 원은 약간 밝게

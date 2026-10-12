@@ -3,6 +3,9 @@ import * as THREE from 'three';
 /** 피격 시 캐릭터 전체가 순간적으로 밝아지는 정도 (0..1). 재질 셰이더가 읽는다. */
 export const HIT_FLASH = { lion: { value: 0 }, player: { value: 0 } };
 
+/** 재질 셰이더가 읽는 공용 조명 값: 태양 방향(뷰 공간, 정규화) — 장면이 매 프레임 갱신한다 */
+export const LIGHTING = { sunView: { value: new THREE.Vector3(0.3, 0.8, -0.5) } };
+
 /** MeshStandardMaterial 의 onBeforeCompile 셰이더에 피격 플래시를 끼워 넣는다. */
 export function injectHitFlash(sh: { fragmentShader: string; uniforms: Record<string, THREE.IUniform> }, who: 'lion' | 'player', color: [number, number, number]) {
   sh.uniforms.uHitFlash = HIT_FLASH[who];

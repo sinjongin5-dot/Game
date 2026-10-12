@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { injectHitFlash } from './fx';
+import { injectHitFlash, LIGHTING } from './fx';
 import { NOISE_GLSL } from './glsl';
 
 export interface FurSettings {
@@ -37,6 +37,7 @@ export function createFurMaterial(shell: number, shells: number, s: FurSettings,
     sh.uniforms.uDensity = { value: s.density };
     sh.uniforms.uTime = shared.time;
     sh.uniforms.uIsBase = { value: shell === 0 ? 1 : 0 };
+    sh.uniforms.uSunV = LIGHTING.sunView;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
         uniform float uShell; uniform float uFurLen; uniform float uTime;
@@ -56,7 +57,7 @@ export function createFurMaterial(shell: number, shells: number, s: FurSettings,
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         ${NOISE_GLSL}
-        uniform float uShell; uniform float uDensity; uniform float uIsBase;
+        uniform float uShell; uniform float uDensity; uniform float uIsBase; uniform vec3 uSunV;
         varying vec3 vRest; varying vec3 vRestN; varying float vFurK;
         float strandCov(vec2 p, float shell){
           vec2 g = p * uDensity; vec2 id = floor(g); vec2 f = fract(g) - 0.5;
@@ -89,6 +90,15 @@ export function createFurMaterial(shell: number, shells: number, s: FurSettings,
           // 배 쪽은 밝게
           float belly = smoothstep(0.1, -0.7, normalize(vRestN).y);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.22, 1.16, 1.0), belly * 0.5);
+        }`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        {
+          // 털의 역광 투과(빛이 털 끝을 통과해 따뜻하게 빛남)와 가장자리 림 라이트
+          vec3 Vf = normalize(vViewPosition);
+          float ndvF = abs(dot(normal, Vf));
+          float rimF = pow(1.0 - ndvF, 2.0);
+          float backF = pow(clamp(dot(Vf, -uSunV), 0.0, 1.0), 3.0);
+          totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.78, 0.5) * (rimF * 0.32 * uShell + backF * (0.2 + 0.8 * uShell) * 0.9);
         }`);
   };
   const furCompile = mat.onBeforeCompile;

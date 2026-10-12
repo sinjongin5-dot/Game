@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { injectHitFlash } from './fx';
+import { injectHitFlash, LIGHTING } from './fx';
 import { NOISE_GLSL } from './glsl';
 
 export type MatKind = 'skin' | 'bronze' | 'iron' | 'steel' | 'leather' | 'cloth' | 'wood' | 'shield_face' | 'glass';
@@ -29,27 +29,32 @@ const PARAMS: Record<string, KindParams> = {
 
 export function createCharMaterial(kind: string, src?: THREE.MeshStandardMaterial, opts: { vertexColors?: boolean; map?: THREE.Texture | null } = {}): THREE.MeshStandardMaterial {
   const p = PARAMS[kind] ?? PARAMS.leather;
-  const mat = new THREE.MeshStandardMaterial({
+  // 피부/가죽/금속은 MeshPhysicalMaterial: 땀/기름 광택(clearcoat)과 천의 결(sheen)을 쓴다
+  const mat = new THREE.MeshPhysicalMaterial({
     color: src ? src.color.clone() : 0xffffff,
     roughness: p.rough,
     metalness: p.metal,
     vertexColors: opts.vertexColors ?? !!(src as any)?.vertexColors,
     map: opts.map ?? null,
   });
+  if (kind === 'skin') { mat.clearcoat = 0.18; mat.clearcoatRoughness = 0.38; mat.sheen = 0.35; mat.sheenColor = new THREE.Color(0.95, 0.62, 0.5); mat.sheenRoughness = 0.55; }
+  if (kind === 'leather') { mat.clearcoat = 0.06; mat.clearcoatRoughness = 0.5; }
+  if (kind === 'cloth') { mat.sheen = 0.6; mat.sheenColor = new THREE.Color(0.9, 0.85, 0.8); mat.sheenRoughness = 0.7; }
+  if (kind === 'bronze' || kind === 'steel') { mat.envMapIntensity = 1.35; mat.clearcoat = 0.1; mat.clearcoatRoughness = 0.25; }
   mat.name = kind;
-  if (p.metal > 0.5) mat.envMapIntensity = 0.7;
   if (kind === 'glass') {
     mat.transparent = true;
     mat.opacity = 0.82;
     mat.envMapIntensity = 1.4;
   }
   mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uSunV = LIGHTING.sunView;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        varying vec3 vRest;
+        varying vec3 vRest; uniform vec3 uSunV;
         ${NOISE_GLSL}
         float heightFn(vec3 q){
           float h = fbm3(q * ${p.scale.toFixed(1)});
@@ -70,6 +75,16 @@ export function createCharMaterial(kind: string, src?: THREE.MeshStandardMateria
         diffuseColor.rgb *= 1.0 + ${p.colorVar.toFixed(3)} * (dn - 0.5) * 2.0;
         ${p.patina ? `float cav = smoothstep(0.55, 0.3, fbm3(vRest * ${(p.scale * 0.45).toFixed(1)} + 9.0)); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.45, 0.5, 0.42), cav * ${p.patina.toFixed(2)});` : ''}
         ${kind === 'skin' ? 'diffuseColor.rgb *= 0.92 + 0.16 * vnoise(vRest * 18.0); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.06, 0.92, 0.9), smoothstep(0.55, 0.9, vnoise(vRest * 7.0)) * 0.5);' : ''}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        ${kind === 'skin' ? `{
+          // 피하 산란 근사: 빛이 비스듬히 스치는 가장자리와 역광에서 붉은 기가 번진다
+          vec3 V = normalize(vViewPosition);
+          float ndv = clamp(dot(normal, V), 0.0, 1.0);
+          float rim = pow(1.0 - ndv, 3.0);
+          float wrap = clamp(dot(normal, uSunV) * 0.5 + 0.5, 0.0, 1.0);
+          float back = pow(clamp(dot(V, -uSunV), 0.0, 1.0), 2.0);
+          totalEmissiveRadiance += diffuseColor.rgb * vec3(0.55, 0.16, 0.08) * (rim * wrap * 0.35 + back * rim * 0.5);
+        }` : ''}`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = clamp(roughnessFactor + ${p.roughVar.toFixed(3)} * (dn - 0.5), 0.05, 1.0);
         ${p.patina ? 'roughnessFactor = mix(roughnessFactor, 0.85, cav * 0.6);' : ''}`)

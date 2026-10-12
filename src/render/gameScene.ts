@@ -10,18 +10,22 @@ import { CameraRig, type CameraSettings } from './cameraRig';
 import { GladiatorActor, LionActor, type FootFx } from './characters';
 import { Crowd } from './crowd';
 import { Decals } from './decals';
-import { Fx, HIT_FLASH } from './fx';
+import { Fx, HIT_FLASH, LIGHTING } from './fx';
 import { LION_ATTACKS } from '../combat/attackData';
 import { activeWindowIndex, lionAttackVolume } from '../simulation/lion';
 import { Particles } from './particles';
 import { SwordTrail } from './swordTrail';
+import { PostFX, type PostConfig } from './post';
 
-export type Quality = 'low' | 'medium' | 'high';
+export type Quality = 'low' | 'medium' | 'high' | 'ultra';
 
-export const QUALITY: Record<Quality, { scale: number; maxDpr: number; shadow: number; shells: number; crowd: number; particles: number }> = {
-  low: { scale: 0.75, maxDpr: 1, shadow: 2048, shells: 0, crowd: 0.3, particles: 0.5 },
-  medium: { scale: 0.9, maxDpr: 1.25, shadow: 2048, shells: 6, crowd: 0.65, particles: 0.8 },
-  high: { scale: 1.0, maxDpr: 2, shadow: 4096, shells: 12, crowd: 1.0, particles: 1.0 },
+const POST_OFF: PostConfig = { enabled: false, msaa: 0, ao: false, aoScale: 0.5, bloom: false, godrays: false, dof: false, grain: false, aberration: false };
+
+export const QUALITY: Record<Quality, { scale: number; maxDpr: number; shadow: number; shells: number; crowd: number; particles: number; post: PostConfig }> = {
+  low: { scale: 0.75, maxDpr: 1, shadow: 2048, shells: 0, crowd: 0.3, particles: 0.5, post: POST_OFF },
+  medium: { scale: 0.9, maxDpr: 1.25, shadow: 2048, shells: 6, crowd: 0.65, particles: 0.8, post: { enabled: true, msaa: 2, ao: true, aoScale: 0.4, bloom: true, godrays: false, dof: false, grain: true, aberration: false } },
+  high: { scale: 1.0, maxDpr: 2, shadow: 4096, shells: 12, crowd: 1.0, particles: 1.0, post: { enabled: true, msaa: 4, ao: true, aoScale: 0.5, bloom: true, godrays: true, dof: true, grain: true, aberration: true } },
+  ultra: { scale: 1.0, maxDpr: 2, shadow: 4096, shells: 18, crowd: 1.0, particles: 1.0, post: { enabled: true, msaa: 4, ao: true, aoScale: 0.75, bloom: true, godrays: true, dof: true, grain: true, aberration: true } },
 };
 
 export interface SceneStats { fps: number; frameMs: number; calls: number; tris: number; geometries: number; textures: number }
@@ -48,6 +52,13 @@ export class GameScene {
   readonly lion: LionActor;
   readonly gladiator: GladiatorActor;
   readonly debug = new DebugDraw();
+  readonly post: PostFX;
+  private focusDist = 8;
+  /** 적응형 해상도: 프레임이 느리면 내부 해상도를 줄이고 여유가 생기면 되돌린다 (1 = 설정값) */
+  private dynScale = 1;
+  private slowAcc = 0;
+  private fastAcc = 0;
+  adaptive = typeof navigator !== "undefined" && !navigator.webdriver;
   readonly trail = new SwordTrail();
   readonly fx = new Fx();
   private clawTrails = [new SwordTrail([1.0, 0.72, 0.55], 0.26, 1.3), new SwordTrail([1.0, 0.72, 0.55], 0.26, 1.3)];
@@ -57,6 +68,7 @@ export class GameScene {
   private lastLionWin = -1;
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
+  private bounce: THREE.DirectionalLight;
   private quality: Quality = 'high';
   private time = 0;
   private envTex: THREE.Texture | null = null;
@@ -83,6 +95,8 @@ export class GameScene {
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.contextLost = true; });
     canvas.addEventListener('webglcontextrestored', () => { this.contextLost = false; });
 
+    this.renderer.info.autoReset = false;
+    this.post = new PostFX(this.renderer);
     this.cam = new CameraRig(camSettings);
     this.arena = new ArenaBuilder();
     this.scene.add(this.arena.group);
@@ -92,8 +106,8 @@ export class GameScene {
 
     this.scene.fog = new THREE.FogExp2(0xd7c6a1, 0.0042);
     // 조명: 태양(그림자), 반구 필러, 환경 반사
-    this.sun = new THREE.DirectionalLight(0xfff0d4, 3.1);
-    const sunDir = new THREE.Vector3(0.62, 0.74, -0.5).normalize();
+    this.sun = new THREE.DirectionalLight(0xffe8c4, 3.6);
+    const sunDir = new THREE.Vector3(0.69, 0.7, -0.16).normalize(); // 고도 약 44°: 한쪽 벽의 긴 그림자가 아레나 가장자리에 드리우고 중앙 통로는 밝게 유지
     this.sun.position.copy(sunDir).multiplyScalar(90);
     this.sun.target.position.set(0, 0, 0);
     this.sun.castShadow = true;
@@ -103,8 +117,12 @@ export class GameScene {
     this.sun.shadow.normalBias = 0.05;
     this.sun.shadow.radius = 2.0;
     this.scene.add(this.sun, this.sun.target);
-    this.hemi = new THREE.HemisphereLight(0xb9cdf0, 0x8f7550, 0.7);
+    this.hemi = new THREE.HemisphereLight(0xa9c4f0, 0xa07a48, 1.0);
     this.scene.add(this.hemi);
+    // 모래에서 올라오는 따뜻한 반사광(바운스): 그림자 쪽 면을 자연스럽게 채운다
+    this.bounce = new THREE.DirectionalLight(0xffc28c, 0.45);
+    this.bounce.position.set(-0.55, 0.12, 0.6).multiplyScalar(50);
+    this.scene.add(this.bounce);
     (this.arena.skyMat.uniforms.uSun.value as THREE.Vector3).copy(sunDir);
     this.buildEnvironment();
 
@@ -124,7 +142,7 @@ export class GameScene {
     s.add(ground);
     this.envTex = pm.fromScene(s, 0.02).texture;
     this.scene.environment = this.envTex;
-    this.scene.environmentIntensity = 0.55;
+    this.scene.environmentIntensity = 0.85;
     pm.dispose();
   }
 
@@ -136,6 +154,10 @@ export class GameScene {
     this.sun.shadow.map = null;
     this.lion.setShells(c.shells);
     this.crowd.setDensity(c.crowd);
+    this.dynScale = 1;
+    this.post.setConfig(c.post);
+    // 후처리가 안개를 담당하므로 기본 장면 안개는 끈다 (낮음 단계에서만 사용)
+    this.scene.fog = c.post.enabled ? null : new THREE.FogExp2(0xd7c6a1, 0.0042);
     this.resizeInternal();
   }
 
@@ -149,10 +171,11 @@ export class GameScene {
 
   private resizeInternal() {
     const c = QUALITY[this.quality];
-    const dpr = Math.min(window.devicePixelRatio || 1, c.maxDpr) * c.scale;
+    const dpr = Math.min(window.devicePixelRatio || 1, c.maxDpr) * c.scale * this.dynScale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(this._w, this._h, false);
     this.cam.resize(this._w, this._h);
+    this.post.resize(this.renderer.domElement.width, this.renderer.domElement.height);
   }
 
   /** 새 판 시작 시 장면 상태를 모두 되돌린다 (재도전) */
@@ -452,6 +475,12 @@ export class GameScene {
     else if (phase === 'intro') this.cam.intro(sim, dt);
     else this.cam.gameplay(sim, look, dt, (o, d, m) => sim.physics.raycast({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, m), controlEnabled, alpha);
 
+    // 피사계 심도 초점: 락온이면 사자, 아니면 플레이어 (부드럽게 이동)
+    {
+      const cp = this.cam.camera.position;
+      const tgt = this.mode === 'title' ? 14 : sim.player.lockOn ? Math.hypot(cp.x - sim.lion.pos.x, (cp.y - 1.0), cp.z - sim.lion.pos.z) : Math.hypot(cp.x - sim.player.pos.x, cp.y - 1.2, cp.z - sim.player.pos.z);
+      this.focusDist += (tgt - this.focusDist) * Math.min(1, dt * 5);
+    }
     // 태양 그림자 카메라는 고정 (아레나 전체)
     this.debug.update(sim);
     this.lastPlayerPhase = phase;
@@ -540,7 +569,13 @@ export class GameScene {
 
   render(frameMs: number): SceneStats {
     if (this.contextLost) return { fps: 0, frameMs, calls: 0, tris: 0, geometries: 0, textures: 0 };
-    this.renderer.render(this.scene, this.cam.camera);
+    this.renderer.info.reset();
+    this.adaptResolution(frameMs);
+    this.cam.camera.updateMatrixWorld();
+    LIGHTING.sunView.value.copy(this.sun.position).normalize().transformDirection(new THREE.Matrix4().copy(this.cam.camera.matrixWorld).invert());
+    this.post.render(this.scene, this.cam.camera, {
+      time: this.time, sunDir: this.sun.position.clone().normalize(), focusDist: this.focusDist, exposure: 1.0, dofStrength: this.mode === 'title' ? 0.6 : 1.0,
+    });
     this.frameTimes.push(frameMs);
     if (this.frameTimes.length > 60) this.frameTimes.shift();
     const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
@@ -548,7 +583,26 @@ export class GameScene {
     return { fps: avg > 0 ? 1000 / avg : 0, frameMs: avg, calls: info.render.calls, tris: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures };
   }
 
+  /** 프레임 시간이 길게 이어지면 렌더 해상도를 단계적으로 낮추고, 여유가 있으면 다시 올린다 (GPU 성능 편차 대응) */
+  private adaptResolution(frameMs: number) {
+    if (!this.adaptive) return;
+    const dt = Math.min(frameMs, 250);
+    if (dt > 26) { this.slowAcc += dt; this.fastAcc = 0; } else if (dt < 15) { this.fastAcc += dt; this.slowAcc = Math.max(0, this.slowAcc - dt); } else { this.slowAcc = Math.max(0, this.slowAcc - dt); this.fastAcc = 0; }
+    if (this.slowAcc > 1800 && this.dynScale > 0.62) {
+      this.dynScale = Math.max(0.62, this.dynScale - 0.12);
+      this.slowAcc = 0;
+      this.resizeInternal();
+    } else if (this.fastAcc > 6000 && this.dynScale < 1) {
+      this.dynScale = Math.min(1, this.dynScale + 0.08);
+      this.fastAcc = 0;
+      this.resizeInternal();
+    }
+  }
+
+  get resolutionScale() { return this.dynScale; }
+
   dispose() {
+    this.post.dispose();
     this.renderer.dispose();
   }
 }

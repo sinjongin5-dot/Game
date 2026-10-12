@@ -173,13 +173,15 @@ function mouthPrims(): Prim[] {
   return P;
 }
 
+const MESH_DETAIL = parseFloat(process.env.MESH_DETAIL ?? "0.72");
+
 interface Region { bb: [number, number, number, number, number, number]; h: number }
 
 function meshField(spec: PartSpec, regions: Region[]): { positions: Float32Array; normals: Float32Array; indices: Uint32Array } {
   const field = makeField(spec);
   const pos: number[] = [], nor: number[] = [], idx: number[] = [];
   for (const r of regions) {
-    const m = surfaceNets(field.sd, r.bb, r.h);
+    const m = surfaceNets(field.sd, r.bb, r.h * MESH_DETAIL);
     const base = pos.length / 3;
     for (const v of m.positions) pos.push(v);
     for (const v of m.normals) nor.push(v);

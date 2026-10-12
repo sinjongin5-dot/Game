@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { NOISE_GLSL } from './glsl';
 import { ARENA } from '../simulation/arena';
 import { createBannerMaterial, createSandMaterial, createStoneMaterial, type SharedUniforms } from './proceduralMaterials';
 import { mulberry32 } from './rand';
@@ -620,21 +621,37 @@ export class ArenaBuilder {
 
   // ── 하늘 ──
   private buildSky() {
-    const geo = new THREE.SphereGeometry(300, 32, 16);
+    const geo = new THREE.SphereGeometry(300, 48, 24);
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
       fog: false,
-      uniforms: { uSun: { value: new THREE.Vector3(0.5, 0.6, 0.4) } },
+      uniforms: { uSun: { value: new THREE.Vector3(0.5, 0.6, 0.4) }, uTime: this.shared.time },
       vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: `varying vec3 vDir; uniform vec3 uSun;
+      fragmentShader: `varying vec3 vDir; uniform vec3 uSun; uniform float uTime;
+        ${NOISE_GLSL}
         void main(){
-          float h = clamp(vDir.y, 0.0, 1.0);
-          vec3 horizon = vec3(0.86, 0.80, 0.66);
-          vec3 zenith = vec3(0.30, 0.50, 0.82);
-          vec3 c = mix(horizon, zenith, pow(h, 0.55));
-          float s = max(dot(normalize(vDir), normalize(uSun)), 0.0);
-          c += vec3(1.0, 0.85, 0.55) * pow(s, 24.0) * 0.45 + vec3(1.0, 0.95, 0.8) * pow(s, 700.0) * 3.0;
+          vec3 d = normalize(vDir);
+          float h = max(d.y, 0.0);
+          // 레일리 풍 그라데이션: 지평선 근처는 먼지 낀 따뜻한 빛, 위로 갈수록 깊은 파랑
+          vec3 horizon = vec3(0.95, 0.80, 0.60);
+          vec3 mid = vec3(0.40, 0.58, 0.88);
+          vec3 zenith = vec3(0.13, 0.28, 0.62);
+          vec3 c = mix(horizon, mid, pow(h, 0.32));
+          c = mix(c, zenith, smoothstep(0.35, 1.0, h));
+          float s = max(dot(d, normalize(uSun)), 0.0);
+          // 미 산란(태양 주변 후광)과 태양 원반 (HDR → 블룸이 번지게 한다)
+          c += vec3(1.0, 0.72, 0.40) * pow(s, 5.0) * 0.28 + vec3(1.0, 0.82, 0.55) * pow(s, 36.0) * 0.55;
+          c += vec3(1.0, 0.95, 0.85) * smoothstep(0.99935, 0.99985, s) * 28.0;
+          // 얇은 권운/적운: 평면에 투영한 fbm
+          vec2 cp = d.xz / (d.y + 0.16) * 1.3 + vec2(uTime * 0.012, uTime * 0.006);
+          float cl = fbm3(vec3(cp, 1.7)) * 1.2 + fbm3(vec3(cp * 3.1, 4.0)) * 0.35 - 0.38;
+          cl = smoothstep(0.0, 0.42, cl) * smoothstep(0.0, 0.18, d.y);
+          vec3 lit = mix(vec3(0.82, 0.80, 0.78), vec3(1.15, 1.0, 0.85), pow(s, 1.5));
+          vec3 shade = vec3(0.50, 0.52, 0.58);
+          c = mix(c, mix(shade, lit, 0.55 + 0.45 * smoothstep(0.1, 0.8, fbm3(vec3(cp * 1.7, 9.0)))), cl * 0.7);
+          // 지평선 아래(벽 너머)는 어두운 먼지 색
+          c = mix(c, vec3(0.45, 0.38, 0.28), smoothstep(0.0, -0.25, d.y));
           gl_FragColor = vec4(c, 1.0);
         }`,
     });
