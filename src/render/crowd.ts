@@ -16,23 +16,23 @@ function personGeometry(detail: boolean): THREE.BufferGeometry {
     parts.push(g.index ? g.toNonIndexed() : g);
   };
   const skin: [number, number, number] = [0.62, 0.42, 0.3];
-  const torso = new THREE.CylinderGeometry(0.15, 0.2, 0.5, detail ? 8 : 6);
+  const torso = new THREE.CylinderGeometry(0.14, 0.2, 0.5, detail ? 14 : 8, 1);
   torso.translate(0, 0.4, 0);
   addPart(torso, 1, 0, [1, 1, 1]);
-  const sho = new THREE.BoxGeometry(0.42, 0.13, 0.2);
+  const sho = new THREE.CapsuleGeometry(0.075, 0.28, 3, detail ? 8 : 5).rotateZ(Math.PI / 2).scale(1, 1, 1.45);
   sho.translate(0, 0.64, 0);
   addPart(sho, 1, 0, [0.95, 0.95, 0.95]);
-  const neck = new THREE.CylinderGeometry(0.045, 0.05, 0.08, 6);
+  const neck = new THREE.CylinderGeometry(0.045, 0.05, 0.08, 8);
   neck.translate(0, 0.73, 0);
   addPart(neck, 0, 0, skin);
-  const head = new THREE.IcosahedronGeometry(0.095, detail ? 1 : 0);
+  const head = new THREE.SphereGeometry(0.095, detail ? 12 : 7, detail ? 9 : 5).scale(0.92, 1.08, 1);
   head.translate(0, 0.82, 0);
   addPart(head, 0, 0, skin);
-  const hair = new THREE.SphereGeometry(0.1, 6, 4, 0, Math.PI * 2, 0, Math.PI * 0.55);
+  const hair = new THREE.SphereGeometry(0.1, detail ? 12 : 6, detail ? 7 : 4, 0, Math.PI * 2, 0, Math.PI * 0.55);
   hair.translate(0, 0.845, -0.005);
   addPart(hair, 0, 0, [0.12, 0.09, 0.07]);
   for (const s of [-1, 1]) {
-    const arm = new THREE.BoxGeometry(0.07, detail ? 0.4 : 0.34, 0.07);
+    const arm = new THREE.CylinderGeometry(0.035, 0.03, detail ? 0.4 : 0.34, detail ? 7 : 5);
     arm.translate(s * 0.245, 0.66 - (detail ? 0.2 : 0.17), 0.0);
     addPart(arm, 0.4, 1, skin);
   }
@@ -67,9 +67,9 @@ function crowdMaterial(shared: SharedUniforms, cheer: { value: number }): THREE.
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
         attribute float aMask; attribute float aArm; attribute vec3 iTint; attribute float iSeed;
-        uniform float uCheer; uniform float uTime; varying vec3 vTint; varying float vMask;`)
+        uniform float uCheer; uniform float uTime; varying vec3 vTint; varying float vMask; varying float vY; varying float vSk;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        vTint = iTint; vMask = aMask;
+        vTint = iTint; vMask = aMask; vY = position.y; vSk = fract(iSeed * 3.17);
         float sd = fract(iSeed * 13.7);
         float act = step(1.0 - uCheer * 0.9, sd);
         float ph = uTime * (4.5 + 3.0 * fract(iSeed * 7.1)) + iSeed * 20.0;
@@ -85,9 +85,12 @@ function crowdMaterial(shared: SharedUniforms, cheer: { value: number }): THREE.
         transformed.y += act * 0.07 * abs(sin(ph)) + calm * 0.5;
         transformed.x += calm * (position.y);`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vTint; varying float vMask;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTint; varying float vMask; varying float vY; varying float vSk;')
       .replace('#include <color_fragment>', `#include <color_fragment>
-        diffuseColor.rgb *= mix(vec3(1.0), vTint, vMask);`);
+        diffuseColor.rgb *= mix(vec3(1.0), vTint, vMask);
+        // 위쪽(어깨·머리)은 밝게, 아래 옷자락은 어둡게: 간이 차폐
+        diffuseColor.rgb *= mix(0.7, 1.05, clamp((vY + 0.05) / 0.9, 0.0, 1.0));
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(0.78 + 0.5 * vSk, 0.85 + 0.25 * vSk, 0.8 + 0.3 * vSk), 1.0 - vMask);`);
     void NOISE_GLSL;
   };
   mat.customProgramCacheKey = () => 'crowd';

@@ -95,6 +95,12 @@ export class Particles {
   private static sand = new THREE.Color(0.7, 0.57, 0.38);
   private static sandL = new THREE.Color(0.82, 0.7, 0.5);
 
+  /** 햇살 속에 떠다니는 미세 먼지(대기감). 느리게 흩날린다 */
+  mote(pos: THREE.Vector3) {
+    this.spawn('dust', pos, new THREE.Vector3((Math.random() - 0.3) * 0.35, (Math.random() - 0.4) * 0.12, (Math.random() - 0.5) * 0.3),
+      5 + Math.random() * 4, 0.035 + Math.random() * 0.04, 0.0, new THREE.Color(1.0, 0.86, 0.62), 0.22 + Math.random() * 0.2, 0.3, 0);
+  }
+
   /** 발걸음/착지 먼지. strength 0..1 */
   puff(pos: THREE.Vector3, strength: number, dir?: THREE.Vector3, count = 0) {
     const n = count || Math.max(1, Math.round(2 + strength * 6));

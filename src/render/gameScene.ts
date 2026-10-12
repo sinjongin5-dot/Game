@@ -64,6 +64,7 @@ export class GameScene {
   private clawTrails = [new SwordTrail([1.0, 0.72, 0.55], 0.26, 1.3), new SwordTrail([1.0, 0.72, 0.55], 0.26, 1.3)];
   private eyePulse = 0;
   private emberAcc = 0;
+  private moteAcc = 0;
   private ringDustAcc = 0;
   private lastLionWin = -1;
   private sun: THREE.DirectionalLight;
@@ -553,6 +554,13 @@ export class GameScene {
     } else this.lastLionWin = -1;
     for (const t of this.clawTrails) t.update(dt);
 
+    // 대기 중 먼지 입자: 플레이어 주변 공중에 항상 조금씩 떠 있다
+    this.moteAcc += dt * 14 * QUALITY[this.quality].particles;
+    while (this.moteAcc >= 1) {
+      this.moteAcc -= 1;
+      const a = Math.random() * Math.PI * 2, r = 1 + Math.random() * 9;
+      this.particles.mote(new V3(sim.player.pos.x + Math.cos(a) * r, 0.3 + Math.random() * 3.2, sim.player.pos.z + Math.sin(a) * r));
+    }
     // 2페이즈: 몸에서 불씨가 피어오른다
     if (l.phase === 2 && alive && sim.phase === 'fight') {
       this.emberAcc += dt * 26 * QUALITY[this.quality].particles;
