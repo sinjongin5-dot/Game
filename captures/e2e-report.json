@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-12T08:54:28.676Z",
+  "startedAt": "2026-10-12T09:02:47.225Z",
   "checks": [
     {
       "name": "설정 패널 열림",
@@ -179,12 +179,12 @@
     {
       "name": "재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음",
       "ok": true,
-      "detail": "[{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":1},{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":2},{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":1}]"
+      "detail": "[{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":2},{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":1},{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":2}]"
     },
     {
       "name": "오디오 소스가 누적되지 않음",
       "ok": true,
-      "detail": "[1,2,1]"
+      "detail": "[2,1,2]"
     },
     {
       "name": "봇 전투가 승리 또는 사망으로 종료",
@@ -219,12 +219,6 @@
           "objects": 15,
           "geometries": 135,
           "textures": 11,
-          "audioActive": 1
-        },
-        {
-          "objects": 15,
-          "geometries": 135,
-          "textures": 11,
           "audioActive": 2
         },
         {
@@ -232,6 +226,12 @@
           "geometries": 135,
           "textures": 11,
           "audioActive": 1
+        },
+        {
+          "objects": 15,
+          "geometries": 135,
+          "textures": 11,
+          "audioActive": 2
         }
       ]
     },
