@@ -15,7 +15,7 @@ export function createLion(): LionState {
     hp: L.hp, hpMax: L.hp, poise: 0, poiseDelay: 0, staggerImmune: 0, phase: 1, pendingPhase2: false, invuln: false,
     mode: 'idle', modeT: 0, modeDur: 1, attack: null, attackSerial: 0, circleDir: 1, circleT: 0, approachRange: 2.6,
     cooldown: { swipe: 0, bite: 0, pounce: 2, charge: 4, rear: 0, flurry: 3, dashBite: 2.5, backHop: 5, quake: 6, whirl: 3 }, history: [], behindT: 0, sinceAttack: 0, postDelay: 0,
-    flinch: 0, flinchDir: v2(), turnRate: 0, lookYaw: 0, deadT: 0, roarT: 0, landed: 0, thinkT: 0.6,
+    flinch: 0, flinchDir: v2(), turnRate: 0, lookYaw: 0, deadT: 0, roarT: 0, landed: 0, thinkT: 0.6, executed: false, execReady: false,
   };
 }
 
@@ -23,6 +23,7 @@ export function setLionMode(l: LionState, mode: LionState['mode'], dur = 1) {
   l.mode = mode;
   l.modeT = 0;
   l.modeDur = dur;
+  l.executed = false;
 }
 
 export function lionLocalToWorld(l: LionState, p: V3): V3 {
@@ -647,7 +648,7 @@ function updateAttack(ctx: SimContext, dt: number) {
           setLionMode(l, 'stunned', 1.9);
           l.poise = 0;
           ctx.events.push({ type: 'lionWallHit', pos: { ...l.pos } });
-          ctx.events.push({ type: 'lionStagger' });
+          ctx.events.push({ type: 'lionStagger', source: 'wall' });
           l.cooldown.charge = def.cooldown;
           l.history.push('charge');
           return;
@@ -679,8 +680,22 @@ function updateAttack(ctx: SimContext, dt: number) {
   if (t >= def.duration) endAttack(ctx);
 }
 
+/** 패링 등으로 공격을 중간에 끊는다: 쿨다운을 걸고 회복 상태(반격 기회)로 보낸다 */
+export function interruptLionAttack(ctx: SimContext, recover: number) {
+  const l = ctx.lion;
+  const a = l.attack;
+  if (!a) return;
+  const def = LION_ATTACKS[a.id];
+  l.cooldown[a.id] = def.cooldown * (l.phase === 2 ? 0.8 : 1);
+  l.attack = null;
+  l.y = 0;
+  l.speed *= 0.25;
+  l.sinceAttack = 0;
+  setLionMode(l, 'recover', recover);
+}
+
 /** 사자에게 가해지는 경직 누적 및 반응 */
-export function addLionPoise(ctx: SimContext, amount: number): boolean {
+export function addLionPoise(ctx: SimContext, amount: number, source: 'poise' | 'parry' = 'poise'): boolean {
   const l = ctx.lion;
   if (l.mode === 'dying' || l.mode === 'dead') return false;
   const mul = l.staggerImmune > 0 ? L.staggerImmuneGain : 1;
@@ -692,7 +707,7 @@ export function addLionPoise(ctx: SimContext, amount: number): boolean {
     l.attack = null;
     l.y = 0;
     setLionMode(l, 'stagger', L.staggerTime);
-    ctx.events.push({ type: 'lionStagger' });
+    ctx.events.push({ type: 'lionStagger', source });
     return true;
   }
   return false;

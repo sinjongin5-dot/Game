@@ -3,6 +3,7 @@ import type { Physics } from '../physics/types';
 import { ARENA, wallDistance } from './arena';
 import { resolveLionAttack, resolvePlayerAttack } from './combat';
 import type { SimContext } from './context';
+import { canExecute } from './execution';
 import { createLion, setLionMode, updateLion } from './lion';
 import { Rng, clamp, v2 } from './math';
 import { createPlayer, setMode, updatePlayer, bufferDuringHitstop } from './player';
@@ -188,6 +189,7 @@ export class GameSim {
       updateLion(c, dt);
       resolvePlayerAttack(c);
       resolveLionAttack(c);
+      c.lion.execReady = canExecute(c);
       this.physics.step();
       this.enforceBounds();
       this.checkEnd(dt);

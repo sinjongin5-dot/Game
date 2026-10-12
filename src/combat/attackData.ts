@@ -159,6 +159,14 @@ export function clipTravel(name: 'attack', t: number): number {
   return Math.min(1, Math.max(0, (z0 + (z1 - z0) * u) / max));
 }
 
+/**
+ * 공격을 끊을 수 있는 규칙.
+ * - 정확한 패링: 아래 목록의 '가벼운' 공격은 중간에 끊기고 사자는 비틀거린다.
+ * - 도약/돌진/충격파/회전 같은 큰 기술은 슈퍼아머(끊기지 않음). 패링 타이밍으로 막아도 가드만 성공한다.
+ * - 일반 타격은 사자의 공격을 끊지 못한다(경직 게이지만 쌓인다). 경직 게이지가 가득 차면 모든 공격이 끊기고 경직한다.
+ */
+export const PARRYABLE: ReadonlySet<LionAttackId> = new Set<LionAttackId>(['swipe', 'bite', 'rear', 'swipeBite', 'pounceSwat', 'flurry', 'dashBite']);
+
 export const LIGHT_CHAIN: PlayerAttackId[] = ['light1', 'light2', 'light3'];
 
 // ─────────────────────────────────────────────────────────────────────────────

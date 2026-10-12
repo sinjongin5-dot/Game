@@ -119,7 +119,7 @@ export class Fx {
   private tmp2 = new THREE.Vector3();
 
   constructor() {
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 20; i++) {
       const mat = new THREE.SpriteMaterial({ map: this.flashTex, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true });
       const s = new THREE.Sprite(mat);
       s.visible = false;
@@ -127,7 +127,7 @@ export class Fx {
       this.group.add(s);
       this.flashes.push({ s, life: 0, max: 1, size: 1, grow: 1, spin: 0 });
     }
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 18; i++) {
       const mat = new THREE.SpriteMaterial({ map: this.streakTex, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true });
       const s = new THREE.Sprite(mat);
       s.visible = false;
@@ -135,7 +135,7 @@ export class Fx {
       this.group.add(s);
       this.streaks.push({ s, life: 0, max: 1, len: 1, wid: 0.1 });
     }
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const mat = new THREE.ShaderMaterial({
         vertexShader: ringVert, fragmentShader: ringFrag, transparent: true, depthWrite: false, side: THREE.DoubleSide,
         uniforms: { uR: { value: 0 }, uW: { value: 0.05 }, uA: { value: 1 }, uColor: { value: new THREE.Color(1, 0.9, 0.7) }, uSeed: { value: i * 7.3 } },

@@ -32,6 +32,12 @@ export const TUNING = {
     height: 1.8,
   },
 
+  /** 패링: 방패를 든 직후(block.perfect 창) 막으면 사자의 가벼운 공격을 끊고 경직을 쌓는다 */
+  parry: { poiseLight: 40, poiseHeavy: 14, recover: 1.15, riposteWindow: 1.3, riposteDamage: 1.25, riposteHitstop: 0.02, hitstop: 0.13, knockLight: 1.2 },
+  /** 처형: 사자가 경직(stagger/stunned)일 때 강공격 입력으로 발동 */
+  execute: { range: 4.4, bearing: 1.15, minTime: 0.18, minRemain: 0.45, standDist: 1.9, hpFrac: 0.17, minDamage: 120, hitstop: 0.3, killHitstop: 0.45 },
+  runAttack: { minSpeed: 4.4, damageMul: 1.15, poiseMul: 1.25 },
+
   lion: {
     hp: 900,
     phase2At: 0.55,

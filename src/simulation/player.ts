@@ -5,6 +5,7 @@ import {
   worldToLocal2, type V2,
 } from './math';
 import { TUNING } from './tuning';
+import { canExecute } from './execution';
 import type { InputFrame, PlayerState } from './state';
 
 const T = TUNING.player;
@@ -18,12 +19,14 @@ export function createPlayer(): PlayerState {
     guardHeld: false, guardUpT: 0, guardImpact: 0, healApplied: false,
     hitDir: v2(0, -1), hitHeavy: false, invulnT: 0, knock: v2(), lockOn: false, running: false, speed: 0,
     moveLocal: v2(), buffer: { action: null, t: 0 }, prevBlade: null, swingFired: false, lowStaminaFlash: 0, lastDodgeStart: -10,
+    executing: false, runAttack: false, riposteUntil: -1,
   };
 }
 
 export function setMode(p: PlayerState, mode: PlayerState['mode']) {
   p.mode = mode;
   p.modeT = 0;
+  if (mode !== 'attack') p.executing = false;
 }
 
 /** 현재 회피 무적 여부 */
@@ -121,6 +124,36 @@ function startAttack(ctx: SimContext, p: PlayerState, id: PlayerAttackId, chain:
   p.prevBlade = null;
   p.swingFired = false;
   p.buffer.action = null;
+  p.executing = false;
+  // 달리기 공격: 달리다가 처음 휘두르는 약공격
+  p.runAttack = id === 'light1' && chain === 0 && p.running && p.speed >= TUNING.runAttack.minSpeed;
+  return true;
+}
+
+/** 처형: 경직한 사자 앞으로 도약 내려찍기 클립을 재사용해 파고든다. 판정은 고정 명중이고 동작 내내 무적이다. */
+function startExecution(ctx: SimContext, p: PlayerState): boolean {
+  if (!canExecute(ctx)) return false;
+  const lion = ctx.lion;
+  const def = PLAYER_ATTACKS.heavy;
+  const dl = dist2(p.pos, lion.pos);
+  p.yaw = yawOf(norm2({ x: lion.pos.x - p.pos.x, z: lion.pos.z - p.pos.z }));
+  p.mode = 'attack';
+  p.modeT = 0;
+  p.attackId = 'heavy';
+  p.attackSerial++;
+  p.slamFired = false;
+  p.attackTravel = clamp(dl - TUNING.execute.standDist, 0.35, def.clip?.travelMax ?? 3);
+  p.attackHitDone = false;
+  p.attackChain = 0;
+  p.prevBlade = null;
+  p.swingFired = false;
+  p.buffer.action = null;
+  p.executing = true;
+  p.runAttack = false;
+  p.invulnT = Math.max(p.invulnT, def.duration);
+  lion.executed = true;
+  lion.modeDur = Math.max(lion.modeDur, lion.modeT + def.duration + 0.3);
+  ctx.events.push({ type: 'executionStart', pos: { x: lion.pos.x, z: lion.pos.z }, dur: def.duration });
   return true;
 }
 
@@ -217,6 +250,7 @@ export function updatePlayer(ctx: SimContext, input: InputFrame, dt: number) {
       const a = p.buffer.action;
       if (a === 'dodge' && startDodge(ctx, p, input)) break;
       if (a === 'heal') { if (!startHeal(ctx, p)) p.buffer.action = null; else break; }
+      if (a === 'heavy' && startExecution(ctx, p)) break;
       if (a === 'heavy' && startAttack(ctx, p, 'heavy', 0, input)) break;
       if (a === 'light') {
         // 직전 공격 직후 짧은 시간 안이면 연계 이어감 (마지막 타 이후엔 처음부터)

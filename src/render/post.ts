@@ -28,6 +28,10 @@ export interface PostParams {
   exposure: number;
   /** 0..1: 전체 후처리 연출 강도(타이틀/게임 장면별로 조절) */
   dofStrength: number;
+  /** 0..1: 타격 순간의 화면 충격(줌 블러·대비·비네트), 빠르게 감쇠하는 값 */
+  pulse?: number;
+  /** 0..1: 전투 분위기(더 차갑고 어둡고 채도 낮게) */
+  mood?: number;
 }
 
 const QUAD_VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -150,6 +154,7 @@ uniform vec3 uSunDir; uniform vec2 uSunUV; uniform float uSunFront; uniform vec3
 uniform float uTime; uniform float uExposure;
 uniform float uAO; uniform float uBloom; uniform float uGod; uniform float uDof; uniform float uFocus; uniform float uGrain; uniform float uAberr;
 uniform float uFogDensity; uniform float uFogHeight; uniform vec3 uFogColor; uniform vec3 uFogSun;
+uniform float uPulse; uniform float uMood;
 
 float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float lin(float d){ return uNear * uFar / (uFar - d * (uFar - uNear)); }
@@ -208,6 +213,12 @@ void main(){
     }
   }
 #endif
+
+  // 충격 줌 블러: 타격 순간 화면 중심에서 바깥으로 짧게 번진다
+  if (uPulse > 0.03) {
+    vec2 zd = (vUv - 0.5) * uPulse * 0.011;
+    col = (col * 2.0 + texture2D(tScene, vUv - zd).rgb + texture2D(tScene, vUv - zd * 2.0).rgb + texture2D(tScene, vUv - zd * 3.0).rgb) / 5.0;
+  }
 
   // 화면 공간 앰비언트 오클루전 (하늘 제외). 직사광에는 덜 영향이 가도록 밝은 곳은 약하게
   if (!sky) {
@@ -268,10 +279,17 @@ void main(){
   ldr = (ldr - 0.5) * 1.14 + 0.5;
   ldr = max(ldr, 0.0);
 
+  // 전투 분위기: 차갑고 어둡고 채도를 낮춘다. 충격 순간에는 대비가 잠깐 오른다
+  float mood = clamp(uMood, 0.0, 1.0), pul = clamp(uPulse, 0.0, 1.0);
+  ldr = mix(ldr, vec3(luma(ldr)), 0.24 * mood);
+  ldr *= mix(vec3(1.0), vec3(0.9, 0.97, 1.07), mood);
+  ldr = mix(ldr, (ldr - 0.5) * 1.12 + 0.5, mood * 0.6 + pul * 0.45);
+
   // 비네트
   vec2 c = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
   float vig = smoothstep(1.15, 0.25, length(c) * 1.1);
-  ldr *= mix(0.62, 1.0, vig);
+  ldr *= mix(0.62, 1.0, vig) * (1.0 - (1.0 - vig) * (mood * 0.16 + pul * 0.2));
+  ldr = max(ldr, 0.0);
 
   vec3 outc = toSRGB(ldr);
 #ifdef GRAIN
@@ -459,6 +477,7 @@ export class PostFX {
           uSunDir: { value: new V3() }, uSunUV: { value: new V2() }, uSunFront: { value: 0 }, uSunColor: { value: new V3(1.0, 0.82, 0.55) },
           uTime: { value: 0 }, uExposure: { value: 1 }, uAO: { value: 1 }, uBloom: { value: 0.4 }, uGod: { value: 0.5 }, uDof: { value: 0 }, uFocus: { value: 6 },
           uGrain: { value: 0.02 }, uAberr: { value: 0.01 },
+          uPulse: { value: 0 }, uMood: { value: 0 },
           uFogDensity: { value: 0.006 }, uFogHeight: { value: 0.08 }, uFogColor: { value: new V3(0.78, 0.70, 0.56) }, uFogSun: { value: new V3(1.0, 0.80, 0.52) },
         },
       });
@@ -487,6 +506,8 @@ export class PostFX {
     u.uFocus.value = p.focusDist;
     u.uGrain.value = this.tuning.grainAmt;
     u.uAberr.value = this.tuning.aberration;
+    u.uPulse.value = p.pulse ?? 0;
+    u.uMood.value = p.mood ?? 0;
     u.uFogDensity.value = this.tuning.fogDensity;
     u.uFogHeight.value = this.tuning.fogHeight;
     this.pass(this.compMat, null);

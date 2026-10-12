@@ -40,7 +40,7 @@ export class Game {
   private debugOn = false;
   private lastStats: SceneStats = { fps: 0, frameMs: 0, calls: 0, tris: 0, geometries: 0, textures: 0 };
   private rafId = 0;
-  private hints = { move: false, lock: false, windup: false, attack: false, stamina: false, heal: false, dodge: false };
+  private hints = { move: false, lock: false, windup: false, attack: false, stamina: false, heal: false, dodge: false, parry: false, exec: 0 };
   private hintQueue: string[] = [];
   private seenPatterns = new Set<string>();
   private fightClock = 0;
@@ -101,7 +101,7 @@ export class Game {
     this.ui.setProgress(0, '에셋을 불러오는 중…');
     let glFrac = { loaded: 0, total: 1 };
     let audioDone = 0;
-    const audioTotal = 40;
+    const audioTotal = 51;
     let rapierDone = 0;
     const update = (label: string) => {
       const total = glFrac.total + audioTotal * AUDIO_UNIT + 100000;
@@ -409,6 +409,14 @@ export class Game {
         this.ui.hint('사자의 준비 동작을 읽으세요 — Space 로 회피하거나, 우클릭을 유지해 방패로 막습니다.', 5200);
       }
       if (e.type === 'phase2') this.ui.hint('사자가 더욱 사나워졌다', 3200);
+      if (e.type === 'playerBlocked' && e.parry && !this.hints.parry) {
+        this.hints.parry = true;
+        this.ui.hint('패링 성공 — 사자가 휘청거립니다. 지금 반격하세요!', 3600);
+      }
+      if (e.type === 'lionStagger' && this.hints.exec < 3) {
+        this.hints.exec++;
+        this.ui.hint('사자가 무너졌다 — 가까이서 강공격(Q)으로 처형!', 3000);
+      }
       if (e.type === 'lionWindup' && PATTERN_HINTS[e.attack] && !this.seenPatterns.has(e.attack) && !this.ui.hintVisible) {
         this.seenPatterns.add(e.attack);
         this.ui.hint(PATTERN_HINTS[e.attack], 3600);

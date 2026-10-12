@@ -31,6 +31,11 @@ export class CameraRig {
   private shakeT = 0;
   private fovCur = 58;
   private blend = 1; // 연출 → 게임플레이 블렌드 (1 = 게임플레이)
+  private blendDur = 0.9;
+  private tensionV = 0;
+  private tensionTarget = 0;
+  private tensionHold = 0;
+  private cine: { kind: 'execute'; t: number; dur: number; side: number; focus: THREE.Vector3 } | null = null;
   private blendFrom: Shot = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 58 };
   private lastShot: Shot = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 58 };
   private deathT = 0;
@@ -68,6 +73,43 @@ export class CameraRig {
     this.rollKick = THREE.MathUtils.clamp(this.rollKick + roll * k, -0.08, 0.08);
   }
 
+  /**
+   * 전투 충격을 한꺼번에 가한다. 이미 흔들리는 중이면 추가분이 줄어들어(남은 여유만큼만) 연속 타격에도 화면이 누적해서 흔들리지 않는다.
+   * trauma: 0..1 흔들림, kick: 타격 방향으로 밀리는 미터, fov: 도 단위 펀치(+확대), roll: 라디안
+   */
+  impact(o: { dir?: THREE.Vector3; trauma?: number; kick?: number; fov?: number; roll?: number }) {
+    const room = 1 - Math.min(1, this.trauma);
+    const scale = 0.3 + 0.7 * room;
+    if (o.trauma) this.addTrauma(o.trauma * scale);
+    if (o.kick && o.dir) this.kick(o.dir, o.kick * scale);
+    if (o.fov !== undefined || o.roll !== undefined) this.punchFov((o.fov ?? 0) * scale, (o.roll ?? 0) * scale);
+  }
+
+  /** 준비 동작의 긴장감: level(0..1) 만큼 시야가 좁아지고 카메라가 미세하게 다가간다. holdSec 뒤 자동으로 풀린다. */
+  setTension(level: number, holdSec = 1.5) {
+    this.tensionTarget = THREE.MathUtils.clamp(level, 0, 1) * (this.settings.shake > 0 ? 1 : 0);
+    this.tensionHold = level > 0 ? holdSec : 0;
+  }
+
+  /** 처형 등 짧은 시네마틱: 끝나면 게임플레이 카메라로 부드럽게 돌아온다 (플레이어 입력이 막힌 동안에만 사용) */
+  startCine(kind: 'execute', dur: number, sim: GameSim) {
+    if (this.settings.shake <= 0) return;
+    const p = sim.player.pos, l = sim.lion.pos;
+    const ax = new THREE.Vector3(l.x - p.x, 0, l.z - p.z).normalize();
+    const right = new THREE.Vector3(-ax.z, 0, ax.x);
+    // 카메라가 있던 쪽 옆면을 택해 시점이 갑자기 뒤집히지 않게 한다
+    const camSide = Math.sign(right.dot(this.camera.position.clone().sub(new THREE.Vector3(p.x, 0, p.z)))) || 1;
+    this.startBlendFromCurrent();
+    this.blendDur = 0.4;
+    this.cine = { kind, t: 0, dur, side: camSide, focus: new THREE.Vector3() };
+  }
+
+  get cineActive() { return this.cine !== null; }
+  get traumaLevel() { return this.trauma; }
+  get kickLength() { return this.kickVec.length(); }
+  get fovKickValue() { return this.fovKick; }
+  get tension() { return this.tensionV; }
+
   /** 씬 전환/재시작 시 카메라 상태 초기화 */
   reset(sim: GameSim) {
     this.yaw = 0;
@@ -79,6 +121,9 @@ export class CameraRig {
     this.kickVec.set(0, 0, 0);
     this.fovKick = 0;
     this.rollKick = 0;
+    this.tensionV = 0; this.tensionTarget = 0; this.tensionHold = 0;
+    this.cine = null;
+    this.blendDur = 0.9;
     this.deathT = 0;
     this.victoryAng = 0;
     this.pivot.set(sim.player.pos.x, 1.5, sim.player.pos.z);
@@ -90,6 +135,7 @@ export class CameraRig {
     this.blendFrom.look.copy(this.lastShot.look);
     this.blendFrom.fov = this.lastShot.fov;
     this.blend = 0;
+    this.blendDur = 0.9;
   }
 
   /** 타이틀 화면: 터널 안에서 햇빛이 드는 경기장 쪽을 본다 */
@@ -229,9 +275,44 @@ export class CameraRig {
       this.tmpLook.set(c.x, 1.3, c.z);
       fov = 50;
     }
+    // 보스 공격 준비: 시야가 좁아지고 살짝 다가간다
+    if (this.tensionHold > 0) this.tensionHold -= dt; else this.tensionTarget = 0;
+    this.tensionV = damp(this.tensionV, this.tensionTarget, this.tensionTarget > this.tensionV ? 3.2 : 9, dt);
+    fov -= 3.2 * this.tensionV;
+    if (this.tensionV > 0.001) this.tmpPos.lerp(this.tmpLook, 0.045 * this.tensionV);
     this.fovCur = damp(this.fovCur, fov, 4, dt);
     const shot: Shot = { pos: this.tmpPos, look: this.tmpLook, fov: this.fovCur };
+    if (this.cine) this.cineShot(sim, dt, shot);
     this.apply(shot, dt);
+  }
+
+  /** 처형 시네마틱: 플레이어와 사자 사이를 낮은 옆 앵글에서 천천히 돌며 밀고 들어간다. 끝나면 게임플레이 시점으로 블렌드 */
+  private cineShot(sim: GameSim, dt: number, out: Shot) {
+    const c = this.cine!;
+    c.t += dt;
+    if (c.t >= c.dur || sim.phase === 'playerDead') {
+      this.cine = null;
+      this.startBlendFromCurrent();
+      this.blendDur = 0.55;
+      return;
+    }
+    const u = clamp(c.t / c.dur, 0, 1);
+    const p = sim.player.pos, l = sim.lion.pos;
+    const mid = new THREE.Vector3((p.x + l.x) / 2, 0, (p.z + l.z) / 2);
+    const ax = new THREE.Vector3(l.x - p.x, 0, l.z - p.z).normalize();
+    const right = new THREE.Vector3(-ax.z, 0, ax.x).multiplyScalar(c.side);
+    const ang = lerp(0.2, 0.75, u * u * (3 - 2 * u)); // 옆 → 약간 뒤쪽 비스듬히
+    const r = lerp(5.6, 4.5, u);
+    const pos = mid.clone().addScaledVector(right, Math.cos(ang) * r).addScaledVector(ax, -Math.sin(ang) * r);
+    pos.y = lerp(0.95, 1.5, u);
+    // 항상 경기장 안쪽
+    const qx = pos.x / (ARENA.a - 2.4), qz = pos.z / (ARENA.b - 2.4);
+    const q = Math.hypot(qx, qz);
+    if (q > 1) { pos.x /= q; pos.z /= q; }
+    c.focus.set(mid.x, 1.5, mid.z);
+    out.pos.copy(pos);
+    out.look.copy(c.focus);
+    out.fov = lerp(48, 42, u);
   }
 
   private apply(shot: Shot, dt: number) {
@@ -239,7 +320,7 @@ export class CameraRig {
     // 연출 → 게임플레이 블렌드
     let pos = shot.pos, look = shot.look, fov = shot.fov;
     if (this.blend < 1) {
-      this.blend = Math.min(1, this.blend + dt / 0.9);
+      this.blend = Math.min(1, this.blend + dt / this.blendDur);
       const k = this.blend * this.blend * (3 - 2 * this.blend);
       pos = this.blendFrom.pos.clone().lerp(shot.pos, k);
       look = this.blendFrom.look.clone().lerp(shot.look, k);

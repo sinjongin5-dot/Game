@@ -57,6 +57,12 @@ export interface PlayerState {
   swingFired: boolean;
   lowStaminaFlash: number;
   lastDodgeStart: number;
+  /** 처형 동작 중 (강공격 클립을 재사용하되 판정은 고정 명중, 무적) */
+  executing: boolean;
+  /** 달리다가 시작한 약공격 (달리기 공격) */
+  runAttack: boolean;
+  /** 이 시각(ctx.time)까지 다음 공격이 반격(리포스트) 보너스를 받는다 */
+  riposteUntil: number;
 }
 
 export type LionMode =
@@ -130,13 +136,18 @@ export interface LionState {
   roarT: number;
   landed: number; // 착지 직후 감쇠
   thinkT: number; // 이동 중 재평가 타이머
+  /** 이번 경직(stagger/stunned) 동안 이미 처형을 당했는가 */
+  executed: boolean;
+  /** 지금 처형할 수 있는 상태인가 (플레이어 거리/각도 포함, 시뮬레이션이 매 스텝 갱신) */
+  execReady: boolean;
 }
 
 export type SimEvent =
   | { type: 'playerSwing'; id: PlayerAttackId }
   | { type: 'playerSlam'; pos: V2; hit: boolean }
-  | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean; dir: V3; killing: boolean; combo: number }
-  | { type: 'playerBlocked'; strength: number; pos: V3; broke: boolean; attack: LionAttackId; perfect: boolean }
+  | { type: 'playerHitLion'; pos: V3; dmg: number; heavy: boolean; head: boolean; stunned: boolean; invuln: boolean; dir: V3; killing: boolean; combo: number; execute?: boolean; riposte?: boolean; run?: boolean; finisher?: boolean }
+  | { type: 'executionStart'; pos: V2; dur: number }
+  | { type: 'playerBlocked'; strength: number; pos: V3; broke: boolean; attack: LionAttackId; perfect: boolean; parry?: boolean; interrupted?: boolean }
   | { type: 'playerHit'; dmg: number; pos: V3; heavy: boolean; attack: LionAttackId }
   | { type: 'playerDodge'; backstep: boolean }
   | { type: 'dodgeSuccess'; attack: LionAttackId }
@@ -153,7 +164,7 @@ export type SimEvent =
   | { type: 'lionSlam'; pos: V2 }
   | { type: 'lionHop'; pos: V2; to: V2 }
   | { type: 'lionWallHit'; pos: V2 }
-  | { type: 'lionStagger' }
+  | { type: 'lionStagger'; source?: 'poise' | 'parry' | 'wall' }
   | { type: 'lionDeath' }
   | { type: 'phase2' }
   | { type: 'gateClose' }

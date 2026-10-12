@@ -51,3 +51,8 @@ OFL 은 글꼴의 포함·재배포를 허용하며, 글꼴 자체를 단독 판
 ## 그래픽 업그레이드 (후처리/하늘/재질)
 
 - 후처리(SSAO, 블룸, 갓레이, DOF, ACES 그레이딩), 절차적 하늘, 재질 셰이더, 군중 지오메트리, 사자·검투사 메쉬(해상도 상향 재생성)는 모두 이 저장소의 코드(`src/render/*`, `tools/gen-*.ts`)로 직접 작성·생성한 것입니다. 새로 추가한 외부 에셋·텍스처·HDRI 는 없고, 외부 이미지를 내려받거나 핫링크하지 않습니다.
+
+## 전투 연출 추가분 (v2.0)
+
+- 검 궤적/충돌 프로필/카메라 연출/후처리 펄스는 모두 이 저장소의 코드(`src/render/slashTrail.ts`, `combatVfx.ts` 등)이며 외부 이미지·텍스처를 쓰지 않습니다.
+- 추가 효과음 11종(`swing_light_b/c`, `swing_run`, `hit_flesh_b/c`, `parry_clang`, `stagger_break`, `execute_whoosh`, `execute_hit`, `ground_crack`, `lion_tell`)은 `tools/gen-audio-combat.py`(numpy/scipy 절차적 합성)가 직접 만든 원본입니다. 외부 샘플·녹음을 사용하지 않았고 라이선스 문제가 없습니다(실제 녹음보다 질감이 단순).

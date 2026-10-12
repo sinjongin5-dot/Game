@@ -15,6 +15,7 @@ import { LION_ATTACKS } from '../combat/attackData';
 import { activeWindowIndex, lionAttackVolume } from '../simulation/lion';
 import { Particles } from './particles';
 import { SwordTrail } from './swordTrail';
+import { CombatVfx } from './combatVfx';
 import { PostFX, type PostConfig } from './post';
 
 export type Quality = 'low' | 'medium' | 'high' | 'ultra';
@@ -54,13 +55,14 @@ export class GameScene {
   readonly debug = new DebugDraw();
   readonly post: PostFX;
   private focusDist = 8;
+  private mood = 0;
   /** 적응형 해상도: 프레임이 느리면 내부 해상도를 줄이고 여유가 생기면 되돌린다 (1 = 설정값) */
   private dynScale = 1;
   private slowAcc = 0;
   private fastAcc = 0;
   adaptive = typeof navigator !== "undefined" && !navigator.webdriver;
-  readonly trail = new SwordTrail();
   readonly fx = new Fx();
+  readonly vfx: CombatVfx;
   private clawTrails = [new SwordTrail([1.0, 0.72, 0.55], 0.26, 1.3), new SwordTrail([1.0, 0.72, 0.55], 0.26, 1.3)];
   private eyePulse = 0;
   private emberAcc = 0;
@@ -103,7 +105,8 @@ export class GameScene {
     this.scene.add(this.arena.group);
     this.crowd = new Crowd(this.arena.shared, this.arena.standProfile);
     this.scene.add(this.crowd.group);
-    this.scene.add(this.particles.group, this.decals.mesh, this.trail.mesh, this.fx.group, this.clawTrails[0].mesh, this.clawTrails[1].mesh, this.debug.group);
+    this.vfx = new CombatVfx(this.fx, this.particles, this.decals, this.cam, () => this.hooks, () => this.cam.camera);
+    this.scene.add(this.particles.group, this.decals.mesh, this.vfx.group, this.vfx.lightObject, this.fx.group, this.clawTrails[0].mesh, this.clawTrails[1].mesh, this.debug.group);
 
     this.scene.fog = new THREE.FogExp2(0xd7c6a1, 0.0042);
     // 조명: 태양(그림자), 반구 필러, 환경 반사
@@ -157,6 +160,7 @@ export class GameScene {
     this.crowd.setDensity(c.crowd);
     this.dynScale = 1;
     this.post.setConfig(c.post);
+    this.vfx.setQuality({ particles: c.particles, rich: c.post.enabled });
     // 후처리가 안개를 담당하므로 기본 장면 안개는 끈다 (낮음 단계에서만 사용)
     this.scene.fog = c.post.enabled ? null : new THREE.FogExp2(0xd7c6a1, 0.0042);
     this.resizeInternal();
@@ -183,7 +187,7 @@ export class GameScene {
   resetForNewAttempt(sim: GameSim) {
     this.particles.clear();
     this.decals.clear();
-    this.trail.clear();
+    this.vfx.clear();
     this.lion.reset();
     this.gladiator.reset();
     this.cam.reset(sim);
@@ -211,49 +215,14 @@ export class GameScene {
     for (const e of events) {
       switch (e.type) {
         case 'playerHitLion': {
-          const p = new V3(e.pos.x, e.pos.y, e.pos.z);
-          const n = new V3(sim.player.pos.x - sim.lion.pos.x, 0.3, sim.player.pos.z - sim.lion.pos.z).normalize();
-          if (e.invuln) {
-            this.particles.sparks(p, n, 8);
-            this.fx.flash(p, 0.5, 0xbfd8ff, 0.1);
-            break;
-          }
-          const heavy = e.heavy;
-          this.particles.furBurst(p, n, heavy ? 30 : 16);
-          this.particles.sparks(p, n, heavy ? 14 : 6, new THREE.Color(1.0, 0.8, 0.5));
-          this.particles.burst(p, heavy ? 12 : 5, heavy ? 6 : 4);
-          // 번쩍임 + 베기 줄기 (스윙 방향)
-          this.fx.flash(p, heavy ? 1.5 : e.head ? 1.1 : 0.85, e.head ? 0xffe9a0 : 0xffd6a0, heavy ? 0.2 : 0.14);
-          const dir = new V3(e.dir.x, e.dir.y, e.dir.z);
-          this.fx.streakWorld(p, dir, this.cam.camera, heavy ? 2.6 : 1.7, heavy ? 0.2 : 0.13, 0xfff0d0, heavy ? 0.22 : 0.16);
-          if (heavy) this.fx.streakWorld(p, dir.clone().applyAxisAngle(new V3(0, 1, 0), 0.5), this.cam.camera, 1.6, 0.1, 0xffc890, 0.2);
-          HIT_FLASH.lion.value = heavy ? 0.85 : 0.55;
-          this.cam.addTrauma(heavy ? 0.55 : 0.26);
-          this.cam.kick(toLion(), heavy ? 0.2 : 0.1);
-          this.cam.punchFov(heavy ? 2.4 : 1.1, (Math.random() - 0.5) * (heavy ? 0.03 : 0.015));
-          this.crowd.cheerBurst(heavy ? 0.5 : 0.22);
-          if (e.killing) {
-            this.hooks.onSlowmo?.(0.2, 1.1);
-            this.hooks.onScreenFlash?.('255,240,210', 0.6);
-            this.fx.shock(sim.lion.pos.x, sim.lion.pos.z, 0.6, 7, 0.9, 0.9, 0xfff0d0, 0.7);
-          } else if (e.stunned) this.hooks.onSlowmo?.(0.35, 0.2);
-          else if (heavy) this.hooks.onSlowmo?.(0.5, 0.1);
+          this.vfx.handle(e, sim);
+          if (!e.invuln) this.crowd.cheerBurst(e.execute ? 1 : e.heavy ? 0.5 : 0.22);
           break;
         }
-        case 'playerBlocked': {
-          const p = new V3(e.pos.x, e.pos.y, e.pos.z);
-          const n = new V3(sim.player.pos.x - sim.lion.pos.x, 0.2, sim.player.pos.z - sim.lion.pos.z).normalize();
-          this.particles.sparks(p, n, e.broke ? 34 : 14 + Math.round(e.strength * 12), new THREE.Color(1.0, 0.75, 0.4));
-          this.particles.puff(new V3(sim.player.pos.x, 0.1, sim.player.pos.z), 0.6 + e.strength * 0.5, n.clone().multiplyScalar(-1), 5);
-          this.fx.flash(p, e.perfect ? 1.6 : 0.8 + e.strength * 0.7, e.perfect ? 0xbfe0ff : e.broke ? 0xff8a60 : 0xffd9a0, e.perfect ? 0.22 : 0.14);
-          this.fx.shock(sim.player.pos.x, sim.player.pos.z, 0.3, e.perfect ? 3.4 : 1.8 + e.strength, 0.28, 0.35, e.perfect ? 0xc8e4ff : 0xffe2b0, 0.55);
-          this.cam.addTrauma(e.broke ? 0.8 : 0.3 + e.strength * 0.25);
-          this.cam.kick(toLion().negate(), e.broke ? 0.3 : 0.08 + e.strength * 0.12);
-          this.cam.punchFov(e.broke ? -2.5 : e.perfect ? 2.2 : -0.8);
-          if (e.perfect) { this.hooks.onScreenFlash?.('190,224,255', 0.28); this.hooks.onSlowmo?.(0.4, 0.2); }
-          if (e.broke) { this.hooks.onScreenFlash?.('255,120,80', 0.3); this.hooks.onSlowmo?.(0.4, 0.18); }
+        case 'playerBlocked':
+          this.vfx.handle(e, sim);
+          if (e.parry) this.crowd.cheerBurst(0.4);
           break;
-        }
         case 'playerHit': {
           const heavy = e.heavy;
           const p = new V3(e.pos.x, e.pos.y, e.pos.z);
@@ -286,8 +255,9 @@ export class GameScene {
           const pw = e.power ?? 1;
           this.particles.ring(new V3(e.pos.x, 0, e.pos.z), 1.8 * pw);
           this.fx.shock(e.pos.x, e.pos.z, 0.4, 3.6 * pw + 0.8, 0.45, 0.6, 0xffe6bb, 0.5 * pw + 0.2);
-          this.cam.addTrauma(0.7 * pw);
-          this.cam.punchFov(1.4 * pw);
+          // 도약 착지는 실제로 바닥에 닿은 순간이므로 먼지 벽·파편·가라앉는 먼지가 따른다 (작은 뒷걸음 도약은 약하게)
+          this.vfx.groundImpact(e.pos.x, e.pos.z, Math.min(1, pw * 0.8), { ring: false, settle: pw >= 0.8 });
+          this.cam.impact({ dir: new V3(e.pos.x - sim.player.pos.x, 0, e.pos.z - sim.player.pos.z), trauma: 0.7 * pw, fov: 1.4 * pw });
           this.crowd.cheerBurst(0.35 * pw);
           break;
         }
@@ -298,6 +268,7 @@ export class GameScene {
           this.particles.ring(c, 2.6, 56);
           this.particles.debris(c.clone().setY(0.2), 26);
           this.particles.burst(c.clone().setY(0.3), 20, 6);
+          this.vfx.groundImpact(e.pos.x, e.pos.z, 1, { ring: false });
           // 바닥 균열 (방사형)
           for (let i = 0; i < 9; i++) {
             const a = (i / 9) * Math.PI * 2 + Math.random() * 0.4;
@@ -310,15 +281,12 @@ export class GameScene {
           this.crowd.cheerBurst(0.9);
           break;
         }
-        case 'playerSlam': {
-          const c = new V3(e.pos.x, 0, e.pos.z);
-          this.particles.ring(c, 1.4, 34);
-          this.particles.debris(c.clone().setY(0.15), 12);
-          this.fx.shock(e.pos.x, e.pos.z, 0.3, 3.2, 0.4, 0.55, 0xffe6bb, 0.6);
-          this.cam.addTrauma(0.45);
-          this.cam.punchFov(1.6);
+        case 'playerSlam':
+          this.vfx.handle(e, sim);
           break;
-        }
+        case 'executionStart':
+          this.vfx.handle(e, sim);
+          break;
         case 'lionHop': {
           this.particles.puff(new V3(e.pos.x, 0.05, e.pos.z), 1.0, undefined, 10);
           this.cam.addTrauma(0.15);
@@ -352,9 +320,11 @@ export class GameScene {
           break;
         case 'lionWindup':
           this.eyePulse = 1;
+          this.vfx.bossTell(e.attack, e.dur, sim);
           if (e.attack === 'quake') this.particles.puff(new V3(sim.lion.pos.x, 0.05, sim.lion.pos.z), 1.2, undefined, 12);
           break;
         case 'lionAttack': {
+          this.vfx.releaseTell();
           const lp = sim.lion.pos;
           const head = this.lion.headWorld;
           if (e.attack === 'pounce') this.particles.puff(new V3(lp.x, 0.05, lp.z), 1.0, undefined, 10);
@@ -371,9 +341,7 @@ export class GameScene {
           break;
         }
         case 'lionStagger':
-          this.cam.addTrauma(0.3);
-          this.fx.flash(this.lion.headWorld.clone(), 1.2, 0xffe6a0, 0.2);
-          this.particles.burst(this.lion.headWorld.clone(), 14, 5);
+          this.vfx.handle(e, sim);
           break;
         case 'lionDeath':
           this.cam.addTrauma(0.6);
@@ -455,12 +423,8 @@ export class GameScene {
       this.decals.add(l.pos.x, l.pos.z, l.yaw, 0.5, 1.4, 30, 0.7);
     }
     // 칼 궤적
-    const bladeActive = sim.player.mode === 'attack' && sim.player.attackId !== null;
-    if (bladeActive) {
-      this.trail.push(this.gladiator.swordBase, this.gladiator.swordTip);
-    }
-    this.lastBlade = bladeActive;
-    this.trail.update(dt);
+    this.vfx.updateSlash(sim, this.gladiator.swordBase, this.gladiator.swordTip, dt);
+    this.vfx.update(dt, sim);
     this.updateLionFx(sim, dt);
 
     // 관중 흥분도
@@ -476,6 +440,12 @@ export class GameScene {
     else if (phase === 'intro') this.cam.intro(sim, dt);
     else this.cam.gameplay(sim, look, dt, (o, d, m) => sim.physics.raycast({ x: o.x, y: o.y, z: o.z }, { x: d.x, y: d.y, z: d.z }, m), controlEnabled, alpha);
 
+    // 전투 분위기: 보스전이 진행될수록(2페이즈), 사자가 경직했을 때, 처형 연출 중에 더 차갑고 어두워진다
+    {
+      const stag = l.mode === 'stagger' || l.mode === 'stunned';
+      const target = this.mode === 'title' || phase === 'intro' ? 0 : 0.12 + (l.phase === 2 ? 0.3 : 0) + (stag ? 0.22 : 0) + (this.cam.cineActive ? 0.28 : 0);
+      this.mood += (target - this.mood) * Math.min(1, dt * 2.2);
+    }
     // 피사계 심도 초점: 락온이면 사자, 아니면 플레이어 (부드럽게 이동)
     {
       const cp = this.cam.camera.position;
@@ -582,7 +552,7 @@ export class GameScene {
     this.cam.camera.updateMatrixWorld();
     LIGHTING.sunView.value.copy(this.sun.position).normalize().transformDirection(new THREE.Matrix4().copy(this.cam.camera.matrixWorld).invert());
     this.post.render(this.scene, this.cam.camera, {
-      time: this.time, sunDir: this.sun.position.clone().normalize(), focusDist: this.focusDist, exposure: 1.0, dofStrength: this.mode === 'title' ? 0.6 : 1.0,
+      time: this.time, sunDir: this.sun.position.clone().normalize(), focusDist: this.focusDist, exposure: 1.0, dofStrength: this.mode === 'title' ? 0.6 : 1.0, pulse: this.cam.settings.shake > 0 ? this.vfx.pulse : 0, mood: this.mood,
     });
     this.frameTimes.push(frameMs);
     if (this.frameTimes.length > 60) this.frameTimes.shift();
@@ -610,6 +580,7 @@ export class GameScene {
   get resolutionScale() { return this.dynScale; }
 
   dispose() {
+    this.vfx.dispose();
     this.post.dispose();
     this.renderer.dispose();
   }

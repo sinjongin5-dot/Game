@@ -1,5 +1,5 @@
 // 실제 브라우저(헤드리스 Chromium, SwiftShader) 종단 간 테스트. 개발 서버(vite)가 5173 에서 실행 중이어야 한다.
-// 사용: node tools/e2e.mjs [ui|input|fight|all]
+// 사용: node tools/e2e.mjs [ui|input|fight|combat|all]
 import fs from 'node:fs';
 import { launch, sleep } from './harness.mjs';
 
@@ -176,6 +176,70 @@ if (section === 'fight' || section === 'all') {
   } else report.notes.push('승리 시나리오에서 봇이 패배: 시뮬레이션 단독 테스트로 대체 검증');
   await page.click(res === 'victory' ? '#btn-victory-title' : '#btn-death-title'); await sleep(1500);
   check('타이틀 복귀', (await snap()).state === 'title' && await page.isVisible('#title'));
+}
+
+if (section === 'combat' || section === 'all') {
+  // 전투 연출: 패링/일반 방어/처형/궤적 풀 재사용/충격값 복귀를 실제 브라우저의 장면(렌더 포함)에서 확인한다.
+  await page.click('#btn-start'); await sleep(600);
+  await page.evaluate(() => window.__arena.simAdvance(11.2)); await sleep(2000);
+  await page.keyboard.press('Enter'); await sleep(1500);
+  const run = (code) => page.evaluate(async (c) => {
+    const g = window.__arena, sim = g.sim, sc = g.scene;
+    const m = await import('/src/simulation/lion.ts'); const pl = await import('/src/simulation/player.ts');
+    g.timeScale = 0;
+    const idle = { moveX: 0, moveY: 0, run: false, guard: false, cameraYaw: 0, pressed: { light: false, heavy: false, dodge: false, heal: false, lock: false } };
+    const reset = (px, pz, lz) => {
+      g.inputOverride = null; sim.ctx.phase = 'fight'; pl.setMode(sim.player, 'free'); sim.player.hp = sim.player.hpMax = 1000; sim.ctx.hitstop = 0; sim.ctx.graceUntil = 1e9;
+      sim.player.lockOn = true; sim.player.pos = { x: px, z: pz }; sim.player.yaw = 0; sim.physics.teleport('player', sim.player.pos, 0);
+      sim.lion.attack = null; sim.lion.pos = { x: 0, z: lz }; sim.lion.yaw = Math.PI; sim.physics.teleport('lion', sim.lion.pos, Math.PI);
+      sim.lion.mode = 'idle'; sim.lion.modeT = 0; sim.lion.modeDur = 1e9; sim.lion.y = 0; sim.lion.invuln = false; sim.lion.hp = sim.lion.hpMax; sim.lion.poise = 0; sim.lion.staggerImmune = 0; sim.lion.executed = false;
+      sim.player.stamina = 100; sim.player.exhausted = false; sim.player.invulnT = 0; sim.player.riposteUntil = -1; sc.cam.reset(sim); sc.vfx.clear();
+    };
+    const ev = [];
+    const step = (inp) => { sim.step(inp ?? (g.inputOverride ? g.inputOverride() : idle)); const e = sim.drainEvents(); ev.push(...e); sc.handleEvents(e, sim); sc.update(sim, 1 / 60, 1, { dx: 0, dy: 0 }, true); };
+    const out = await (new Function('g', 'sim', 'sc', 'm', 'pl', 'idle', 'reset', 'step', 'ev', 'return (async()=>{' + c + '})()'))(g, sim, sc, m, pl, idle, reset, step, ev);
+    g.timeScale = 1; g.inputOverride = null;
+    return out;
+  }, code);
+  const lateGuard = (t) => `g.inputOverride = () => ({ moveX: 0, moveY: 0, run: false, guard: !!(sim.lion.attack && sim.lion.attack.t >= ${t}), cameraYaw: 0, pressed: idle.pressed });`;
+
+  // 패링
+  const objs0 = await page.evaluate(() => window.__arena.scene.scene.children.length);
+  const parry = await run(`reset(0, -2, 0); m.startLionAttack(sim.ctx, 'bite'); sim.lion.attack.hold = 0; ${lateGuard(0.42)}
+    let n = 0; while (n++ < 200 && !ev.some((e) => e.type === 'playerBlocked')) step();
+    const b = ev.find((e) => e.type === 'playerBlocked');
+    return { parry: b && b.parry, interrupted: b && b.interrupted, lionMode: sim.lion.mode, hp: sim.player.hp, impact: sc.vfx.lastImpact, trauma: sc.cam.traumaLevel, riposte: sim.player.riposteUntil > sim.ctx.time };`);
+  check('정확한 타이밍 가드 = 패링(공격 중단, 사자 회복 상태, 피해 없음)', parry.parry && parry.interrupted && parry.lionMode === 'recover' && parry.hp === 1000, JSON.stringify(parry));
+  check('패링 연출 재생 + 반격 보너스 부여', parry.impact === 'parry' && parry.riposte, JSON.stringify({ i: parry.impact, r: parry.riposte }));
+  check('카메라 충격은 상한 이내', parry.trauma <= 1);
+  // 일반 방어: 패링과 시각적으로 다른 프로필
+  const guard = await run(`reset(0, -2, 0); m.startLionAttack(sim.ctx, 'bite'); sim.lion.attack.hold = 0; ${lateGuard(0.05)}
+    let n = 0; while (n++ < 200 && !ev.some((e) => e.type === 'playerBlocked')) step();
+    const b = ev.find((e) => e.type === 'playerBlocked');
+    return { parry: b && b.parry, impact: sc.vfx.lastImpact, lionMode: sim.lion.mode };`);
+  check('일찍 든 가드는 패링이 아닌 일반 방어(공격 안 끊김, 다른 연출)', !guard.parry && guard.impact === 'guard' && guard.lionMode === 'attack', JSON.stringify(guard));
+  // 일반/강공격 구분
+  const light = await run(`reset(0, -2, 0); sim.step({ ...idle, pressed: { ...idle.pressed, light: true } }); let n = 0; while (n++ < 90 && !ev.some((e) => e.type === 'playerHitLion')) step(); return { impact: sc.vfx.lastImpact, trails: sc.vfx.trails.activeCount };`);
+  const heavy = await run(`reset(0, -3.4, 0); sim.step({ ...idle, pressed: { ...idle.pressed, heavy: true } }); let n = 0; while (n++ < 150 && !ev.some((e) => e.type === 'playerHitLion')) step(); return { impact: sc.vfx.lastImpact, trails: sc.vfx.trails.activeCount };`);
+  check('약공격/강공격이 서로 다른 충돌 연출과 궤적을 쓴다', light.impact === 'light' && heavy.impact === 'heavy' && light.trails >= 1 && heavy.trails >= 1, JSON.stringify({ light, heavy }));
+  // 처형
+  const exec = await run(`reset(0, -3, 0.2); m.setLionMode(sim.lion, 'stagger', 1.7); for (let i = 0; i < 20; i++) step();
+    const hp0 = sim.lion.hp; ev.length = 0; step({ ...idle, pressed: { ...idle.pressed, heavy: true } });
+    let cine = false, n = 0; while (n++ < 240) { step(); if (sc.cam.cineActive) cine = true; if (!sim.player.executing && n > 20 && !sc.cam.cineActive) break; }
+    const hits = ev.filter((e) => e.type === 'playerHitLion');
+    return { started: ev.some((e) => e.type === 'executionStart'), cine, hits: hits.length, execHits: hits.filter((e) => e.execute).length, dmg: hp0 - sim.lion.hp, hp: sim.player.hp, impact: sc.vfx.lastImpact, cineEnd: !sc.cam.cineActive };`);
+  check('처형: 발동/시네마틱/정확히 1회 명중/무적 유지', exec.started && exec.cine && exec.hits === 1 && exec.execHits === 1 && exec.hp === 1000 && exec.cineEnd, JSON.stringify(exec));
+  check('처형 연출 재생 및 시네마틱 종료 후 정상 카메라 복귀', exec.impact === 'execute' && exec.cineEnd);
+  // 충격값 복귀 + 조명 소등 + 풀 재사용
+  const calm = await run(`for (let i = 0; i < 240; i++) step(); return { trauma: sc.cam.traumaLevel, fov: sc.cam.fovKickValue, light: sc.vfx.lightObject.intensity, pulse: sc.vfx.pulse, tension: sc.cam.tension, trails: sc.vfx.trails.activeCount };`);
+  check('충격 4초 후 카메라 흔들림/FOV 펀치/화면 펄스/순간 조명이 모두 0 으로 복귀', calm.trauma < 0.02 && Math.abs(calm.fov) < 0.1 && calm.pulse < 0.01 && calm.light < 0.01 && calm.trails === 0, JSON.stringify(calm));
+  const pool = await run(`for (let k = 0; k < 40; k++) { reset(0, -2, 0); sim.step({ ...idle, pressed: { ...idle.pressed, [k % 3 ? 'light' : 'heavy']: true } }); for (let i = 0; i < 70; i++) step(); }
+    return { size: sc.vfx.trails.size, children: sc.vfx.trails.group.children.length, root: sc.scene.children.length };`);
+  check('공격 40회 후에도 궤적 풀/씬 오브젝트 수가 늘지 않음', pool.size === 3 && pool.children === 3 && pool.root === objs0, JSON.stringify({ ...pool, objs0 }));
+  await page.evaluate(() => { window.__arena.timeScale = 1; });
+  await shot('13_combat_vfx');
+  await page.keyboard.press('Escape'); await sleep(300);
+  await page.evaluate(() => window.__arena.returnToTitle?.());
 }
 
 report.console = logs.filter((l) => !/KHR_parallel_shader_compile/.test(l));

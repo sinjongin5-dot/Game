@@ -49,9 +49,9 @@ export class Particles {
 
   constructor() {
     this.systems = {
-      dust: this.make(700, fragDust, THREE.NormalBlending),
-      spark: this.make(260, fragSpark, THREE.AdditiveBlending),
-      chip: this.make(200, fragDust, THREE.NormalBlending),
+      dust: this.make(900, fragDust, THREE.NormalBlending),
+      spark: this.make(420, fragSpark, THREE.AdditiveBlending),
+      chip: this.make(320, fragDust, THREE.NormalBlending),
     };
   }
 
@@ -174,6 +174,73 @@ export class Particles {
       const tang = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(spin * (4 + Math.random() * 3));
       tang.y = 0.6 + Math.random() * 1.2;
       this.spawn('dust', p, tang, 0.6 + Math.random() * 0.6, 0.45 + Math.random() * 0.4, 0.9, Math.random() < 0.5 ? Particles.sand : Particles.sandL, 0.18, 1.4, -0.2);
+    }
+  }
+
+
+  // ── 전투 연출용 (임시 객체 없이 재사용) ──────────────────────────────────────
+  private static steelHot = new THREE.Color(1.6, 1.45, 1.2);
+  private static steelCool = new THREE.Color(0.95, 1.1, 1.5);
+  private static emberHot = new THREE.Color(1.5, 0.8, 0.32);
+  private static blood = new THREE.Color(0.2, 0.025, 0.03);
+  private static stone = new THREE.Color(0.55, 0.53, 0.5);
+  private static stoneDark = new THREE.Color(0.32, 0.31, 0.3);
+  private static ashDust = new THREE.Color(0.52, 0.48, 0.42);
+  private tv = new THREE.Vector3();
+  private tp = new THREE.Vector3();
+
+  /**
+   * 금속 충돌 불꽃: dir(정규화된 충돌 법선 쪽) 으로 원뿔처럼 튀며, 일부는 따뜻한 주황으로 식는다.
+   * spread 0..1 (클수록 넓게)
+   */
+  metalSparks(pos: THREE.Vector3, dir: THREE.Vector3, count: number, speed: number, spread: number, warm = 0.35) {
+    for (let i = 0; i < count; i++) {
+      const sp = speed * (0.45 + Math.random() * 0.9);
+      this.tv.set(dir.x + (Math.random() - 0.5) * 2 * spread, dir.y + (Math.random() - 0.4) * 2 * spread, dir.z + (Math.random() - 0.5) * 2 * spread).normalize().multiplyScalar(sp);
+      const c = Math.random() < warm ? Particles.emberHot : Math.random() < 0.5 ? Particles.steelHot : Particles.steelCool;
+      this.spawn('spark', pos, this.tv, 0.14 + Math.random() * 0.26, 0.05 + Math.random() * 0.05, -0.05, c, 1.0, 1.6, 9.5);
+    }
+  }
+
+  /** 짙은 붉은 핏방울/살점 (살에 맞았을 때만, 어둡고 절제된 양) */
+  droplets(pos: THREE.Vector3, dir: THREE.Vector3, count: number, speed = 3.2) {
+    for (let i = 0; i < count; i++) {
+      const sp = speed * (0.4 + Math.random());
+      this.tv.set(dir.x + (Math.random() - 0.5) * 1.2, dir.y * 0.5 + Math.random() * 0.8, dir.z + (Math.random() - 0.5) * 1.2).normalize().multiplyScalar(sp);
+      this.spawn('chip', pos, this.tv, 0.45 + Math.random() * 0.45, 0.06 + Math.random() * 0.05, 0, Particles.blood, 0.95, 0.5, 10);
+    }
+  }
+
+  /** 돌/바닥 파편 (지면이 실제로 맞았을 때) */
+  shards(pos: THREE.Vector3, count: number, power: number) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, sp = power * (0.35 + Math.random());
+      this.tv.set(Math.cos(a) * sp, power * (0.5 + Math.random() * 0.9), Math.sin(a) * sp);
+      this.tp.set(pos.x + Math.cos(a) * 0.15, pos.y + 0.05, pos.z + Math.sin(a) * 0.15);
+      this.spawn('chip', this.tp, this.tv, 0.6 + Math.random() * 0.6, 0.06 + Math.random() * 0.1, 0, Math.random() < 0.5 ? Particles.stone : Particles.stoneDark, 1.0, 0.25, 11);
+    }
+  }
+
+  /**
+   * 충격 먼지 벽: 중심에서 방사형으로 낮게 퍼지는 두꺼운 먼지 (지면 충돌 전용)
+   */
+  dustWave(center: THREE.Vector3, radius: number, count: number, power: number) {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + Math.random() * 0.25;
+      const sp = power * (0.7 + Math.random() * 0.7);
+      this.tv.set(Math.cos(a) * sp, 0.25 + Math.random() * 0.9, Math.sin(a) * sp);
+      this.tp.set(center.x + Math.cos(a) * radius * 0.25, center.y + 0.06, center.z + Math.sin(a) * radius * 0.25);
+      this.spawn('dust', this.tp, this.tv, 0.9 + Math.random() * 0.9, 0.55 + Math.random() * 0.5, 1.4, Math.random() < 0.5 ? Particles.ashDust : Particles.sand, 0.2 + Math.random() * 0.1, 2.6, -0.3);
+    }
+  }
+
+  /** 먼지가 천천히 가라앉는 후속 연출: 공중에 떠올랐다가 느리게 내려앉는다 */
+  settleDust(center: THREE.Vector3, spread: number, count: number) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * spread;
+      this.tp.set(center.x + Math.cos(a) * r, center.y + 0.15 + Math.random() * 0.8, center.z + Math.sin(a) * r);
+      this.tv.set((Math.random() - 0.5) * 0.5, 0.15 + Math.random() * 0.35, (Math.random() - 0.5) * 0.5);
+      this.spawn('dust', this.tp, this.tv, 1.8 + Math.random() * 1.6, 0.7 + Math.random() * 0.6, 0.5, Particles.ashDust, 0.12 + Math.random() * 0.08, 0.9, 0.12);
     }
   }
 

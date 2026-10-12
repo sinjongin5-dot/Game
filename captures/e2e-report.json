@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-10-12T09:02:47.225Z",
+  "startedAt": "2026-10-12T09:43:53.441Z",
   "checks": [
     {
       "name": "설정 패널 열림",
@@ -74,7 +74,7 @@
     {
       "name": "W 키로 전진",
       "ok": true,
-      "detail": "moved 5.00m"
+      "detail": "moved 4.90m"
     },
     {
       "name": "F 로 락온",
@@ -179,7 +179,7 @@
     {
       "name": "재도전을 반복해도 씬 객체/지오메트리/텍스처가 누적되지 않음",
       "ok": true,
-      "detail": "[{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":2},{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":1},{\"objects\":15,\"geometries\":135,\"textures\":11,\"audioActive\":2}]"
+      "detail": "[{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":2},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":1},{\"objects\":16,\"geometries\":136,\"textures\":11,\"audioActive\":2}]"
     },
     {
       "name": "오디오 소스가 누적되지 않음",
@@ -202,6 +202,51 @@
       "detail": ""
     },
     {
+      "name": "정확한 타이밍 가드 = 패링(공격 중단, 사자 회복 상태, 피해 없음)",
+      "ok": true,
+      "detail": "{\"parry\":true,\"interrupted\":true,\"lionMode\":\"recover\",\"hp\":1000,\"impact\":\"parry\",\"trauma\":0.2833333333333333,\"riposte\":true}"
+    },
+    {
+      "name": "패링 연출 재생 + 반격 보너스 부여",
+      "ok": true,
+      "detail": "{\"i\":\"parry\",\"r\":true}"
+    },
+    {
+      "name": "카메라 충격은 상한 이내",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "일찍 든 가드는 패링이 아닌 일반 방어(공격 안 끊김, 다른 연출)",
+      "ok": true,
+      "detail": "{\"parry\":false,\"impact\":\"guard\",\"lionMode\":\"attack\"}"
+    },
+    {
+      "name": "약공격/강공격이 서로 다른 충돌 연출과 궤적을 쓴다",
+      "ok": true,
+      "detail": "{\"light\":{\"impact\":\"light\",\"trails\":1},\"heavy\":{\"impact\":\"heavy\",\"trails\":1}}"
+    },
+    {
+      "name": "처형: 발동/시네마틱/정확히 1회 명중/무적 유지",
+      "ok": true,
+      "detail": "{\"started\":true,\"cine\":true,\"hits\":1,\"execHits\":1,\"dmg\":153,\"hp\":1000,\"impact\":\"execute\",\"cineEnd\":true}"
+    },
+    {
+      "name": "처형 연출 재생 및 시네마틱 종료 후 정상 카메라 복귀",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "충격 4초 후 카메라 흔들림/FOV 펀치/화면 펄스/순간 조명이 모두 0 으로 복귀",
+      "ok": true,
+      "detail": "{\"trauma\":0,\"fov\":0.0017143683885847618,\"light\":0,\"pulse\":0,\"tension\":0.5918044945097996,\"trails\":0}"
+    },
+    {
+      "name": "공격 40회 후에도 궤적 풀/씬 오브젝트 수가 늘지 않음",
+      "ok": true,
+      "detail": "{\"size\":3,\"children\":3,\"root\":16,\"objs0\":16}"
+    },
+    {
       "name": "콘솔 오류/예외 없음",
       "ok": true,
       "detail": ""
@@ -216,20 +261,20 @@
     {
       "objCounts": [
         {
-          "objects": 15,
-          "geometries": 135,
+          "objects": 16,
+          "geometries": 136,
           "textures": 11,
           "audioActive": 2
         },
         {
-          "objects": 15,
-          "geometries": 135,
+          "objects": 16,
+          "geometries": 136,
           "textures": 11,
           "audioActive": 1
         },
         {
-          "objects": 15,
-          "geometries": 135,
+          "objects": 16,
+          "geometries": 136,
           "textures": 11,
           "audioActive": 2
         }
@@ -238,6 +283,12 @@
     {
       "victoryAttempt": {
         "seed": 15,
+        "result": "dead"
+      }
+    },
+    {
+      "victoryAttempt": {
+        "seed": 17,
         "result": "victory"
       }
     }

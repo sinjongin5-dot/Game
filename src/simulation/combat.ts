@@ -1,6 +1,6 @@
-import { LION_ATTACKS, PLAYER_ATTACKS, SWORD } from '../combat/attackData';
+import { LION_ATTACKS, PARRYABLE, PLAYER_ATTACKS, SWORD } from '../combat/attackData';
 import type { SimContext } from './context';
-import { activeWindowIndex, attackIsActive, addLionPoise, lionAttackVolume, lionHurtSpheres } from './lion';
+import { activeWindowIndex, attackIsActive, addLionPoise, interruptLionAttack, lionAttackVolume, lionHurtSpheres } from './lion';
 import { angleDiff, clamp, forward, norm2, segPointDist, segSegDist2, v2, yawOf, type V3 } from './math';
 import { bladeActive, isDodgeInvulnerable, isGuardUp, playerBladeSegment, setMode } from './player';
 import { TUNING } from './tuning';
@@ -18,6 +18,7 @@ export function resolvePlayerAttack(ctx: SimContext) {
     return;
   }
   if (l.mode === 'dying' || l.mode === 'dead') return;
+  if (p.executing) { resolveExecution(ctx); return; }
   const cur = playerBladeSegment(p);
   if (!cur) return;
   const prev = p.prevBlade ?? cur;
@@ -45,7 +46,10 @@ export function resolvePlayerAttack(ctx: SimContext) {
   p.attackHitDone = true;
   const head = best.name === 'head';
   const stunned = l.mode === 'stagger' || l.mode === 'stunned';
-  let dmg = def.damage * (head ? 1.2 : 1) * (stunned ? 1.35 : 1);
+  const riposte = ctx.time <= p.riposteUntil;
+  const run = p.runAttack;
+  const finisher = def.id === 'light3';
+  let dmg = def.damage * (head ? 1.2 : 1) * (stunned ? 1.35 : 1) * (riposte ? TUNING.parry.riposteDamage : 1) * (run ? TUNING.runAttack.damageMul : 1);
   if (l.invuln) {
     ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg: 0, heavy: def.id === 'heavy', head, stunned: false, invuln: true, dir: swingDir, killing: false, combo: p.attackChain });
     ctx.hitstop = Math.max(ctx.hitstop, 0.04);
@@ -56,11 +60,35 @@ export function resolvePlayerAttack(ctx: SimContext) {
   ctx.stats.hitsLanded++;
   const staggeredNow = l.poise + def.poise * (l.staggerImmune > 0 ? TUNING.lion.staggerImmuneGain : 1) >= TUNING.lion.poiseMax;
   // 타격 정지: 기본 + 머리 가격/경직 유발/처치 시 더 길게
-  ctx.hitstop = Math.max(ctx.hitstop, def.hitstop + (head ? 0.02 : 0) + (staggeredNow ? 0.06 : 0) + (l.hp <= 0 ? 0.22 : 0));
-  l.flinch = def.id === 'heavy' ? 1 : 0.55;
+  ctx.hitstop = Math.max(ctx.hitstop, def.hitstop + (head ? 0.02 : 0) + (staggeredNow ? 0.06 : 0) + (riposte ? TUNING.parry.riposteHitstop : 0) + (l.hp <= 0 ? 0.22 : 0));
+  // 경직 반응: 무게에 따라 크기가, 실제 휘두른 방향에 따라 방향이 정해진다 (검이 밀어낸 쪽으로 몸이 흔들린다)
+  l.flinch = def.id === 'heavy' ? 1 : finisher ? 0.75 : 0.45;
+  const away = norm2({ x: l.pos.x - p.pos.x, z: l.pos.z - p.pos.z });
+  const sw = norm2({ x: swingDir.x, z: swingDir.z });
+  l.flinchDir = norm2({ x: away.x * 0.6 + sw.x * 0.4, z: away.z * 0.6 + sw.z * 0.4 });
+  const staggered = addLionPoise(ctx, def.poise * (run ? TUNING.runAttack.poiseMul : 1) * (riposte ? 1.4 : 1));
+  if (riposte) p.riposteUntil = -1;
+  ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg, heavy: def.id === 'heavy', head, stunned: stunned || staggered, invuln: false, dir: swingDir, killing: l.hp <= 0, combo: p.attackChain, riposte, run, finisher });
+}
+
+/** 처형: 검 궤적과 무관하게 유효 구간에 들어서는 순간 한 번 반드시 명중한다 (사자는 경직 중이라 방어 불가) */
+function resolveExecution(ctx: SimContext) {
+  const p = ctx.player, l = ctx.lion;
+  p.attackHitDone = true;
+  const X = TUNING.execute;
+  const spheres = lionHurtSpheres(l);
+  const target = spheres.find((s) => s.name === 'head') ?? spheres[0];
+  const dir = norm3({ x: l.pos.x - p.pos.x, y: -0.45, z: l.pos.z - p.pos.z });
+  const pos = target ? { x: target.c.x, y: target.c.y, z: target.c.z } : { x: l.pos.x, y: 1.0, z: l.pos.z };
+  const dmg = Math.round(Math.max(X.minDamage, l.hpMax * X.hpFrac));
+  l.hp = Math.max(0, l.hp - dmg);
+  ctx.stats.hitsLanded++;
+  l.flinch = 1;
   l.flinchDir = norm2({ x: l.pos.x - p.pos.x, z: l.pos.z - p.pos.z });
-  const staggered = addLionPoise(ctx, def.poise);
-  ctx.events.push({ type: 'playerHitLion', pos: best.point, dmg, heavy: def.id === 'heavy', head, stunned: stunned || staggered, invuln: false, dir: swingDir, killing: l.hp <= 0, combo: p.attackChain });
+  l.poise = 0;
+  l.staggerImmune = Math.max(l.staggerImmune, 5);
+  ctx.hitstop = Math.max(ctx.hitstop, l.hp <= 0 ? X.killHitstop : X.hitstop);
+  ctx.events.push({ type: 'playerHitLion', pos, dmg, heavy: true, head: true, stunned: true, invuln: false, dir, killing: l.hp <= 0, combo: 0, execute: true });
 }
 
 function playerCapsule(ctx: SimContext) {
@@ -161,12 +189,21 @@ export function resolveLionAttack(ctx: SimContext) {
     p.stamina -= cost;
     p.staminaDelay = Math.max(p.staminaDelay, 0.8);
     p.guardImpact = clamp(cost / 40, 0.35, 1);
-    const kb = def.heavyHit ? 8 : 3.4;
+    // 패링: 타이밍이 정확하고 끊을 수 있는 가벼운 공격이면 공격을 중단시키고 사자를 비틀거리게 한다
+    const parry = perfect && PARRYABLE.has(a.id);
+    const kb = parry ? TUNING.parry.knockLight : def.heavyHit ? 8 : 3.4;
     p.knock = { x: away.x * kb, z: away.z * kb };
     p.invulnT = 0.2;
     a.blockedBy = true;
-    ctx.events.push({ type: 'playerBlocked', strength: p.guardImpact, pos: contact, broke: false, attack: a.id, perfect });
-    ctx.hitstop = Math.max(ctx.hitstop, perfect ? 0.1 : def.heavyHit ? 0.07 : 0.045);
+    let interrupted = false;
+    if (perfect) {
+      const staggered = addLionPoise(ctx, parry ? TUNING.parry.poiseLight : TUNING.parry.poiseHeavy, 'parry');
+      if (parry && !staggered && l.attack) { interruptLionAttack(ctx, TUNING.parry.recover); interrupted = true; }
+      if (parry) { p.riposteUntil = ctx.time + TUNING.parry.riposteWindow; l.flinch = 1; l.flinchDir = norm2({ x: -away.x, z: -away.z }); }
+      interrupted = interrupted || staggered;
+    }
+    ctx.events.push({ type: 'playerBlocked', strength: p.guardImpact, pos: contact, broke: false, attack: a.id, perfect, parry, interrupted });
+    ctx.hitstop = Math.max(ctx.hitstop, parry ? TUNING.parry.hitstop : perfect ? 0.1 : def.heavyHit ? 0.07 : 0.045);
     return;
   }
   const kb = def.heavyHit ? 7 : 3.6;
