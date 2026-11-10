@@ -1,0 +1,11 @@
+{
+  "name": "crosslink",
+  "version": "1.0.0",
+  "description": "크로스링크 — 비스트 테이머와 카드 듀얼리스트가 서로 다른 규칙으로 맞붙는 2D 크로스오버 RPG",
+  "private": true,
+  "scripts": {
+    "test": "node tools/checkworld.js && node tools/sim.js 200",
+    "sim": "node tools/sim.js",
+    "build": "node tools/build.js"
+  }
+}

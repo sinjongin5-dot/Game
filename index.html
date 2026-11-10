@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>크로스링크</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="world" width="320" height="200"></canvas>
+  <div id="hud">
+    <div id="toast"></div>
+    <button id="btn-menu" class="hud-btn">메뉴</button>
+  </div>
+  <div id="battle" class="hidden"></div>
+  <div id="overlay" class="hidden"></div>
+  <div id="dialog" class="hidden">
+    <div id="dlg-name"></div>
+    <div id="dlg-text"></div>
+    <div id="dlg-next">▼</div>
+  </div>
+  <div id="choices" class="hidden"></div>
+  <div id="title" class="hidden"></div>
+  <div id="touch" class="hidden">
+    <div id="dpad"><button data-d="up">▲</button><button data-d="left">◀</button><button data-d="right">▶</button><button data-d="down">▼</button></div>
+    <div id="abtn"><button data-k="b">B</button><button data-k="a">A</button></div>
+  </div>
+  <div id="fade"></div>
+</div>
+<!--SCRIPTS-->
+<script src="js/core.js"></script>
+<script src="js/data/beasts.js"></script>
+<script src="js/data/cards.js"></script>
+<script src="js/engine/beast.js"></script>
+<script src="js/engine/battle.js"></script>
+<script src="js/engine/ai.js"></script>
+<script src="js/data/world.js"></script>
+<script src="js/ui/sprites.js"></script>
+<script src="js/ui/main.js"></script>
+<script src="js/ui/overworld.js"></script>
+<script src="js/ui/battleui.js"></script>
+<script src="js/ui/menus.js"></script>
+<script>XG.G.boot();</script>
+<!--/SCRIPTS-->
+</body>
+</html>
