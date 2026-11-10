@@ -11,7 +11,14 @@ html = html.replace(/<!--SCRIPTS-->([\s\S]*?)<!--\/SCRIPTS-->/, (_, block) => {
   if (js.includes('</script')) throw new Error('인라인 불가: </script 포함');
   return `<script>\n${js}${boot}\n</script>`;
 });
-const out = process.argv[2] || path.join(root, 'dist', 'crosslink.html');
+// --page: 문서 뼈대(doctype/html/head/body) 없이 본문만 내보낸다 (뼈대를 따로 씌우는 호스팅용)
+const args = process.argv.slice(2), page = args.includes('--page');
+if (page) {
+  const title = html.match(/<title>[^<]*<\/title>/)[0], style = html.match(/<style>[\s\S]*?<\/style>/)[0], body = html.match(/<body>([\s\S]*)<\/body>/)[1];
+  const extra = '<style>:root{color-scheme:dark}body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}</style>';
+  html = `${title}\n<meta name="claude:viewport-fit-sides" content="cover">\n${style}\n${extra}\n${body}`;
+}
+const out = args.find((a) => !a.startsWith('--')) || path.join(root, 'dist', page ? 'crosslink-page.html' : 'crosslink.html');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log('built', out, (html.length / 1024).toFixed(0) + ' KB');

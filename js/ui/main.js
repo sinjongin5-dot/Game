@@ -188,7 +188,13 @@
     // ── 부팅 ──
     boot() {
       const stage = $('#stage');
-      const fit = () => { const s = Math.min(innerWidth / 960, innerHeight / 600); stage.style.transform = `translate(${(innerWidth - 960 * s) / 2}px, ${(innerHeight - 600 * s) / 2}px) scale(${s})`; };
+      // 화면에 맞춰 960x600 스테이지를 확대/축소. 바깥 여백(안전 영역, 좌우 거터)은 CSS 패딩에서 읽는다.
+      const fit = () => {
+        const px = (el, k) => parseFloat(getComputedStyle(el)[k]) || 0, R = document.documentElement, B = document.body;
+        const l = px(B, 'paddingLeft') + px(R, 'paddingLeft'), r = px(B, 'paddingRight') + px(R, 'paddingRight'), t = px(R, 'paddingTop') + px(B, 'paddingTop'), bt = px(R, 'paddingBottom') + px(B, 'paddingBottom');
+        const w = innerWidth - l - r, h = innerHeight - t - bt, s = Math.min(w / 960, h / 600);
+        stage.style.transform = `translate(${l + (w - 960 * s) / 2}px, ${t + (h - 600 * s) / 2}px) scale(${s})`;
+      };
       addEventListener('resize', fit); fit();
       const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', z: 'a', Enter: 'a', ' ': 'a', x: 'b', Escape: 'b', Backspace: 'b' };
       const down = (k) => { if (['up', 'down', 'left', 'right'].includes(k)) { if (!G.held.includes(k)) G.held.push(k); G.key(k); } else G.key(k); };

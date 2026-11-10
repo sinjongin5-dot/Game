@@ -1,7 +1,7 @@
 :root{--bg:#0c0a14;--panel:#1c1830;--panel2:#262040;--line:#4a4270;--ink:#f2efe6;--dim:#a8a2c0;--gold:#f2c94c;--good:#6fd67a;--bad:#f06a6a;--mon:#c9a66b;--fxm:#d9824a;--spell:#2f9a8a;--trap:#b0478a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;color:var(--ink);user-select:none;-webkit-user-select:none;touch-action:manipulation}
-#stage{position:absolute;left:0;top:0;width:960px;height:600px;transform-origin:0 0;overflow:hidden;background:#000}
+#stage{position:fixed;left:0;top:0;width:960px;height:600px;transform-origin:0 0;overflow:hidden;background:#000}
 .hidden{display:none!important}
 img,canvas{image-rendering:pixelated}
 button{font-family:inherit;color:inherit;cursor:pointer}
