@@ -105,7 +105,7 @@
       if (m.hidden) return `<div class="fc back def"></div><div class="fz-stat">세트</div>`;
       const c = X.CARDS[m.id];
       const cls = (cur, base) => (cur > base ? 'up' : cur < base ? 'dn' : '');
-      return `<div class="fc k-mon${c.text ? ' fxm' : ''}${m.pos === 'def' ? ' def' : ''}${m.faceDown ? ' own-fd' : ''}"><div class="c-art"><img src="${A.cardUrl(m.id)}"></div><i class="attr" style="background:${X.TYPES[c.attr].color}"></i>${m.status ? `<span class="st st-${m.status}">${X.STATUS[m.status]}</span>` : ''}</div>
+      return `<img class="holo${m.pos === 'def' ? ' hd' : ''}${m.faceDown ? ' fdn' : ''}" style="--hc:${X.TYPES[c.attr].color}" src="${A.cardUrl(m.id)}"><div class="fc k-mon${c.text ? ' fxm' : ''}${m.pos === 'def' ? ' def' : ''}${m.faceDown ? ' own-fd' : ''}"><div class="c-art"><img src="${A.cardUrl(m.id)}"></div><i class="attr" style="background:${X.TYPES[c.attr].color}"></i></div>${m.status ? `<span class="st st-${m.status} zst">${X.STATUS[m.status]}</span>` : ''}
         <div class="fz-name">${m.faceDown ? '(세트) ' : ''}${c.name}</div><div class="fz-stat"><b class="${cls(m.a, c.atk)}${m.pos === 'atk' ? ' cur' : ''}">${m.a}</b> / <b class="${cls(m.d, c.def)}${m.pos === 'def' ? ' cur' : ''}">${m.d}</b></div>`;
     },
     stHTML(t) {

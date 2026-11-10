@@ -209,6 +209,12 @@
       case 'p': floor(); R(5, 10, 6, 5, '#b86a48'); g.fillStyle = '#3f9a48'; g.beginPath(); g.arc(8, 6, 5, 0, 7); g.fill(); R(6, 3, 2, 2, '#62bf5c'); break;
       case 'z': fill('#e8e0d0'); R(4, 11, 8, 4, '#a8a294'); R(6, 3, 4, 8, '#c8c2b4'); R(5, 1, 6, 4, '#d8d2c4'); R(4, 11, 8, 1, '#c8c2b4'); break;
       case 'e': fill('#2a2438'); R(0, 0, 16, 1, '#f5e79a'); R(0, 15, 16, 1, '#f5e79a'); R(7, 0, 2, 16, '#3a3450'); break; // 듀얼 필드 바닥
+      case '1': fill('#8f897c'); dots('#7d776b', 9, 2, 1); dots('#a59f92', 5); break; // 바위 지대 바닥
+      case '2': fill('#2a2230'); dots('#221a28', 8, 2, 2); break; // 동굴 벽 밑
+      case '3': fill('#5a5248'); break; // 건물 기초
+      case '4': fill('#cfc6b4'); R(0, 0, 16, 1, '#b5ac9a'); R(7, 0, 1, 16, '#bdb4a2'); R(0, 8, 16, 1, '#bdb4a2'); break; // 현관 포장
+      case '5': fill('#cfc6b4'); R(2, 2, 12, 12, '#b0473a'); R(4, 4, 8, 8, '#d06a5a'); break; // 현관 매트
+      case '6': fill('#2c2440'); break; // 실내 벽 밑
       default: fill('#ff00ff');
     }
     return (tileCache[key] = cv);
@@ -272,9 +278,63 @@
     return (charCache[key] = cv);
   }
 
+  // ── 2.5D 소품: 지면 위에 세워지는 스프라이트 (폭 16px, 높이 가변) ──
+  const PROP_H = { T: 30, '^': 24, '#': 26, f: 12, S: 16, C: 24, ':': 7, xb: 30, xs: 8, k: 26, p: 22, t: 11, c: 13, h: 22, z: 26 };
+  const propCache = {};
+  function prop(key) {
+    if (propCache[key]) return propCache[key];
+    const h = PROP_H[key], cv = mk(16, h), g = cv.getContext('2d');
+    const R = (x, y, w, hh, c) => { g.fillStyle = c; g.fillRect(x, y, w, hh); };
+    const Cc = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+    switch (key) {
+      case 'T': R(6, 21, 4, 9, '#6a4428'); R(6, 21, 1, 9, '#8a5c38'); Cc(8, 12, 8, '#256e30'); Cc(8, 10, 7.5, '#2f8a3c'); Cc(6, 7, 4.5, '#48a850'); Cc(11, 13, 3.5, '#1f5f2a'); R(4, 5, 2, 1, '#7ad070'); R(6, 4, 2, 1, '#7ad070'); break;
+      case '^': R(0, 5, 16, 19, '#827c70'); g.fillStyle = '#9a9488'; g.beginPath(); g.moveTo(0, 8); g.lineTo(4, 1); g.lineTo(8, 6); g.lineTo(12, 0); g.lineTo(16, 7); g.lineTo(16, 12); g.lineTo(0, 12); g.fill(); R(3, 3, 1, 6, '#b8b2a4'); R(11, 2, 1, 7, '#b8b2a4'); R(0, 20, 16, 4, '#69645a'); R(6, 12, 1, 7, '#69645a'); R(13, 14, 1, 6, '#69645a'); break;
+      case '#': R(0, 0, 16, 26, '#3f3446'); R(0, 0, 16, 3, '#66566a'); R(0, 3, 16, 1, '#2a2230'); R(4, 7, 1, 9, '#2a2230'); R(11, 12, 1, 10, '#2a2230'); R(7, 16, 3, 1, '#2a2230'); R(0, 22, 16, 4, '#2a2230'); R(1, 9, 2, 1, '#5a4c5c'); R(12, 6, 2, 1, '#5a4c5c'); break;
+      case 'f': R(0, 3, 16, 2, '#d0a878'); R(0, 7, 16, 2, '#b89060'); R(2, 0, 3, 12, '#a07848'); R(11, 0, 3, 12, '#a07848'); R(2, 0, 3, 1, '#d0a878'); R(11, 0, 3, 1, '#d0a878'); break;
+      case 'S': R(7, 8, 2, 8, '#6a4428'); R(1, 1, 14, 8, '#c8a070'); R(1, 1, 14, 1, '#e8c898'); R(1, 8, 14, 1, '#8a6038'); R(3, 3, 10, 1, '#6a4428'); R(3, 5, 7, 1, '#6a4428'); break;
+      case 'C': R(0, 0, 16, 24, '#827c70'); R(0, 0, 16, 3, '#9a9488'); Cc(8, 13, 7, '#141018'); R(1, 13, 14, 11, '#141018'); R(3, 20, 10, 4, '#2a2230'); break;
+      case ':': g.fillStyle = '#2c7a38'; for (let x = 0; x < 16; x += 2) g.fillRect(x, (x * 7) % 3, 1, 7); g.fillStyle = '#58b85a'; for (let x = 1; x < 16; x += 4) g.fillRect(x, 1 + (x % 3), 1, 6); break;
+      case 'xb': R(0, 0, 16, 30, '#75658e'); R(0, 0, 16, 3, '#9484ae'); R(0, 24, 16, 6, '#4c3e64'); R(0, 23, 16, 1, '#3a2e50'); R(7, 4, 1, 18, '#685880'); R(15, 4, 1, 18, '#685880'); break;
+      case 'xs': R(0, 0, 16, 8, '#4c3e64'); R(0, 0, 16, 2, '#75658e'); break;
+      case 'k': R(0, 0, 16, 26, '#5a3820'); R(0, 0, 16, 2, '#8a6038'); for (let y = 3; y < 24; y += 7) { R(1, y, 14, 6, '#24160c'); let x = 1; for (const c of ['#c84040', '#4070c8', '#48a850', '#e0b030', '#8a50b8', '#e8e8e8', '#d07030']) { R(x, y + (x % 3 ? 0 : 1), 2, 6 - (x % 3 ? 0 : 1), c); x += 2; } } break;
+      case 'p': R(4, 14, 8, 8, '#b86a48'); R(4, 14, 8, 2, '#d08a68'); Cc(8, 8, 6.5, '#2f8a3c'); Cc(6, 6, 3.5, '#58b85a'); Cc(11, 10, 3, '#256e30'); break;
+      case 't': R(0, 0, 16, 5, '#c89868'); R(0, 0, 16, 1, '#e8b888'); R(0, 5, 16, 2, '#8a5c38'); R(1, 7, 2, 4, '#6a4428'); R(13, 7, 2, 4, '#6a4428'); break;
+      case 'c': R(0, 0, 16, 4, '#d8a878'); R(0, 0, 16, 1, '#f0c898'); R(0, 4, 16, 9, '#8a5a3a'); R(0, 4, 16, 1, '#6a4428'); R(7, 6, 1, 6, '#74482c'); break;
+      case 'h': R(1, 2, 14, 20, '#dcdce8'); R(1, 2, 14, 2, '#f8f8ff'); R(3, 6, 10, 7, '#28324a'); R(4, 7, 8, 5, '#58d0c0'); R(7, 8, 2, 3, '#fff'); R(6, 9, 4, 1, '#fff'); R(3, 15, 3, 2, '#f090a8'); R(8, 15, 5, 2, '#a8a8b8'); R(1, 20, 14, 2, '#a8a8b8'); break;
+      case 'z': R(3, 20, 10, 6, '#a8a294'); R(3, 20, 10, 1, '#c8c2b4'); R(5, 8, 6, 12, '#c8c2b4'); Cc(8, 5, 3.5, '#d8d2c4'); R(3, 9, 2, 7, '#b8b2a4'); R(11, 9, 2, 7, '#b8b2a4'); R(5, 8, 1, 12, '#e0dacc'); break;
+    }
+    return (propCache[key] = { url: cv.toDataURL(), h });
+  }
+  // 건물 정면 벽 텍스처: 창문/문/간판을 한 장에 그린다 (칸당 16x24)
+  function wallTex(chars, kinds) {
+    const n = chars.length, cv = mk(n * 16, 24), g = cv.getContext('2d');
+    const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    R(0, 0, n * 16, 24, '#f2e6cc'); R(0, 0, n * 16, 2, '#c8b898'); R(0, 20, n * 16, 4, '#b8a888'); R(0, 0, 1, 24, '#d8c8a8'); R(n * 16 - 1, 0, 1, 24, '#d8c8a8');
+    for (let i = 0; i < n; i++) {
+      const x = i * 16, c = chars[i];
+      if (c === 'w') { R(x + 3, 6, 10, 10, '#3a4a78'); R(x + 4, 7, 8, 8, '#6a9ad8'); R(x + 7.5, 7, 1, 8, '#3a4a78'); R(x + 4, 10.5, 8, 1, '#3a4a78'); R(x + 5, 8, 2, 2, '#c8e4ff'); R(x + 2, 16, 12, 1, '#c8b898'); }
+      else if (c === 'D') {
+        R(x + 3, 9, 10, 15, '#5a3820'); R(x + 4, 10, 8, 14, '#a06a40'); R(x + 4, 10, 8, 1, '#c08a58'); R(x + 10, 17, 1, 2, '#f2c318');
+        const k = kinds[i]; if (!k) continue;
+        const P = (a, b, w, h, col) => R(x + 2 + a, -1 + b, w, h, col);
+        P(-1, 0, 14, 10, '#1a1626'); P(0, 1, 12, 8, '#f8f4e8');
+        if (k === 'heal') { P(5, 2, 2, 6, '#e03a5a'); P(3, 4, 6, 2, '#e03a5a'); }
+        else if (k === 'mart') { P(3, 2, 6, 6, '#e0a820'); P(5, 3, 2, 4, '#fff3c0'); }
+        else if (k === 'cards') { P(2, 2, 5, 6, '#8a58c0'); P(5, 3, 5, 5, '#2f9a8a'); P(7, 4, 1, 3, '#fff'); }
+        else if (k === 'gym') { P(2, 5, 8, 3, '#3f9a48'); P(2, 2, 2, 2, '#3f9a48'); P(5, 2, 2, 2, '#3f9a48'); P(8, 2, 2, 2, '#3f9a48'); }
+        else if (k === 'hall') { P(3, 2, 6, 6, '#3a2a58'); P(5, 3, 2, 4, '#f2c94c'); P(4, 4, 4, 2, '#f2c94c'); }
+        else if (k === 'arena') { P(2, 2, 8, 3, '#e0a820'); P(4, 5, 4, 2, '#e0a820'); P(3, 7, 6, 1, '#8a6a20'); }
+        else { P(5, 2, 2, 2, '#58b0e8'); P(3, 4, 6, 4, '#58b0e8'); P(4, 5, 2, 2, '#d6f0ff'); }
+      }
+    }
+    return cv.toDataURL();
+  }
+
   const artCache = {}, urlCache = {};
   X.Art = {
-    TILE, drawTile, drawChar, LOOKS,
+    TILE, drawTile, drawChar, LOOKS, prop, wallTex,
+    tileUrl(ch) { return urlCache['t' + ch] || (urlCache['t' + ch] = drawTile(ch, 0).toDataURL()); },
+    charFrame(look, dir, f) { const k = 'f' + look + dir + f; return urlCache[k] || (urlCache[k] = drawChar(look, dir, f).toDataURL()); },
     beast(id) { return artCache['b' + id] || (artCache['b' + id] = creature(X.BEASTS[id].look)); },
     card(id) { const c = X.CARDS[id]; return artCache['c' + id] || (artCache['c' + id] = c.kind === 'mon' ? creature(c.look) : icon(c.icon)); },
     beastUrl(id) { return urlCache['b' + id] || (urlCache['b' + id] = this.beast(id).toDataURL()); },

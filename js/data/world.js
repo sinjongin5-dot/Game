@@ -29,7 +29,7 @@
     const cx = Math.floor(w / 2);
     rows[h - 1][cx] = 'm';
     for (const [x, y, ch] of items) rows[y][x] = ch;
-    MAPS[id] = { id, name, indoor: true, tiles: rows.map((r) => r.join('')), npcs, warps: [{ x: cx, y: h - 1, to: exit[0], tx: exit[1], ty: exit[2], dir: 'down' }], entry: [cx, h - 2] };
+    MAPS[id] = { id, name, indoor: true, floor: fl, tiles: rows.map((r) => r.join('')), npcs, warps: [{ x: cx, y: h - 1, to: exit[0], tx: exit[1], ty: exit[2], dir: 'down' }], entry: [cx, h - 2] };
     return id;
   }
   const door = (x, y, to) => ({ x, y, to, door: true });

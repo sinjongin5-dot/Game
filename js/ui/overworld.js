@@ -1,20 +1,40 @@
-// 필드: 타일맵 렌더링, 이동, NPC 상호작용/시야, 워프, 야생 조우
+// 필드 (2.5D): CSS 3D 장면 — 기울어진 지면, 입체 건물, 카메라를 향해 서 있는 나무·소품·캐릭터.
+// 게임 로직(이동, NPC 시야, 워프, 조우)은 타일 좌표 그대로이고, 그리는 방식만 3D다.
 (function (root) {
-  const X = root.XG, G = X.G, A = X.Art, T = 16;
+  const X = root.XG, G = X.G, A = X.Art, el = X.el;
   const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
   const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
-  const STEP = 150; // 한 칸 이동 시간(ms)
+  const STEP = 150;          // 한 칸 이동 시간(ms)
+  const TS = 48, PX = 3;     // 지면 위 타일 크기, 픽셀 아트 배율
+  const TILT = 50 * Math.PI / 180, CO = Math.cos(TILT), SI = Math.sin(TILT);
+  const ROOF = 'RBPGYH', WALL = 'WwD';
+  const FEET = 0.82;         // 캐릭터가 타일 안에서 서는 깊이 (같은 칸의 풀숲 뒤에 서도록)
+
+  // 3D 면 하나: 왼쪽 위 꼭짓점 o에서 u(가로)·v(세로 아래 방향) 축으로 펼친다.
+  function face(w, h, o, u, v, cls, css) {
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const d = el('div', 'f3 ' + (cls || ''));
+    d.style.cssText = `width:${w}px;height:${h}px;transform:matrix3d(${u[0]},${u[1]},${u[2]},0,${v[0]},${v[1]},${v[2]},0,${n[0]},${n[1]},${n[2]},0,${o[0]},${o[1]},${o[2]},1);${css || ''}`;
+    return d;
+  }
+  // 카메라를 향해 서는 판(빌보드). (x, y)는 지면 위 밑변 왼쪽 끝.
+  const boardM = (x, y, h) => `matrix3d(1,0,0,0,0,${CO},${-SI},0,0,${SI},${CO},0,${x},${y - h * CO},${h * SI},1)`;
+  function board(x, y, w, h, cls, css) { const d = el('div', 'f3 ' + (cls || '')); d.style.cssText = `width:${w}px;height:${h}px;transform:${boardM(x, y, h)};${css || ''}`; return d; }
 
   const OW = (X.OW = {
-    map: null, npcs: [], pl: { x: 0, y: 0, dir: 'down', fx: 0, fy: 0, t: 0, moving: false }, time: 0, bang: null,
+    map: null, npcs: [], pl: { x: 0, y: 0, dir: 'down', t: 0, moving: false }, time: 0, bang: null,
 
     init() {
-      this.cv = document.querySelector('#world');
-      this.g = this.cv.getContext('2d');
-      this.g.imageSmoothingEnabled = false;
-      let last = performance.now();
+      this.scene = document.querySelector('#scene');
+      this.plane = document.querySelector('#plane');
       const touch = document.querySelector('#touch'), ov = document.querySelector('#overlay');
-      const loop = (now) => { const dt = Math.min(50, now - last); last = now; if (G.scene === 'world') { this.update(dt); this.draw(); } touch.style.visibility = G.scene === 'world' && ov.classList.contains('hidden') ? '' : 'hidden'; requestAnimationFrame(loop); };
+      let last = performance.now();
+      const loop = (now) => {
+        const dt = Math.min(50, now - last); last = now;
+        if (G.scene === 'world') { this.update(dt); this.draw(); }
+        touch.style.visibility = G.scene === 'world' && ov.classList.contains('hidden') ? '' : 'hidden';
+        requestAnimationFrame(loop);
+      };
       requestAnimationFrame(loop);
     },
 
@@ -22,13 +42,111 @@
       const m = (this.map = X.WORLD.maps[id]), p = G.p;
       Object.assign(this.pl, { x, y, dir: dir || 'down', moving: false, t: 0 });
       p.map = id; p.x = x; p.y = y; p.dir = this.pl.dir;
+      this.build();
       this.refreshNpcs();
       if (this._name !== m.name) { this._name = m.name; G.toast(m.name, 2200); }
     },
-    refreshNpcs() { if (this.map) this.npcs = this.map.npcs.filter((n) => !n.show || n.show(G)); },
     tile(x, y) { const m = this.map; return x < 0 || y < 0 || x >= m.w || y >= m.h ? null : m.tiles[y][x]; },
     npcAt(x, y) { return this.npcs.find((n) => n.x === x && n.y === y); },
     passable(x, y) { const c = this.tile(x, y); return c != null && !X.BLOCK.includes(c) && !this.npcAt(x, y); },
+
+    // ── 장면 구성 ──
+    // 세워지는 타일의 밑바닥에 깔 평면 타일
+    base(ch) {
+      const m = this.map;
+      if ('TfS:'.includes(ch)) return ch === ':' ? ':' : '.';
+      if (ch === '^' || ch === 'C') return '1';
+      if (ch === '#') return '2';
+      if (ROOF.includes(ch)) return '3';
+      if (ch === 'W' || ch === 'w') return '4';
+      if (ch === 'D') return '5';
+      if (ch === 'x') return '6';
+      if ('kptchz'.includes(ch)) return m.floor || 'o';
+      return ch;
+    },
+    propKey(ch, x, y) {
+      const m = this.map;
+      if (ch === 'x') return y === m.h - 1 ? 'xs' : 'xb';
+      return 'T^#fSC:kptchz'.includes(ch) ? ch : null;
+    },
+    build() {
+      const m = this.map, pl = this.plane;
+      pl.innerHTML = '';
+      this.scene.className = 'bg-' + (m.bg || 'indoor');
+      // 지면
+      const gc = document.createElement('canvas');
+      gc.width = m.w * 16; gc.height = m.h * 16; gc.className = 'ground';
+      gc.style.width = m.w * TS + 'px'; gc.style.height = m.h * TS + 'px';
+      const g = (this.gctx = gc.getContext('2d'));
+      this.anim = [];
+      for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
+        const b = this.base(m.tiles[y][x]);
+        g.drawImage(A.drawTile(b, 0), x * 16, y * 16);
+        if (b === '~') this.anim.push([x, y]);
+      }
+      pl.appendChild(gc);
+      // 세워지는 소품: 같은 줄에 이어진 것은 한 장의 띠로 묶는다
+      const sh = (x, y, w, h, a) => { g.fillStyle = `rgba(10,8,24,${a})`; g.beginPath(); g.ellipse(x, y, w, h, 0, 0, 7); g.fill(); };
+      for (let y = 0; y < m.h; y++) {
+        for (let x = 0; x < m.w;) {
+          const k = this.propKey(m.tiles[y][x], x, y);
+          if (!k) { x++; continue; }
+          let n = 1;
+          while (x + n < m.w && this.propKey(m.tiles[y][x + n], x + n, y) === k) n++;
+          const P = A.prop(k), h = P.h * PX;
+          pl.appendChild(board(x * TS, (y + (k === ':' ? 1 : 0.98)) * TS, n * TS, h, 'prop p-' + (k === ':' ? 'grass' : k), `background-image:url(${P.url});background-size:${TS}px ${h}px`));
+          if (k === 'T' || k === 'p' || k === 'z') for (let i = 0; i < n; i++) sh((x + i) * 16 + 9, y * 16 + 15, 7, 2.5, 0.25);
+          x += n;
+        }
+      }
+      // 건물: 지붕 줄 영역을 3D 상자로 올린다 (정면 벽 + 박공 지붕 + 옆벽)
+      for (let y = 1; y < m.h; y++) {
+        for (let x = 0; x < m.w;) {
+          if (!WALL.includes(m.tiles[y][x]) || !ROOF.includes(m.tiles[y - 1][x])) { x++; continue; }
+          let n = 1;
+          while (x + n < m.w && WALL.includes(m.tiles[y][x + n])) n++;
+          let rows = 0;
+          while (y - 1 - rows >= 0 && ROOF.includes(m.tiles[y - 1 - rows][x])) rows++;
+          this.building(x, y, n, rows, g);
+          x += n;
+        }
+      }
+      // 플레이어
+      this.plShadow = el('div', 'f3 shadow3');
+      this.plEl = el('div', 'f3 ent');
+      pl.appendChild(this.plShadow); pl.appendChild(this.plEl);
+      this.npcEls = [];
+      this._plKey = '';
+    },
+    building(x, y, n, rows, g) {
+      const m = this.map, pl = this.plane, rc = m.tiles[y - 1][x];
+      const X0 = x * TS, W = n * TS, yF = y * TS, D = rows * TS, yB = yF - D, H = 72, R = Math.min(46, D * 0.42), L = Math.hypot(D / 2, R);
+      const chars = m.tiles[y].slice(x, x + n);
+      const kinds = [...chars].map((c, i) => { const w = m.warps.find((v) => v.door && v.x === x + i && v.y === y); return w ? ['heal', 'mart', 'cards', 'gym', 'hall', 'arena', 'lab'].find((k) => w.to.includes(k)) || null : null; });
+      const roof = `background-image:url(${A.tileUrl(rc)});background-size:${TS}px ${TS}px`;
+      const gable = `clip-path:polygon(0 ${R}px,50% 0,100% ${R}px,100% 100%,0 100%)`;
+      pl.appendChild(face(D, H + R, [X0, yB, H + R], [0, 1, 0], [0, 0, -1], 'bw-side', gable));
+      pl.appendChild(face(D, H + R, [X0 + W, yB, H + R], [0, 1, 0], [0, 0, -1], 'bw-side', gable));
+      pl.appendChild(face(W, H, [X0, yB, H], [1, 0, 0], [0, 0, -1], 'bw-side'));
+      pl.appendChild(face(W, L, [X0, yB, H], [1, 0, 0], [0, D / 2 / L, R / L], 'bw-roof back', roof));
+      pl.appendChild(face(W + 12, L + 8, [X0 - 6, yF - D / 2, H + R], [1, 0, 0], [0, D / 2 / L, -R / L], 'bw-roof', roof));
+      pl.appendChild(face(W, H, [X0, yF, H], [1, 0, 0], [0, 0, -1], 'bw-front', `background-image:url(${A.wallTex(chars, kinds)});background-size:100% 100%`));
+      g.fillStyle = 'rgba(10,8,24,0.28)'; g.fillRect(x * 16 + n * 16, (y - rows) * 16 + 4, 5, rows * 16);
+    },
+    refreshNpcs() {
+      if (!this.map) return;
+      this.npcs = this.map.npcs.filter((n) => !n.show || n.show(G));
+      for (const e of this.npcEls || []) e.remove();
+      this.npcEls = [];
+      for (const n of this.npcs) {
+        const px = n.x * TS, py = (n.y + FEET) * TS;
+        const s = el('div', 'f3 shadow3'); s.style.transform = `translate3d(${px + 6}px,${py - 9}px,1px)`;
+        const d = n.beast ? board(px - 12, py, 72, 72, 'ent beast', `background-image:url(${A.beastUrl(n.beast)})`) : board(px, py, TS, TS, 'ent', `background-image:url(${A.charFrame(n.look, n.dir, 0)})`);
+        d._npc = n; d._dir = n.dir;
+        this.plane.appendChild(s); this.plane.appendChild(d);
+        this.npcEls.push(s, d);
+      }
+    },
 
     update(dt) {
       const pl = this.pl;
@@ -51,7 +169,7 @@
     onStep() {
       const pl = this.pl, m = this.map;
       const w = m.warps.find((v) => v.x === pl.x && v.y === pl.y);
-      if (w) return G.run(async () => { await G.fade(true); this.load(w.to, w.tx, w.ty, w.dir); await G.fade(false); });
+      if (w) return G.run(async () => { await G.fade(true); this.load(w.to, w.tx, w.ty, w.dir); this.draw(); await G.fade(false); });
       // 트레이너의 시야
       for (const n of this.npcs) {
         if (!n.sight || G.p.defeated[n.id]) continue;
@@ -78,7 +196,7 @@
 
     interact() {
       const pl = this.pl, [dx, dy] = DIRS[pl.dir];
-      let x = pl.x + dx, y = pl.y + dy;
+      const x = pl.x + dx, y = pl.y + dy;
       let n = this.npcAt(x, y);
       if (!n && this.tile(x, y) === 'c') n = this.npcAt(x + dx, y + dy); // 카운터 너머
       if (n) return G.run(async () => { if (n.look) n.dir = OPP[pl.dir]; G.sfx('sel'); await n.script(G, n); });
@@ -89,53 +207,33 @@
       if (c === 'h' && !this.map.id.includes('heal')) return G.run(() => G.say('무언가를 분석하는 기계다. 화면에 "LINK"라는 글자가 깜빡인다.'));
     },
 
-    // 건물 용도를 알려 주는 문 위 간판
-    doorIcon(g, to, x, y) {
-      const kind = ['heal', 'mart', 'cards', 'gym', 'hall', 'arena', 'lab'].find((k) => to.includes(k));
-      if (!kind) return;
-      const R = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(x + a, y + b, w, h); };
-      R(-1, -1, 14, 12, '#1a1626'); R(0, 0, 12, 10, '#f8f4e8');
-      if (kind === 'heal') { R(5, 1, 2, 8, '#e03a5a'); R(2, 4, 8, 2, '#e03a5a'); }
-      else if (kind === 'mart') { R(3, 2, 6, 6, '#e0a820'); R(4, 1, 4, 8, '#e0a820'); R(5, 3, 2, 4, '#fff3c0'); }
-      else if (kind === 'cards') { R(2, 1, 5, 7, '#8a58c0'); R(5, 2, 5, 7, '#2f9a8a'); R(7, 4, 1, 3, '#fff'); }
-      else if (kind === 'gym') { R(2, 5, 8, 4, '#3f9a48'); R(1, 2, 2, 2, '#3f9a48'); R(4, 1, 2, 2, '#3f9a48'); R(7, 1, 2, 2, '#3f9a48'); R(9, 3, 2, 2, '#3f9a48'); }
-      else if (kind === 'hall') { R(3, 1, 6, 8, '#3a2a58'); R(5, 3, 2, 4, '#f2c94c'); R(4, 4, 4, 2, '#f2c94c'); }
-      else if (kind === 'arena') { R(2, 1, 8, 4, '#e0a820'); R(4, 5, 4, 2, '#e0a820'); R(5, 7, 2, 1, '#e0a820'); R(3, 8, 6, 1, '#8a6a20'); }
-      else { R(5, 1, 2, 3, '#58b0e8'); R(3, 4, 6, 5, '#58b0e8'); R(4, 5, 2, 2, '#d6f0ff'); }
-    },
-
     draw() {
-      const g = this.g, m = this.map, pl = this.pl, VW = 320, VH = 200;
+      const m = this.map, pl = this.pl;
       if (!m) return;
       const f = pl.moving ? pl.t / STEP : 0;
-      const px = (pl.x + DIRS[pl.dir][0] * f) * T, py = (pl.y + DIRS[pl.dir][1] * f) * T;
-      const mw = m.w * T, mh = m.h * T;
-      const cx = mw <= VW ? (mw - VW) / 2 : Math.max(0, Math.min(mw - VW, px + 8 - VW / 2));
-      const cy = mh <= VH ? (mh - VH) / 2 : Math.max(0, Math.min(mh - VH, py + 8 - VH / 2));
-      const ox = -Math.round(cx), oy = -Math.round(cy);
-      g.fillStyle = m.indoor ? '#15121f' : '#2f8a3c';
-      g.fillRect(0, 0, VW, VH);
-      const frame = Math.floor(this.time / 500) % 2;
-      const x0 = Math.max(0, Math.floor(cx / T)), x1 = Math.min(m.w - 1, Math.ceil((cx + VW) / T));
-      const y0 = Math.max(0, Math.floor(cy / T)), y1 = Math.min(m.h - 1, Math.ceil((cy + VH) / T));
-      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) g.drawImage(A.drawTile(m.tiles[y][x], frame), x * T + ox, y * T + oy);
-      for (const w of m.warps) if (w.door) this.doorIcon(g, w.to, w.x * T + ox + 2, (w.y - 1) * T + oy + 3);
-      // 캐릭터 (y 순서로 정렬)
-      const ents = this.npcs.map((n) => ({ y: n.y * T, n }));
-      ents.push({ y: py, me: true });
-      ents.sort((a, b) => a.y - b.y);
-      for (const e of ents) {
-        if (e.me) {
-          g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(Math.round(px) + 3 + ox, Math.round(py) + 12 + oy, 10, 3);
-          g.drawImage(A.drawChar('hero', pl.dir, pl.moving ? Math.floor(pl.t / 75) % 2 : 0), Math.round(px) + ox, Math.round(py) - 4 + oy);
-        } else {
-          const n = e.n, sx = n.x * T + ox, sy = n.y * T + oy;
-          g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(sx + 3, sy + 12, 10, 3);
-          if (n.beast) g.drawImage(A.beast(n.beast), sx - 4, sy - 10 + (frame ? 1 : 0), 24, 24);
-          else g.drawImage(A.drawChar(n.look, n.dir, 0), sx, sy - 4);
-          if (this.bang === n) { g.fillStyle = '#fff'; g.fillRect(sx + 5, sy - 17, 7, 11); g.fillStyle = '#e03a3a'; g.fillRect(sx + 7, sy - 15, 3, 5); g.fillRect(sx + 7, sy - 9, 3, 2); }
-        }
+      const px = (pl.x + DIRS[pl.dir][0] * f) * TS, py = (pl.y + DIRS[pl.dir][1] * f + FEET) * TS;
+      // 카메라: 실내는 방 중앙 고정, 실외는 플레이어를 따라가되 맵 가장자리에서 멈춘다
+      const mw = m.w * TS, mh = m.h * TS;
+      let cx, cy;
+      if (m.indoor) { cx = mw / 2; cy = mh / 2 + 30; }
+      else { cx = Math.max(380, Math.min(mw - 380, px + TS / 2)); cy = Math.max(200, Math.min(mh - 120, py)); }
+      this.plane.style.transform = `translate3d(${-cx}px,${-cy}px,0)`;
+      // 플레이어
+      const bob = pl.moving ? Math.abs(Math.sin((pl.t / STEP) * Math.PI)) * 4 : 0;
+      this.plEl.style.transform = boardM(px, py, TS + bob * 2);
+      this.plShadow.style.transform = `translate3d(${px + 6}px,${py - 9}px,1px)`;
+      const key = pl.dir + (pl.moving ? Math.floor(pl.t / 75) % 2 : 0);
+      if (key !== this._plKey) { this._plKey = key; this.plEl.style.backgroundImage = `url(${A.charFrame('hero', pl.dir, pl.moving ? Math.floor(pl.t / 75) % 2 : 0)})`; }
+      // NPC 방향/느낌표
+      for (const e of this.npcEls) {
+        const n = e._npc;
+        if (!n) continue;
+        if (n.look && e._dir !== n.dir) { e._dir = n.dir; e.style.backgroundImage = `url(${A.charFrame(n.look, n.dir, 0)})`; }
+        e.classList.toggle('bang', this.bang === n);
       }
+      // 물결
+      const fr = Math.floor(this.time / 500) % 2;
+      if (fr !== this._fr) { this._fr = fr; for (const [x, y] of this.anim) this.gctx.drawImage(A.drawTile('~', fr), x * 16, y * 16); }
     },
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

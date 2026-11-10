@@ -1,11 +1,26 @@
 :root{--bg:#0c0a14;--panel:#1c1830;--panel2:#262040;--line:#4a4270;--ink:#f2efe6;--dim:#a8a2c0;--gold:#f2c94c;--good:#6fd67a;--bad:#f06a6a;--mon:#c9a66b;--fxm:#d9824a;--spell:#2f9a8a;--trap:#b0478a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;color:var(--ink);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;font-family:"Noto Sans KR","Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;color:var(--ink);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 #stage{position:fixed;left:0;top:0;width:960px;height:600px;transform-origin:0 0;overflow:hidden;background:#000}
 .hidden{display:none!important}
 img,canvas{image-rendering:pixelated}
 button{font-family:inherit;color:inherit;cursor:pointer}
-#world{position:absolute;inset:0;width:960px;height:600px}
+/* ── 2.5D 필드 장면 ── */
+#scene{position:absolute;inset:0;overflow:hidden;perspective:1000px;perspective-origin:50% 36%;background:var(--sky);--sky:#9fd4f5;--void:#2f7a3c}
+#scene.bg-forest{--sky:#5f9a80;--void:#1f5a30}#scene.bg-coast{--sky:#a8dcf8;--void:#3f8ee8}#scene.bg-cave{--sky:#0c0a14;--void:#1a1622}#scene.bg-city{--sky:#cbbdf0;--void:#3a8a48}#scene.bg-indoor{--sky:#0e0b18;--void:#15121f}
+#cam{position:absolute;left:480px;top:410px;transform-style:preserve-3d;transform:rotateX(50deg)}
+#plane{position:absolute;left:0;top:0;transform-style:preserve-3d}
+#plane::before{content:"";position:absolute;left:-3000px;top:-3000px;width:8000px;height:8000px;background:var(--void);transform:translateZ(-3px)}
+.ground{position:absolute;left:0;top:0;image-rendering:pixelated}
+.f3{position:absolute;left:0;top:0;transform-origin:0 0;image-rendering:pixelated;background-repeat:repeat-x}
+.ent{width:48px;height:48px;background-size:100% 100%;background-repeat:no-repeat;filter:drop-shadow(0 0 1px rgba(0,0,0,.4))}
+
+.shadow3{width:36px;height:16px;border-radius:50%;background:rgba(10,8,24,.38)}
+.ent.bang::after{content:"!";position:absolute;left:50%;top:-30px;transform:translateX(-50%);background:#fff;color:#e03a3a;font:900 20px/1.2 sans-serif;border:2px solid #1a1626;border-radius:7px;padding:0 8px}
+.bw-side{background:#d9cdb2;filter:brightness(.74)}.bw-roof.back{filter:brightness(.66)}.bw-roof{box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.bw-front{background-repeat:no-repeat}
+.p-xb{filter:brightness(1.05)}
+#haze{position:absolute;inset:0;pointer-events:none;background:linear-gradient(var(--sky) 0,transparent 30%),radial-gradient(ellipse at 50% 62%,transparent 52%,rgba(8,6,20,.5) 100%)}
 #hud{position:absolute;inset:0;pointer-events:none;z-index:5}
 #toast{position:absolute;top:14px;left:50%;transform:translate(-50%,-60px);background:rgba(20,16,36,.92);border:2px solid var(--gold);border-radius:8px;padding:8px 22px;font-size:18px;font-weight:700;transition:transform .25s;white-space:nowrap}
 #toast.on{transform:translate(-50%,0)}
@@ -227,3 +242,46 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 #abtn{position:absolute;right:20px;bottom:150px;width:150px;height:130px}
 #abtn [data-k=a]{right:0;top:0;background:rgba(242,201,76,.35)}#abtn [data-k=b]{left:0;bottom:0}
 ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+
+/* ══ 2.5D 업그레이드: 전투 무대와 UI 질감 ══ */
+#toast,.mtitle,.tp-name,.res-title,.b-mode,.cd-name,.bd-name,.tab,#dlg-name,.btn.big,.t-sub,.dp-name,.choice{font-family:"Jua","Noto Sans KR",sans-serif;font-weight:400;letter-spacing:.3px}
+.tp-info,.dp-info,.b-banner,#b-right,#b-hand,.hud-btn,#toast{background:linear-gradient(160deg,rgba(40,32,72,.82),rgba(14,10,30,.86));border:1px solid rgba(255,255,255,.22);box-shadow:0 8px 22px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.14);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
+.b-banner{border-color:rgba(242,201,76,.7)}#toast{border-color:var(--gold)}
+#dialog{background:linear-gradient(160deg,rgba(44,36,80,.94),rgba(16,12,34,.96));border:2px solid var(--gold);box-shadow:0 10px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.15);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.btn{box-shadow:0 3px 0 rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.18);transition:transform .08s}.btn:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+.mbox,.ov{background:linear-gradient(160deg,#2a2250,#15112a);box-shadow:0 18px 50px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.12)}
+/* 원근 바닥 */
+#battle{overflow:hidden;--sky1:#7ec8f0;--sky2:#d8f0fb;--g1:#6cc070;--g2:#2f7a40;background:linear-gradient(var(--sky1),var(--sky2) 36%,var(--g2) 36%)!important}
+#battle.bg-forest{--sky1:#2f6a50;--sky2:#8ac0a0;--g1:#3f8a50;--g2:#184a28}#battle.bg-coast{--sky1:#58a8f0;--sky2:#c8ecff;--g1:#f2e2a8;--g2:#c8a868}#battle.bg-cave{--sky1:#18141f;--sky2:#4a3c48;--g1:#7a6858;--g2:#3a2e2c}#battle.bg-city{--sky1:#4a3c88;--sky2:#e8b8c8;--g1:#9a96a8;--g2:#4a4658}#battle.bg-indoor{--sky1:#2a2240;--sky2:#6a5a88;--g1:#c89858;--g2:#6a4a28}
+#battle::before{content:"";position:absolute;left:-60%;right:-60%;top:34%;height:150%;transform-origin:50% 0;transform:perspective(520px) rotateX(64deg);background:repeating-linear-gradient(90deg,rgba(255,255,255,.1) 0 2px,transparent 2px 96px),repeating-linear-gradient(0deg,rgba(255,255,255,.1) 0 2px,transparent 2px 96px),linear-gradient(var(--g1),var(--g2));pointer-events:none}
+#battle::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 34% 45%,transparent 45%,rgba(6,4,16,.5) 100%);pointer-events:none}
+#battle>*{z-index:1}#battle>#b-modal{z-index:40}
+/* 비스트: 발판과 호흡 */
+.tp-sprite .shadow{bottom:2px;width:190px;height:54px;background:radial-gradient(ellipse,rgba(255,255,255,.28) 0,rgba(255,255,255,.1) 46%,rgba(0,0,0,.42) 48%,rgba(0,0,0,.42) 62%,transparent 64%);border-radius:50%}
+.spr{animation:breathe 1.6s ease-in-out infinite alternate;transform-origin:50% 100%;margin-bottom:18px;filter:drop-shadow(0 6px 0 rgba(0,0,0,.22))}
+@keyframes breathe{to{transform:scaleY(1.035) translateY(-2px)}}
+.spr.flip{animation-name:breatheF}@keyframes breatheF{from{transform:scaleX(-1)}to{transform:scale(-1,1.035) translateY(-2px)}}
+.spr.down,.spr.flip.down{animation:none}
+/* 듀얼 필드: 카드는 바닥에 눕고, 몬스터가 그 위에 솟아오른다 */
+.zone.mz,.zone.sz{background:linear-gradient(rgba(20,16,44,.5),rgba(20,16,44,.72));border:1px solid rgba(255,255,255,.3);box-shadow:inset 0 0 18px rgba(120,160,255,.14)}
+.zone.mz{perspective:420px;justify-content:flex-end;padding-bottom:3px}
+.zone.mz .fc{transform:rotateX(62deg);margin:-34px 0 -20px;box-shadow:0 10px 10px rgba(0,0,0,.5)}
+.zone.mz .fc.def{transform:rotateX(62deg) rotateZ(90deg)}
+.zone.mz .fc.back{margin:-10px 0 -6px}
+.holo{position:absolute;left:50%;bottom:44px;width:84px;height:84px;margin-left:-42px;pointer-events:none;filter:drop-shadow(0 0 6px var(--hc,#fff)) drop-shadow(0 4px 0 rgba(0,0,0,.3));animation:float 1.8s ease-in-out infinite alternate}
+@keyframes float{to{transform:translateY(-5px)}}
+.b-me .holo{animation-name:floatF}@keyframes floatF{from{transform:scaleX(-1)}to{transform:scaleX(-1) translateY(-5px)}}
+.holo.hd{width:66px;height:66px;margin-left:-33px;bottom:40px;filter:drop-shadow(0 0 5px #6ab0ff) saturate(.55) brightness(.92)}
+.holo.fdn{opacity:.45;filter:brightness(.4)}
+.fz-name,.fz-stat{position:relative;z-index:2}
+.fz-stat{background:rgba(10,8,24,.7);border-radius:6px;padding:0 6px}
+.fx-pop .holo{animation:rise .45s}@keyframes rise{from{transform:translateY(30px) scale(.3);opacity:0}}
+.card{box-shadow:0 3px 0 rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.35)}
+#b-hand .card:hover{transform:translateY(-8px) rotate(-1.5deg)}
+.res-box{background:linear-gradient(160deg,#2f2660,#15112a);box-shadow:0 20px 60px rgba(0,0,0,.7)}
+#title{background:radial-gradient(ellipse at 50% 20%,#5a48a8,#1a1438 55%,#0c0a18)}
+#title::before{content:"";position:absolute;left:-50%;right:-50%;top:58%;height:140%;transform-origin:50% 0;transform:perspective(500px) rotateX(66deg);background:repeating-linear-gradient(90deg,rgba(242,201,76,.22) 0 2px,transparent 2px 90px),repeating-linear-gradient(0deg,rgba(242,201,76,.22) 0 2px,transparent 2px 90px);-webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%)}
+#title>*{position:relative}.t-foot{position:absolute!important}
+@media (prefers-reduced-motion:reduce){.spr,.holo,.ent.beast,.t-beasts img{animation:none}}
+.zst{position:absolute;right:4px;top:4px;z-index:3}
+.bw-roof{background-repeat:repeat}
