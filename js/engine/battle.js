@@ -286,7 +286,7 @@
         const crit = this.rnd() < 1 / 16;
         const stab = X.BEASTS[b.sp].types.includes(mv.type) ? 1.5 : 1;
         const d = this.hurtBeast(o, this.dmgCalc(b.lv, this.bAtk(i), this.bDef(o), mv.pow, e * stab * (crit ? 1.5 : 1) * (0.85 + this.rnd() * 0.15)));
-        this.ev(crit ? '급소에 맞았다!' : e > 1 ? '효과가 굉장했다!' : e < 1 ? '효과가 별로인 듯하다…' : `${foe.name}에게 ${d}의 피해!`, { k: 'hit', side: o, type: mv.type });
+        this.ev(crit ? '급소에 맞았다!' : e > 1 ? '효과가 굉장했다!' : e < 1 ? '효과가 별로인 듯하다…' : `${foe.name}에게 ${d}의 피해!`, { k: 'hit', side: o, type: mv.type, n: d });
         if (fx.drain && b.hp > 0) { b.hp = Math.min(b.maxhp, b.hp + Math.ceil(d / 2)); this.ev(`${J(b.name, '은/는')} 생기를 흡수했다!`, { k: 'heal', side: i }); }
         if (fx.st && foe.hp > 0 && !foe.status && this.rnd() * 100 < fx.st[1]) this.setBeastStatus(o, fx.st[0], true);
         this.checkFaint(o);
@@ -501,7 +501,7 @@
       const sd = this.side(i);
       if (sd.kind === 'duelist') return this.hurtLP(i, n);
       const b = this.active(i), d = this.hurtBeast(i, b.maxhp * n / this.side(1 - i).maxLp * X.CROSS.BURN);
-      this.ev(`${J(b.name, '이/가')} 대신 ${d}의 피해를 받았다!`, { k: 'hit', side: i });
+      this.ev(`${J(b.name, '이/가')} 대신 ${d}의 피해를 받았다!`, { k: 'hit', side: i, n: d });
       this.checkFaint(i);
     }
 
@@ -530,7 +530,7 @@
       if (!this.unitAlive(u)) return;
       if (u.zone !== 'beast') return this.destroyMon(u.side, u.zone);
       const b = this.active(u.side), d = this.hurtBeast(u.side, b.maxhp * X.CROSS.DESTROY);
-      this.ev(`파괴의 힘이 ${J(b.name, '을/를')} 덮쳤다! ${d}의 피해!`, { k: 'hit', side: u.side });
+      this.ev(`파괴의 힘이 ${J(b.name, '을/를')} 덮쳤다! ${d}의 피해!`, { k: 'hit', side: u.side, n: d });
       this.checkFaint(u.side);
     }
     unitAtk(u, n, temp) {
@@ -634,7 +634,7 @@
         if (this.active(o).hp <= 0) return;
         const b = this.active(o), e = X.eff(ca.attr, X.BEASTS[b.sp].types);
         const d = this.hurtBeast(o, Battle.monHit(a, this.bDef(o), e * (0.9 + this.rnd() * 0.1), this.s.link));
-        this.ev(`${b.name}에게 ${d}의 피해!${e > 1 ? ' 효과가 굉장했다!' : e < 1 ? ' 효과가 별로인 듯하다…' : ''}`, { k: 'hit', side: o, type: ca.attr });
+        this.ev(`${b.name}에게 ${d}의 피해!${e > 1 ? ' 효과가 굉장했다!' : e < 1 ? ' 효과가 별로인 듯하다…' : ''}`, { k: 'hit', side: o, type: ca.attr, n: d });
         this.checkFaint(o);
         return;
       }

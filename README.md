@@ -65,11 +65,13 @@ css/style.css
 js/core.js            네임스페이스, 결정론적 RNG, 유틸
 js/data/              beasts.js(속성·기술·비스트·도구)  cards.js(카드·덱·팩)  world.js(맵·NPC·스토리)
 js/engine/            beast.js(개체·성장)  battle.js(전투 엔진)  ai.js(AI)      ← DOM 의존 없음
-js/ui/                sprites.js(절차적 픽셀 아트)  main.js  overworld.js  battleui.js  menus.js
+js/ui/                sprites.js(절차적 픽셀 아트)  fx3d.js(3D 모델·전투 연출)  main.js  overworld.js  battleui.js  menus.js
 tools/                sim.js(밸런스·퍼징·결정론 검증)  checkworld.js(월드 검증)  build.js(단일 파일 빌드)
 ```
 
 모든 그래픽은 코드로 그립니다. 외부 이미지·라이브러리가 없습니다 (웹 폰트만 선택적으로 불러옵니다).
+
+**3D 전투**: 비스트와 카드 몬스터는 Three.js로 그리는 3D 모델입니다. 2D 스프라이트와 같은 외형 파라미터에서 구·원뿔·상자를 조립해 만들므로 86종 전부가 모델을 가집니다. 돌진, 피격, 격파, 소환, 쓰러짐 연출과 파티클, 카메라 흔들림, 데미지 숫자가 나오고, 배속(×1/×2/×4)과 자동 진행 버튼이 있습니다. Three.js는 CDN에서 불러오며, 불러오지 못하거나 WebGL이 없으면 2.5D 스프라이트 전투로 자동 전환됩니다 (`js/ui/fx3d.js`).
 
 **2.5D 표현**: 필드는 CSS 3D 장면입니다. 지면을 기울인 원근 카메라 아래에 건물은 벽·박공 지붕을 가진 입체 상자로, 나무·바위·가구·캐릭터는 카메라를 향해 서는 판으로 세웁니다. 전투는 원근 바닥 위에서 진행되고, 카드는 필드에 눕고 몬스터가 그 위로 솟아오릅니다. 게임 로직은 타일 좌표 그대로이며 그리는 방식만 바뀝니다.
 

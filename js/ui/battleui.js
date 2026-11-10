@@ -23,6 +23,7 @@
   const UI = (X.BattleUI = {
     async run(cfg) {
       const bt = (this.bt = new X.Battle({ seed: (Math.random() * 2 ** 31) | 0, sides: cfg.sides, link: cfg.link, wild: cfg.wild, noRun: cfg.noRun, expSide: cfg.expSide }));
+      this.auto = false;
       this.cfg = cfg; this.log = []; this.sel = null; this.picking = null; this.prevHp = {}; this.skipFn = null;
       this.meKind = bt.side(0).kind;
       const h = G.pushInput({ a: () => this.skipFn && this.skipFn(), b: () => this.cancelPick() });
@@ -46,7 +47,8 @@
         const req = bt.request(0);
         if (!req) break;
         this.render(bt.view(0));
-        const a = await this.ask(req);
+        let a;
+        if (this.auto) { await X.wait(260 / (G.speed || 1)); a = X.AI.decide(bt, 0); } else a = await this.ask(req);
         this.clearSel();
         if (bt.submit(0, a) === false) { G.sfx('bump'); this.setMsg('그 행동은 지금 할 수 없다.'); continue; }
         await this.play();
@@ -58,6 +60,8 @@
       await this.result(txt, r.winner === 0 || r.reason === 'capture');
       await G.fade(true);
       $('#battle').classList.add('hidden');
+      if (this.gl) X.FX3D.stop();
+      this.auto = false;
       G.popInput(h);
       G.scene = prevScene;
       await G.fade(false);
@@ -68,10 +72,12 @@
       const b = $('#battle'), bt = this.bt;
       const mode = bt.mode === 'tt' ? '비스트 배틀' : bt.mode === 'dd' ? '듀얼' : '크로스 배틀';
       b.className = 'bg-' + (this.cfg.bg || 'field') + ' m-' + bt.mode;
-      b.innerHTML = `<div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div></div><div class="b-side b-me" id="bs0"></div>
+      b.innerHTML = `<div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
         <div id="b-right"><div id="b-log"></div><div id="b-detail" class="hidden"></div></div>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);
+      this.gl = X.FX3D.ok;
+      if (this.gl) { X.FX3D.start(b, this.cfg.bg || 'field'); b.classList.add('gl'); }
     },
 
     // ── 렌더링 ──
@@ -85,6 +91,7 @@
       requestAnimationFrame(() => document.querySelectorAll('#battle [data-to]').forEach((f) => (f.style.width = f.dataset.to + '%')));
       if (this.meKind === 'duelist') this.renderHand();
       this.paintPick();
+      if (this.gl) X.FX3D.sync(v);
     },
     hpCls: (p) => (p > 50 ? 'g' : p > 20 ? 'y' : 'r'),
     tamerHTML(sd, i) {
@@ -152,10 +159,12 @@
     },
     message(text, ms) {
       this.setMsg(text);
+      ms /= G.speed || 1;
       return new Promise((res) => { const t = setTimeout(done, ms); const self = this; function done() { clearTimeout(t); self.skipFn = null; res(); } this.skipFn = done; });
     },
     fx(f) {
       if (!f) return;
+      if (this.gl) X.FX3D.fx(f);
       const tgt = f.zone != null && f.zone !== 'beast' ? $(`#bs${f.side} .mz[data-zone="${f.zone}"]`) : $(`#bs${f.side} .tp-sprite`) || $(`#bs${f.side} .dp-info`);
       const cls = { hit: 'fx-hit', destroy: 'fx-destroy', faint: 'fx-faint', summon: 'fx-pop', flip: 'fx-pop', enter: 'fx-pop', heal: 'fx-heal', buff: 'fx-buff', debuff: 'fx-debuff', status: 'fx-debuff', lp: 'fx-hit', levelup: 'fx-buff', capsule: 'fx-capsule', trap: 'fx-trap', spell: 'fx-buff' }[f.k];
       if (f.k === 'hit' || f.k === 'lp' || f.k === 'destroy') G.sfx('hit'); else if (f.k === 'faint') G.sfx('faint'); else if (f.k === 'heal' || f.k === 'levelup') G.sfx('heal'); else if (['summon', 'spell', 'trap', 'set', 'draw'].includes(f.k)) G.sfx('card');
@@ -199,6 +208,13 @@
       const f = this.acts && this.acts[name];
       if (name === 'close' && this.onClose) return this.onClose();
       if (name === 'cancel') return this.cancelPick();
+      if (name === 'speed') { G.speed = { 1: 2, 2: 4, 4: 1 }[G.speed || 1]; const e = $('#battle [data-act=speed]'); if (e) e.textContent = '▶ ×' + G.speed; return; }
+      if (name === 'auto') {
+        this.auto = !this.auto;
+        const e = $('#battle [data-act=auto]'); if (e) e.classList.toggle('on', this.auto);
+        if (this.auto && this.done && this.bt.request(0)) { this.picking = null; this.paintPick(); $('#b-modal').className = 'hidden'; this.done(X.AI.decide(this.bt, 0)); }
+        return;
+      }
       if (f) f(d);
     },
     showDetail(html, soft) { const d = $('#b-detail'); d.innerHTML = html; d.classList.remove('hidden'); d.classList.toggle('soft', !!soft); },

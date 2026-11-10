@@ -5,11 +5,14 @@ const root = path.join(__dirname, '..');
 let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 html = html.replace(/<link rel="stylesheet" href="(css\/[^"]+)">/, (_, f) => `<style>\n${fs.readFileSync(path.join(root, f), 'utf8')}</style>`);
 html = html.replace(/<!--SCRIPTS-->([\s\S]*?)<!--\/SCRIPTS-->/, (_, block) => {
-  let js = '';
-  for (const m of block.matchAll(/<script src="([^"]+)"><\/script>/g)) js += `// ── ${m[1]} ──\n${fs.readFileSync(path.join(root, m[1]), 'utf8')}\n`;
+  let js = '', cdn = '';
+  for (const m of block.matchAll(/<script src="([^"]+)"><\/script>/g)) {
+    if (m[1].startsWith('http')) cdn += m[0] + '\n'; // 외부 라이브러리는 태그 그대로 둔다
+    else js += `// ── ${m[1]} ──\n${fs.readFileSync(path.join(root, m[1]), 'utf8')}\n`;
+  }
   const boot = block.match(/<script>([^<]+)<\/script>/)[1];
   if (js.includes('</script')) throw new Error('인라인 불가: </script 포함');
-  return `<script>\n${js}${boot}\n</script>`;
+  return `${cdn}<script>\n${js}${boot}\n</script>`;
 });
 // --page: 문서 뼈대(doctype/html/head/body) 없이 본문만 내보낸다 (뼈대를 따로 씌우는 호스팅용)
 const args = process.argv.slice(2), page = args.includes('--page');
