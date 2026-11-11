@@ -204,7 +204,7 @@
       await G.say('어서 와! 새 카드가 들어왔어.', '카드 샵 주인');
       await G.openCardShop({ packs: ['pack1', 'pack2'], singles: ['steelsword', 'spring', 'lightbarrier', 'whelp', 'thornmail'] });
     } },
-    talk('cc_fan', 6, 5, 'duelist_f', '카드 수집가', ['덱은 20장에서 30장. 같은 카드는 3장까지 넣을 수 있어.', '덱이 다 떨어지면 지니까, 너무 얇아도 문제야.']),
+    talk('cc_fan', 6, 5, 'duelist_f', '카드 수집가', ['덱은 20장에서 30장. 같은 카드는 3장까지 넣을 수 있어.', '「융합」 카드는 필드의 몬스터 2장을 합쳐 융합 몬스터를 불러내. 불+바람, 물+땅, 빛+어둠, 전기+바람, 풀+물 조합이 특별해.', '날씨 카드는 비스트의 기술에도 영향을 줘. 테이머가 부른 비가 내 물 몬스터를 강하게 만들기도 하지!', '덱이 다 떨어지면 지니까, 너무 얇아도 문제야.']),
   ], ['cardia', 15, 5]);
   room('cardia_house', '카드리아 민가', 9, 7, [[1, 1, 'k'], [2, 1, 'k'], [7, 1, 'p'], [4, 3, 't']], [
     talk('ca_elder', 5, 2, 'elder', '은퇴한 듀얼 마스터', ['크로스 룰을 알고 싶은가? 핵심만 알려 주지.', '첫째, 테이머는 비스트가 전부 쓰러지면 패배. 듀얼리스트는 LP가 0이 되면 패배.', '둘째, 비스트의 기술은 \'스트라이크\'가 되어 몬스터의 ATK나 DEF와 겨룬다. 못 부숴도 충격으로 수치가 깎이지.', '셋째, 카드의 \'파괴\' 효과는 비스트에겐 큰 피해로, 효과 데미지는 선두 비스트의 HP 피해로 바뀐다.', '넷째, 독·마비·수면·화상은 비스트에게도 몬스터에게도 통한다. 서로의 규칙을 아는 자가 이기는 법이야.']),
@@ -295,15 +295,15 @@
           G.refresh();
         } },
       talk('le_girl', 8, 10, 'tamer_f', '마을 소녀', ['리파 마을은 테이머의 고향이야. 비스트와 함께 밭을 갈고, 함께 잠들지.', '듀얼리스트들은 비스트를 "살아있는 카드"라고 부른대. 실례지?']),
-      talk('le_boy', 19, 8, 'kid', '소년', ['비스트는 레벨이 오르면 진화해! 스타터는 16, 그다음엔 32에 진화한대.']),
+      talk('le_boy', 19, 8, 'kid', '소년', ['비스트는 레벨이 오르면 진화해! 스타터는 16, 그다음엔 32에 진화한대.', '비스트마다 \'특성\'이 달라. 메뉴에서 확인해 봐. 등장만 해도 상대를 움츠리게 하거나, 때린 상대를 마비시키는 애도 있어!', '상점에서 파는 \'지닌 도구\'를 들려 주면 더 강해진대.']),
     ],
   };
   healRoom('leafa_heal', 'leafa', 17, 5);
-  martRoom('leafa_mart', 'leafa', 17, 13, ['capsule', 'supercap', 'potion', 'hipotion', 'cure', 'revive'], [
+  martRoom('leafa_mart', 'leafa', 17, 13, ['capsule', 'supercap', 'potion', 'hipotion', 'cure', 'revive', 'sash', 'charm'], [
     { id: 'le_card', x: 6, y: 4, look: 'duelist_m', name: '떠돌이 카드 상인', dir: 'left', script: async (G) => {
       if (!G.flag('deck')) return G.say('덱이 생기면 다시 오라고.', '떠돌이 카드 상인');
       await G.say('테이머 마을에서도 카드는 팔린다고. 구경해 봐.', '떠돌이 카드 상인');
-      await G.openCardShop({ packs: ['pack1', 'pack2'], singles: ['miasma', 'squall', 'hex', 'irongolem', 'scout', 'mirrorwall'] });
+      await G.openCardShop({ packs: ['pack1', 'pack2'], singles: ['miasma', 'squall', 'hex', 'irongolem', 'scout', 'mirrorwall', 'fusion', 'vanguard', 'nestbird', 'rainfield', 'sunfield'] });
     } },
   ]);
   room('leafa_house', '리파 민가', 9, 7, [[1, 1, 'k'], [7, 1, 'p'], [4, 3, 't']], [
@@ -315,7 +315,7 @@
   ], ['leafa', 4, 13]);
   room('leafa_gym', '리파 테이머 도장', 11, 10, [[1, 1, 'p'], [9, 1, 'p'], [2, 4, 'p'], [8, 4, 'p']], [
     trainer('lg_t1', 7, 6, 'left', 'tamer_f', '도장 수련생 다래', tamer([['mothra', 15], ['lilypad', 15]], 15, 500), '관장님께 가려면 먼저 저를 이기세요!', '수련이 부족했네요…', { sight: 2 }),
-    { id: 'gaon', x: 5, y: 2, look: 'gaon', name: '도장 관장 가온', dir: 'down', battle: tamer([['mothra', 16], ['lilypad', 16], ['leafron', 18]], 17, 1400), script: async (G, n) => {
+    { id: 'gaon', x: 5, y: 2, look: 'gaon', name: '도장 관장 가온', dir: 'down', battle: tamer([['mothra', 16], ['lilypad', 16], ['leafron', 18, 'leftovers']], 17, 1400), script: async (G, n) => {
       if (G.flag('emblem_leaf')) return G.say('비스트도 카드도, 결국 그걸 믿는 사람의 마음이 힘이 되는 거지.', n.name);
       await G.say(['허허, 크로스 링커라는 젊은이가 자네로군.', '나는 가온. 평생 풀의 비스트와 살아온 테이머일세.', '카드로 덤벼도 좋네. 내 비스트들은 종이 한 장에 쓰러지지 않으니!'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -456,16 +456,16 @@
     ],
   };
   healRoom('cross_heal', 'crosscity', 4, 15);
-  martRoom('cross_mart', 'crosscity', 24, 15, ['capsule', 'supercap', 'potion', 'hipotion', 'cure', 'revive'], [
+  martRoom('cross_mart', 'crosscity', 24, 15, ['capsule', 'supercap', 'potion', 'hipotion', 'cure', 'revive', 'sash', 'charm', 'leftovers', 'orb'], [
     { id: 'cm_card', x: 6, y: 4, look: 'duelist_f', name: '카드 딜러', dir: 'left', script: async (G) => {
       if (!G.flag('deck')) return G.say('덱이 생기면 다시 오세요.', '카드 딜러');
       await G.say('대륙 최고의 카드만 취급합니다.', '카드 딜러');
-      await G.openCardShop({ packs: ['pack2', 'pack3'], singles: ['smite', 'rebirth', 'tome', 'warbanner', 'stunsnare', 'holylancer', 'earthtitan', 'voltrix', 'leviar', 'lumiel'] });
+      await G.openCardShop({ packs: ['pack2', 'pack3'], singles: ['smite', 'rebirth', 'tome', 'warbanner', 'stunsnare', 'fusion', 'spellseal', 'wraith', 'archsage', 'effigy', 'crystalturtle', 'holylancer', 'earthtitan', 'voltrix', 'leviar', 'lumiel'] });
     } },
   ]);
   room('cross_gym', '크로스 시티 테이머 도장', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [2, 5, 'p'], [8, 5, 'p']], [
     trainer('xg_t1', 3, 6, 'right', 'tamer_m', '도장 수련생 철민', tamer([['charcoal', 29], ['craggon', 30]], 30, 1100), '무진 관장님의 불꽃을 보려면 나부터다!', '뜨거운 승부였다…!', { sight: 2 }),
-    { id: 'mujin', x: 5, y: 2, look: 'mujin', name: '도장 관장 무진', dir: 'down', battle: tamer([['craggon', 32], ['flarehound', 32], ['magmaros', 34]], 33, 2400), script: async (G, n) => {
+    { id: 'mujin', x: 5, y: 2, look: 'mujin', name: '도장 관장 무진', dir: 'down', battle: tamer([['craggon', 31], ['flarehound', 32, 'charm'], ['magmaros', 33]], 33, 2400), script: async (G, n) => {
       if (G.flag('emblem_magma')) return G.say('불은 대지를 만나 용암이 된다. 섞인다는 건, 약해지는 게 아니다.', n.name);
       await G.say(['왔는가, 크로스 링커. 나는 무진. 불과 대지의 테이머다.', '분리단 놈들은 섞이는 걸 두려워하지. 하지만 내 비스트를 봐라.', '불과 대지가 섞여 용암이 되었다! 자, 네 힘을 보여라!'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -505,7 +505,7 @@
       await G.say(['…역시 넌 대단해. 듀얼리스트로서도, 테이머로서도.', '이 카드, 결승에서 써 줘. (천사장 루미엘을 받았다!)'], n.name);
     } },
     { id: 'aria', x: 6, y: 2, look: 'aria', name: '챔피언 아리아', dir: 'down',
-      battle: { kind: 'both', team: (G) => [['seraphin', 42], ['magmaros', 42], ['lotusprite', 42], ['nightpard', 43], [thirdStarter(G, 44), 44]], deck: 'champion', lvl: 44, reward: 6000 }, script: async (G, n) => {
+      battle: { kind: 'both', team: (G) => [['seraphin', 41], ['magmaros', 41], ['nightpard', 42], [thirdStarter(G, 43), 43, 'leftovers']], deck: 'champion', lvl: 44, reward: 6000 }, script: async (G, n) => {
         if (G.flag('champion')) {
           const c = await G.choose('다시 한번 겨뤄 보겠나, 챔피언?', ['도전한다', '그만둔다'], n.name);
           if (c === 0) { G.healAll(); if ((await G.fight(n, null, { rematch: true })) === 'win') await G.say('역시 그대는 진짜다. 언제든 다시 오게.', n.name); }

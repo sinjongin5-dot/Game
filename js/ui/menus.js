@@ -27,6 +27,8 @@
   function beastDetail(b) {
     const sp = X.BEASTS[b.sp], need = X.expFor(b.lv + 1) - X.expFor(b.lv), have = b.exp - X.expFor(b.lv);
     return `<div class="bd"><div class="bd-top"><img class="bd-spr" src="${A.beastUrl(b.sp)}"><div><div class="bd-name">${b.name} <span class="lv">Lv.${b.lv}</span></div><div>${sp.types.map(chip).join(' ')}</div><div class="bd-desc">${sp.desc}</div></div></div>
+      <div class="bd-ab"><b>◆ ${X.ABILITIES[sp.ab].name}</b> ${X.ABILITIES[sp.ab].desc}</div>
+      <div class="bd-ab"><b>지닌 도구</b> ${b.item ? X.ITEMS[b.item].name + ' — ' + X.ITEMS[b.item].desc.replace('[지닌 도구] ', '') : '없음'}</div>
       <div class="bd-stats"><span>HP <b>${b.hp}/${b.maxhp}</b></span><span>공격 <b>${b.atk}</b></span><span>방어 <b>${b.def}</b></span><span>스피드 <b>${b.spd}</b></span></div>
       <div class="xpbar"><div style="width:${Math.min(100, (have / need) * 100)}%"></div></div><small>다음 레벨까지 ${Math.max(0, need - have)} EXP${sp.evo ? ` · Lv.${sp.evo[0]}에 진화` : ''}</small>
       <div class="bd-moves">${b.moves.map((m) => { const mv = X.MOVES[m.id]; return `<div class="mvrow" style="--tc:${X.TYPES[mv.type].color}"><b>${mv.name}</b><span>${X.TYPES[mv.type].name} · ${mv.pow ? '위력 ' + mv.pow : '변화'} · 명중 ${mv.acc}</span><span>PP ${m.pp}/${mv.pp}</span></div>`; }).join('')}</div></div>`;
@@ -98,7 +100,7 @@
         if (cur === 'team') {
           if (!p.team.length) return '<div class="hint">아직 비스트가 없다.</div>';
           sel = Math.min(sel, p.team.length - 1);
-          return `<div class="split"><div class="tlist">${useItem ? `<div class="hint">${X.ITEMS[useItem].name}을(를) 누구에게 쓸까? <button class="btn sm" data-act="nouse">취소</button></div>` : ''}${p.team.map((b, k) => beastRow(b, k, 'bsel', k === sel ? ' <i>◀</i>' : '')).join('')}</div><div>${beastDetail(p.team[sel])}<div class="cd-btns">${sel > 0 ? '<button class="btn" data-act="lead">선두로 보내기</button>' : '<span class="cd-note">선두 비스트 (전투에 먼저 나간다)</span>'}</div></div></div>`;
+          return `<div class="split"><div class="tlist">${useItem ? `<div class="hint">${X.ITEMS[useItem].name}을(를) 누구에게 쓸까? <button class="btn sm" data-act="nouse">취소</button></div>` : ''}${p.team.map((b, k) => beastRow(b, k, 'bsel', k === sel ? ' <i>◀</i>' : '')).join('')}</div><div>${beastDetail(p.team[sel])}<div class="cd-btns">${sel > 0 ? '<button class="btn" data-act="lead">선두로 보내기</button>' : '<span class="cd-note">선두 비스트 (전투에 먼저 나간다)</span>'}${p.team[sel].item ? '<button class="btn" data-act="unhold">도구 돌려받기</button>' : ''}${Object.keys(p.bag).filter((k) => p.bag[k] > 0 && X.ITEMS[k].hold).map((k) => `<button class="btn" data-act="hold" data-id="${k}">${X.ITEMS[k].name} 지니게 하기 (×${p.bag[k]})</button>`).join('')}</div></div></div>`;
         }
         if (cur === 'deck') {
           if (!G.flag('deck')) return '<div class="hint">아직 덱이 없다. 카드리아 시에서 구할 수 있다고 한다.</div>';
@@ -147,6 +149,8 @@
           sel = k; m.paint();
         },
         nouse: (d, m) => { useItem = null; m.paint(); },
+        hold: (d, m) => { const b = p.team[sel]; if (b.item) G.give(b.item); p.bag[d.id]--; b.item = d.id; G.sfx('get'); m.paint(); },
+        unhold: (d, m) => { const b = p.team[sel]; G.give(b.item); b.item = null; m.paint(); },
         lead: (d, m) => { const b = p.team.splice(sel, 1)[0]; p.team.unshift(b); sel = 0; m.paint(); },
         add: (d, m) => {
           const n = p.deck.filter((x) => x === d.id).length;
@@ -157,7 +161,7 @@
           keepScroll(m);
         },
         rem: (d, m) => { const i = p.deck.indexOf(d.id); if (i >= 0) p.deck.splice(i, 1); cardSel = d.id; keepScroll(m); },
-        use: (d, m) => { const it = X.ITEMS[d.id]; if (it.ball) { G.toast('야생 비스트와의 전투 중에만 쓸 수 있다.'); return; } useItem = d.id; cur = 'team'; m.paint(); },
+        use: (d, m) => { const it = X.ITEMS[d.id]; if (it.hold) { cur = 'team'; G.toast('비스트를 고른 뒤 「지니게 하기」를 누르자.'); m.paint(); return; } if (it.ball) { G.toast('야생 비스트와의 전투 중에만 쓸 수 있다.'); return; } useItem = d.id; cur = 'team'; m.paint(); },
         mute: (d, m) => { G.mute = !G.mute; m.paint(); },
         help: () => this.help(),
         totitle: async (d, m) => { G.save(); m.close(); await G.fade(true); this.title(); await G.fade(false); },

@@ -17,7 +17,7 @@
     BURN: 0.8,      // 효과 데미지 n -> 비스트 최대 HP의 (n / 시작 LP x BURN) 비율
     BASEPOW: 60,    // 위력 60 기술 = 공격 환산치 그대로
     STAB: 1.2,      // 자속 보정
-    MONPOW: 62,     // 카드 몬스터가 비스트를 칠 때의 기술 위력 환산
+    MONPOW: 76,     // 카드 몬스터가 비스트를 칠 때의 기술 위력 환산
     DESTROY: 0.35,  // '파괴' 효과 -> 비스트 최대 HP 비율 피해
     IMPACT: 0.5,    // 파괴하지 못한 몬스터의 ATK/DEF를 스트라이크의 이 비율만큼 깎음
     SPDLV: 400,     // 쾌속: 스피드 환산치 >= 격파 몬스터 레벨 x 이 값이면 추가 행동
@@ -36,7 +36,7 @@
       this.s = {
         seed: o.seed | 0 || 1, turn: 0, cur: 0, wild: !!o.wild, noRun: !!o.noRun,
         expSide: o.expSide == null ? null : o.expSide, result: null, wait: null, uid: 1,
-        choices: [null, null], follow: false, runTries: 0, sides: o.sides,
+        choices: [null, null], follow: false, runTries: 0, sides: o.sides, weather: null,
         link: Math.max(1, o.link || 10), // 링크 레벨: 듀얼리스트 쪽의 '격'. 크로스 환산의 기준이 된다.
       };
       this.events = [];
@@ -44,10 +44,11 @@
       this.mode = k[0] === 'tamer' && k[1] === 'tamer' ? 'tt' : k[0] === 'duelist' && k[1] === 'duelist' ? 'dd' : 'cross';
       this.s.mode = this.mode;
       for (const sd of this.s.sides) if (sd.kind === 'duelist') { X.shuffle(sd.deck, this.s); for (let i = 0; i < 4; i++) sd.hand.push(sd.deck.pop()); }
-      if (this.mode === 'tt') this.ev('배틀 시작!');
+      if (this.mode === 'tt') { this.ev('배틀 시작!'); const first = this.bSpd(0) >= this.bSpd(1) ? [0, 1] : [1, 0]; for (const i of first) this.onEnter(i); }
       else {
         this.s.cur = this.mode === 'dd' ? (this.rnd() < 0.5 ? 0 : 1) : k.indexOf('duelist');
         this.ev(this.mode === 'dd' ? '듀얼 개시!' : '크로스 배틀 개시!');
+        if (this.mode === 'cross') this.onEnter(k.indexOf('tamer'));
         this.startTurn();
       }
     }
@@ -56,7 +57,7 @@
       let a = team.findIndex((b) => b.hp > 0);
       if (a < 0) a = 0;
       const down = []; team.forEach((b, k) => b.hp <= 0 && down.push(k));
-      return { kind: 'tamer', name, team, active: a, stages: { atk: 0, def: 0, spd: 0 }, bag: o.bag || null, part: [a], learn: [], down, wild: !!o.wild };
+      return { kind: 'tamer', name, team, active: a, stages: { atk: 0, def: 0, spd: 0 }, bag: o.bag || null, part: [a], learn: [], down, wild: !!o.wild, conf: 0, protect: false, flinch: false };
     }
     static duelist(name, deck, lp, o = {}) {
       return { kind: 'duelist', name, lp, maxLp: lp, deck: deck.slice(), hand: [], grave: [], mons: [null, null, null], st: [null, null, null], summoned: false, expLv: o.expLv || 0 };
@@ -138,7 +139,79 @@
       sd.active = to;
       sd.stages = { atk: 0, def: 0, spd: 0 };
       if (!sd.part.includes(to)) sd.part.push(to);
-      if (!quiet) this.ev(`${sd.name}${sd.wild ? '' : '의'} ${J(sd.team[to].name, '이/가')} 나섰다!`, { k: 'enter', side: i });
+      sd.conf = 0; sd.protect = false; sd.flinch = false;
+      if (!quiet) { this.ev(`${sd.name}${sd.wild ? '' : '의'} ${J(sd.team[to].name, '이/가')} 나섰다!`, { k: 'enter', side: i }); this.onEnter(i); }
+    }
+    // ───────── 특성 · 날씨 · 지닌 도구 ─────────
+    ab(i) { const sd = this.side(i); return sd.kind === 'tamer' ? X.BEASTS[this.active(i).sp].ab : null; }
+    abMsg(i) { const b = this.active(i); return `[${X.ABILITIES[X.BEASTS[b.sp].ab].name}] `; }
+    setWeather(w, src) {
+      const s = this.s;
+      if (s.weather && s.weather.w === w) return this.ev('날씨는 이미 그렇다.');
+      s.weather = { w, t: this.mode === 'tt' ? 5 : 8 };
+      this.ev(`${src || ''}${{ sun: '햇살이 강해졌다!', rain: '비가 내리기 시작했다!', sand: '모래바람이 불기 시작했다!' }[w]}`, { k: 'weather', w });
+    }
+    tickWeather() {
+      const s = this.s;
+      if (s.weather && --s.weather.t <= 0) { this.ev({ sun: '햇살이 원래대로 돌아왔다.', rain: '비가 그쳤다.', sand: '모래바람이 잦아들었다.' }[s.weather.w], { k: 'weather', w: null }); s.weather = null; }
+    }
+    weatherMod(attr, key) {
+      const w = this.s.weather && this.s.weather.w;
+      if (key === 'atk') { if (w === 'sun') return attr === 'fire' ? 300 : attr === 'water' ? -300 : 0; if (w === 'rain') return attr === 'water' ? 300 : attr === 'fire' ? -300 : 0; }
+      else if (w === 'sand' && attr === 'earth') return 400;
+      return 0;
+    }
+    // 등장 시 발동하는 특성. 상대가 듀얼리스트면 카드 룰에 맞게 환산된다.
+    onEnter(i) {
+      const a = this.ab(i), o = 1 - i, opp = this.side(o);
+      if (!a || this.active(i).hp <= 0) return;
+      if (a === 'intim') {
+        if (opp.kind === 'tamer') { if (this.active(o).hp > 0) { this.ev(this.abMsg(i) + `${J(this.active(i).name, '이/가')} 상대를 노려본다!`); this.stage(o, 'atk', -1); } }
+        else { let n = 0; opp.mons.forEach((m) => { if (m && !m.faceDown) { m.atkMod -= 200; n++; } }); if (n) this.ev(this.abMsg(i) + `상대 몬스터 전체의 ATK -200!`, { k: 'debuff', side: o }); }
+      } else if (a === 'rain' || a === 'sand' || a === 'sun') { if (!this.s.weather || this.s.weather.w !== a) this.setWeather(a, this.abMsg(i)); }
+    }
+    // 공격 배율: 특성(핀치 강화/근성), 도구(구슬/부적), 날씨
+    atkMult(i, mv) {
+      const b = this.active(i), a = this.ab(i), w = this.s.weather && this.s.weather.w;
+      let m = 1;
+      if (b.hp <= b.maxhp / 3 && ((a === 'blaze' && mv.type === 'fire') || (a === 'torrent' && mv.type === 'water') || (a === 'overgrow' && mv.type === 'grass'))) m *= 1.5;
+      if (a === 'guts' && b.status) m *= 1.5;
+      if (b.item === 'orb') m *= 1.3;
+      if (b.item === 'charm' && X.BEASTS[b.sp].types.includes(mv.type)) m *= 1.2;
+      if (w === 'sun') m *= mv.type === 'fire' ? 1.5 : mv.type === 'water' ? 0.5 : 1;
+      if (w === 'rain') m *= mv.type === 'water' ? 1.5 : mv.type === 'fire' ? 0.5 : 1;
+      return m;
+    }
+    defMult(i, type) { return this.ab(i) === 'thick' && (type === 'fire' || type === 'water') ? 0.5 : 1; }
+    // 접촉 특성: 비스트를 때린 쪽(비스트든 카드 몬스터든)에게 상태이상
+    contact(o, attacker) {
+      const st = { static: 'par', flame: 'brn', psn: 'psn' }[this.ab(o)];
+      if (!st || !this.unitAlive(attacker) || this.rnd() >= 0.3) return;
+      const has = attacker.zone === 'beast' ? this.active(attacker.side).status : this.side(attacker.side).mons[attacker.zone].status;
+      if (has) return;
+      this.ev(this.abMsg(o).trim()); this.unitStatus(attacker, st);
+    }
+    // 공격 후 반동 (생명의 구슬, 반동기)
+    recoil(i, frac, why) {
+      const b = this.active(i);
+      if (b.hp <= 0 || frac <= 0) return;
+      this.hurtBeast(i, b.maxhp * frac, true);
+      this.ev(`${J(b.name, '은/는')} ${why}의 반동을 받았다!`, { k: 'hit', side: i });
+      this.checkFaint(i);
+    }
+    // 날씨·방어처럼 대상 없이 판에 거는 변화기
+    miscFx(i, mv) {
+      const fx = mv.fx, sd = this.side(i);
+      if (fx.weather) this.setWeather(fx.weather);
+      if (fx.protect) { sd.protect = true; this.ev(`${J(this.active(i).name, '은/는')} 방어 태세를 갖췄다!`, { k: 'buff', side: i }); }
+    }
+    confuse(u, chance) {
+      if (!this.unitAlive(u) || this.rnd() * 100 >= chance) return;
+      if (u.zone !== 'beast') return this.side(u.side).mons[u.zone].status ? null : this.unitStatus(u, 'par');
+      const sd = this.side(u.side);
+      if (sd.conf > 0) return;
+      sd.conf = 2 + Math.floor(this.rnd() * 3);
+      this.ev(`${J(this.active(u.side).name, '은/는')} 혼란에 빠졌다!`, { k: 'status', side: u.side });
     }
     stage(i, stat, n) {
       const st = this.side(i).stages, b = this.active(i), old = st[stat];
@@ -155,9 +228,15 @@
       this.ev(`${J(b.name, '은/는')} ${{ psn: '독에 걸렸다', brn: '화상을 입었다', par: '마비되었다', slp: '잠들어 버렸다' }[st]}!`, { k: 'status', side: i });
       return true;
     }
-    hurtBeast(i, dmg, fx) {
+    hurtBeast(i, dmg, quiet) {
       const b = this.active(i);
       dmg = Math.max(1, Math.round(dmg));
+      // 체력이 가득일 때 쓰러질 일격은 1로 버틴다 (옹골참 특성 / 기합의 띠)
+      if (!quiet && b.hp === b.maxhp && dmg >= b.hp && b.hp > 1 && (this.ab(i) === 'sturdy' || b.item === 'sash')) {
+        dmg = b.hp - 1;
+        if (this.ab(i) === 'sturdy') this.ev(this.abMsg(i) + `${J(b.name, '은/는')} 일격을 버텨냈다!`);
+        else { b.item = null; this.ev(`${J(b.name, '은/는')} 기합의 띠로 버텨냈다!`); }
+      }
       b.hp = Math.max(0, b.hp - dmg);
       return dmg;
     }
@@ -169,13 +248,27 @@
         b.status = null; this.ev(`${J(b.name, '은/는')} 눈을 떴다!`);
       }
       if (b.status === 'par' && this.rnd() < 0.25) { this.ev(`${J(b.name, '은/는')} 몸이 저려 움직일 수 없다!`); return false; }
+      const sd = this.side(i);
+      if (sd.flinch) { sd.flinch = false; this.ev(`${J(b.name, '은/는')} 풀이 죽어 움직일 수 없다!`); return false; }
+      if (sd.conf > 0) {
+        if (--sd.conf === 0) this.ev(`${J(b.name, '은/는')} 혼란에서 깨어났다!`);
+        else if (this.rnd() < 0.33) {
+          this.hurtBeast(i, this.dmgCalc(b.lv, b.atk, b.def, 40, 1), true);
+          this.ev(`${J(b.name, '은/는')} 혼란스러워 자신을 공격했다!`, { k: 'hit', side: i });
+          this.checkFaint(i);
+          return false;
+        }
+      }
       return true;
     }
     tickBeast(i) {
-      const b = this.active(i);
-      if (b.hp <= 0 || !b.status) return;
-      if (b.status === 'psn') { this.hurtBeast(i, b.maxhp / 8); this.ev(`${J(b.name, '은/는')} 독의 피해를 입었다!`, { k: 'hit', side: i }); }
-      else if (b.status === 'brn') { this.hurtBeast(i, b.maxhp / 16); this.ev(`${J(b.name, '은/는')} 화상의 피해를 입었다!`, { k: 'hit', side: i }); }
+      const b = this.active(i), a = this.ab(i), w = this.s.weather && this.s.weather.w;
+      if (b.hp <= 0) return;
+      if (b.status === 'psn') { this.hurtBeast(i, b.maxhp / 8, true); this.ev(`${J(b.name, '은/는')} 독의 피해를 입었다!`, { k: 'hit', side: i }); }
+      else if (b.status === 'brn') { this.hurtBeast(i, b.maxhp / 16, true); this.ev(`${J(b.name, '은/는')} 화상의 피해를 입었다!`, { k: 'hit', side: i }); }
+      if (b.hp > 0 && w === 'sand' && !X.BEASTS[b.sp].types.includes('earth')) { this.hurtBeast(i, b.maxhp / 16, true); this.ev(`모래바람이 ${J(b.name, '을/를')} 덮쳤다!`, { k: 'hit', side: i }); }
+      if (b.hp > 0 && b.hp < b.maxhp && (a === 'regen' || b.item === 'leftovers')) { b.hp = Math.min(b.maxhp, b.hp + Math.max(1, Math.floor(b.maxhp / 16))); this.ev(`${a === 'regen' ? this.abMsg(i) : ''}${J(b.name, '은/는')} 체력을 조금 회복했다.`, { k: 'heal', side: i }); }
+      if (b.hp > 0 && a === 'speed' && this.side(i).stages.spd < 6) { this.ev(this.abMsg(i).trim()); this.stage(i, 'spd', 1); }
       this.checkFaint(i);
     }
     // 쓰러짐 처리. 교체가 필요하면 wait를 건다.
@@ -254,8 +347,10 @@
         else if (a.type === 'switch') { if (this.canSwitch(i, a.to)) { this.ev(`${J(this.side(i).name, '은/는')} ${J(this.active(i).name, '을/를')} 불러들였다.`); this.switchIn(i, a.to); } }
         else if (this.active(i).hp > 0 && this.active(1 - i).hp > 0) this.ttMove(i, a.move);
       }
+      for (const sd of s.sides) { sd.protect = false; sd.flinch = false; }
       if (this.over) return;
       for (const i of [0, 1]) { this.tickBeast(i); if (this.over) return; }
+      this.tickWeather();
     }
     tryRun(i) {
       const s = this.s; s.runTries++;
@@ -279,18 +374,27 @@
       const mv = this.moveOf(i, idx) || STRUGGLE;
       if (idx >= 0 && b.moves[idx]) b.moves[idx].pp--;
       this.ev(`${this.side(i).wild ? '야생의 ' : ''}${b.name}의 ${mv.name}!`, { k: 'move', side: i, type: mv.type });
+      const fx = mv.fx, aimed = mv.pow > 0 || fx.st || fx.foe || fx.conf;
+      if (aimed && this.side(o).protect) return this.ev(`${J(foe.name, '은/는')} 방어 태세로 막아냈다!`, { k: 'buff', side: o });
       if (this.rnd() * 100 >= mv.acc) return this.ev('그러나 빗나갔다!');
-      const fx = mv.fx;
       if (mv.pow > 0) {
         const e = X.eff(mv.type, X.BEASTS[foe.sp].types);
-        const crit = this.rnd() < 1 / 16;
+        const crit = this.rnd() < (fx.crit ? 1 / 4 : 1 / 16);
         const stab = X.BEASTS[b.sp].types.includes(mv.type) ? 1.5 : 1;
-        const d = this.hurtBeast(o, this.dmgCalc(b.lv, this.bAtk(i), this.bDef(o), mv.pow, e * stab * (crit ? 1.5 : 1) * (0.85 + this.rnd() * 0.15)));
-        this.ev(crit ? '급소에 맞았다!' : e > 1 ? '효과가 굉장했다!' : e < 1 ? '효과가 별로인 듯하다…' : `${foe.name}에게 ${d}의 피해!`, { k: 'hit', side: o, type: mv.type, n: d });
+        const hits = fx.multi ? fx.multi[0] + Math.floor(this.rnd() * (fx.multi[1] - fx.multi[0] + 1)) : 1;
+        let raw = 0;
+        for (let h = 0; h < hits; h++) raw += this.dmgCalc(b.lv, this.bAtk(i), this.bDef(o), mv.pow, e * stab * (crit ? 1.5 : 1) * (0.85 + this.rnd() * 0.15) * this.atkMult(i, mv) * this.defMult(o, mv.type));
+        const d = this.hurtBeast(o, raw);
+        this.ev(`${hits > 1 ? hits + '번 맞았다! ' : ''}${crit ? '급소에 맞았다!' : e > 1 ? '효과가 굉장했다!' : e < 1 ? '효과가 별로인 듯하다…' : `${foe.name}에게 ${d}의 피해!`}`, { k: 'hit', side: o, type: mv.type, n: d });
         if (fx.drain && b.hp > 0) { b.hp = Math.min(b.maxhp, b.hp + Math.ceil(d / 2)); this.ev(`${J(b.name, '은/는')} 생기를 흡수했다!`, { k: 'heal', side: i }); }
         if (fx.st && foe.hp > 0 && !foe.status && this.rnd() * 100 < fx.st[1]) this.setBeastStatus(o, fx.st[0], true);
+        if (fx.conf && foe.hp > 0) this.confuse({ side: o, zone: 'beast' }, fx.conf);
+        if (fx.flinch && foe.hp > 0 && this.rnd() * 100 < fx.flinch) this.side(o).flinch = true;
+        if (foe.hp > 0 || true) this.contact(o, { side: i, zone: 'beast' });
         this.checkFaint(o);
-      } else this.selfOrFoeFx(i, mv, () => { if (fx.st) this.setBeastStatus(o, fx.st[0]); if (fx.foe) this.stage(o, fx.foe[0], fx.foe[1]); });
+        if (fx.recoil) this.recoil(i, Math.min(0.5, (d * fx.recoil) / b.maxhp), mv.name);
+        if (b.item === 'orb') this.recoil(i, 0.1, '생명의 구슬');
+      } else { this.miscFx(i, mv); this.selfOrFoeFx(i, mv, () => { if (fx.st) this.setBeastStatus(o, fx.st[0]); if (fx.foe) this.stage(o, fx.foe[0], fx.foe[1]); if (fx.conf) this.confuse({ side: o, zone: 'beast' }, fx.conf); }); }
     }
     // 변화기 공통 처리 (자기 강화/회복은 어느 룰에서나 동일)
     selfOrFoeFx(i, mv, foeFn) {
@@ -300,7 +404,7 @@
         if (b.hp >= b.maxhp) this.ev('그러나 HP가 가득 차 있다!');
         else { b.hp = Math.min(b.maxhp, b.hp + Math.floor(b.maxhp * fx.heal)); this.ev(`${J(b.name, '은/는')} 체력을 회복했다!`, { k: 'heal', side: i }); }
       }
-      if (fx.st || fx.foe) foeFn();
+      if (fx.st || fx.foe || fx.conf) foeFn();
     }
 
     // ───────── 턴 진행 (dd / cross) ─────────
@@ -310,13 +414,13 @@
       this.ev(`── ${sd.name}의 턴 ──`, { k: 'turn', side: i });
       if (sd.kind !== 'duelist') return;
       sd.summoned = false;
-      for (const m of sd.mons) if (m) { m.attacks = 0; m.moved = false; }
+      for (const m of sd.mons) if (m) { m.attacks = 0; m.moved = false; m.ign = false; m.guard = false; }
       if (s.turn > 1) {
         if (!sd.deck.length) return this.finish(1 - i, 'deck', `${J(sd.name, '은/는')} 더 이상 드로우할 카드가 없다!`);
         this.draw(i, 1);
       }
     }
-    advance() { if (this.over) return; this.s.cur = 1 - this.s.cur; this.startTurn(); }
+    advance() { if (this.over) return; this.tickWeather(); this.s.cur = 1 - this.s.cur; this.startTurn(); }
     draw(i, n) {
       const sd = this.side(i);
       let c = 0;
@@ -353,8 +457,8 @@
       return v;
     }
     equipSum(i, m, key) { let v = 0; for (const t of this.side(i).st) if (t && t.equipTo === m.uid) v += X.CARDS[t.id].equip[key]; return v; }
-    getAtk(i, m) { const c = X.CARDS[m.id]; return Math.max(0, Math.round((c.atk + m.atkMod + (m.tmpAtk || 0) + this.equipSum(i, m, 'atk') + this.aura(i, c, 'atk')) * (m.status === 'brn' ? 0.7 : 1))); }
-    getDef(i, m) { const c = X.CARDS[m.id]; return Math.max(0, c.def + m.defMod + this.equipSum(i, m, 'def') + this.aura(i, c, 'def')); }
+    getAtk(i, m) { const c = X.CARDS[m.id]; return Math.max(0, Math.round((c.atk + m.atkMod + (m.tmpAtk || 0) + this.equipSum(i, m, 'atk') + this.aura(i, c, 'atk') + this.weatherMod(c.attr, 'atk')) * (m.status === 'brn' ? 0.7 : 1))); }
+    getDef(i, m) { const c = X.CARDS[m.id]; return Math.max(0, c.def + m.defMod + this.equipSum(i, m, 'def') + this.aura(i, c, 'def') + this.weatherMod(c.attr, 'def')); }
     monZones(i) { const out = []; this.side(i).mons.forEach((m, z) => m && out.push(z)); return out; }
     freeZone(arr) { return arr.findIndex((x) => !x); }
     eligibleTraps(i, trig) {
@@ -375,6 +479,29 @@
       const m = this.side(i).mons[z];
       return !!m && this.s.turn > 1 && !m.faceDown && m.pos === 'atk' && m.attacks < (X.CARDS[m.id].fx.twice ? 2 : 1) && m.status !== 'par' && m.status !== 'slp';
     }
+    // 패에서의 특수 소환 조건 (일반 소환 횟수를 쓰지 않는다)
+    canSpecial(i, h) {
+      const sd = this.side(i), c = X.CARDS[sd.hand[h]];
+      if (!c || c.kind !== 'mon' || !c.fx.special || this.freeZone(sd.mons) < 0) return false;
+      if (c.fx.special === 'empty') return !this.monZones(i).length;
+      if (c.fx.special === 'grave3') return sd.grave.filter((id) => X.CARDS[id].kind === 'mon').length >= 3;
+      return false;
+    }
+    // 기동 효과: 앞면 몬스터가 자기 턴에 한 번 쓰는 효과
+    canIgnite(i, z) {
+      const sd = this.side(i), m = sd.mons[z];
+      if (!m || m.faceDown || m.ign) return false;
+      const g = X.CARDS[m.id].fx.ign;
+      if (!g) return false;
+      if (g.cost === 'lp' && sd.lp <= 500) return false;
+      return true;
+    }
+    fusionOf(i, zs) {
+      const sd = this.side(i), ms = zs.map((z) => sd.mons[z]);
+      if (zs.length !== 2 || zs[0] === zs[1] || ms.some((m) => !m || m.faceDown)) return null;
+      const at = ms.map((m) => X.CARDS[m.id].attr).sort().join('+');
+      return X.FUSIONS[at] || X.FUSIONS.any;
+    }
     canChangePos(i, z) { const m = this.side(i).mons[z]; return !!m && !m.moved && m.turn < this.s.turn && !m.attacks && m.status !== 'slp'; }
     // 마법 발동 가능 여부. {target:'opp'|'own'|null} 또는 null
     spellInfo(i, h) {
@@ -382,6 +509,7 @@
       if (!c || c.kind !== 'spell') return null;
       if (c.sub !== 'normal' && this.freeZone(sd.st) < 0) return null;
       if (c.sub === 'equip') return sd.mons.some((m) => m && !m.faceDown) ? { target: 'own' } : null;
+      if (c.fusion) return sd.mons.filter((m) => m && !m.faceDown).length >= 2 ? { target: 'fusion' } : null;
       if (c.target === 'opp') { if (opp.kind === 'tamer') return { target: null }; return this.monZones(o).length ? { target: 'opp' } : null; }
       for (const op of c.ops || []) {
         if (op.op === 'destroyST' && !(opp.kind === 'duelist' && opp.st.some((t) => t))) return null;
@@ -420,11 +548,35 @@
           const c = X.CARDS[sd.hand[a.hand]];
           if (info.target === 'opp' && !opp.mons[a.target]) return false;
           if (info.target === 'own' && !(sd.mons[a.target] && !sd.mons[a.target].faceDown)) return false;
+          if (info.target === 'fusion' && !this.fusionOf(i, a.mats || [])) return false;
           sd.hand.splice(a.hand, 1);
           this.ev(`${J(sd.name, '은/는')} 마법 카드 「${c.name}」 발동!`, { k: 'spell', side: i, card: c.id });
-          if (c.sub === 'equip') { sd.st[this.freeZone(sd.st)] = { id: c.id, faceDown: false, equipTo: sd.mons[a.target].uid }; this.ev(`${X.CARDS[sd.mons[a.target].id].name}에게 장착되었다.`, { k: 'buff', side: i, zone: a.target }); }
-          else if (c.sub === 'cont') sd.st[this.freeZone(sd.st)] = { id: c.id, faceDown: false };
-          else { this.runOps(c.ops, { side: i, name: c.name, target: a.target }); sd.grave.push(c.id); }
+          const ctx = { type: 'spell', side: i, card: c.id, target: a.target, mats: a.mats };
+          const traps = this.eligibleTraps(o, 'spell');
+          if (traps.length) s.wait = { kind: 'trap', side: o, options: traps, ctx };
+          else this.resolveSpell(ctx, false);
+          return true;
+        }
+        case 'special': {
+          if (!this.canSpecial(i, a.hand)) return false;
+          const c = X.CARDS[sd.hand[a.hand]], z = this.freeZone(sd.mons);
+          sd.hand.splice(a.hand, 1);
+          const m = (sd.mons[z] = this.newMon(c.id, 'atk', false));
+          this.ev(`${J(sd.name, '은/는')} ${J(c.name, '을/를')} 특수 소환! (ATK ${c.atk})`, { k: 'summon', side: i, zone: z });
+          if (c.fx.onSummon) this.runOps(c.fx.onSummon, { side: i, name: c.name, self: { side: i, zone: z } });
+          if (this.halted() || sd.mons[z] !== m) return true;
+          const traps = this.eligibleTraps(o, 'summon');
+          if (traps.length) s.wait = { kind: 'trap', side: o, options: traps, ctx: { type: 'summon', side: i, zone: z, uid: m.uid } };
+          return true;
+        }
+        case 'ign': {
+          if (!this.canIgnite(i, a.zone)) return false;
+          const m = sd.mons[a.zone], c = X.CARDS[m.id], g = c.fx.ign;
+          m.ign = true;
+          this.ev(`${c.name}의 효과 발동!`, { k: 'buff', side: i, zone: a.zone });
+          if (g.cost === 'lp') { sd.lp -= 500; this.ev(`${J(sd.name, '은/는')} LP 500을 지불했다.`, { k: 'lp', side: i, n: 500 }); }
+          if (g.cost === 'self') { this.toGrave(i, a.zone); this.ev(`${J(c.name, '은/는')} 제물이 되었다.`, { k: 'destroy', side: i, zone: a.zone }); }
+          this.runOps(g.ops, { side: i, name: c.name, target: a.target, self: { side: i, zone: a.zone } });
           return true;
         }
         case 'setST': {
@@ -451,6 +603,7 @@
           const m = sd.mons[a.zone];
           let target = a.target;
           if (opp.kind === 'tamer') target = 'beast';
+          else if (target === 'direct' && X.CARDS[m.id].fx.direct) target = 'direct';
           else if (this.monZones(o).length) { if (!opp.mons[target]) return false; }
           else target = 'direct';
           m.attacks++;
@@ -471,12 +624,38 @@
       }
       return false;
     }
+    resolveSpell(ctx, neg) {
+      const i = ctx.side, sd = this.side(i), c = X.CARDS[ctx.card];
+      if (neg) { sd.grave.push(c.id); return this.ev(`「${c.name}」의 발동은 무효가 되었다!`); }
+      if (c.sub === 'equip') {
+        const m = sd.mons[ctx.target], z = this.freeZone(sd.st);
+        if (!m || z < 0) { sd.grave.push(c.id); return; }
+        sd.st[z] = { id: c.id, faceDown: false, equipTo: m.uid };
+        return this.ev(`${X.CARDS[m.id].name}에게 장착되었다.`, { k: 'buff', side: i, zone: ctx.target });
+      }
+      if (c.sub === 'cont') { const z = this.freeZone(sd.st); if (z >= 0) sd.st[z] = { id: c.id, faceDown: false }; else sd.grave.push(c.id); return; }
+      if (c.fusion) {
+        const fid = this.fusionOf(i, ctx.mats || []);
+        sd.grave.push(c.id);
+        if (!fid) return this.ev('그러나 융합 소재가 사라졌다!');
+        const names = ctx.mats.map((z) => X.CARDS[sd.mons[z].id].name).join('과(와) ');
+        for (const z of ctx.mats) this.toGrave(i, z);
+        const z = this.freeZone(sd.mons), f = X.CARDS[fid];
+        sd.mons[z] = this.newMon(fid, 'atk', false);
+        this.ev(`${names}이(가) 하나로! 융합 소환 — ${f.name}! (ATK ${f.atk})`, { k: 'summon', side: i, zone: z });
+        if (f.fx.onSummon) this.runOps(f.fx.onSummon, { side: i, name: f.name, self: { side: i, zone: z } });
+        return;
+      }
+      this.runOps(c.ops, { side: i, name: c.name, target: ctx.target });
+      sd.grave.push(c.id);
+    }
     newMon(id, pos, faceDown) { return { uid: this.s.uid++, id, pos, faceDown, turn: this.s.turn, attacks: 0, moved: false, atkMod: 0, defMod: 0, tmpAtk: 0, status: null, stTurns: 0 }; }
     // 필드를 떠날 때의 정리 (장착 카드는 묘지로)
     toGrave(i, z, toHand) {
       const sd = this.side(i), m = sd.mons[z];
       sd.mons[z] = null;
-      (toHand ? sd.hand : sd.grave).push(m.id);
+      const cc = X.CARDS[m.id];
+      if (!cc.token && !(toHand && cc.tier === 9)) (toHand ? sd.hand : sd.grave).push(m.id);
       sd.st.forEach((t, k) => { if (t && t.equipTo === m.uid) { sd.grave.push(t.id); sd.st[k] = null; } });
       return m;
     }
@@ -509,6 +688,7 @@
     unit(who, ctx) {
       const o = 1 - ctx.side, opp = this.side(o);
       if (who === 'attacker') return ctx.attacker;
+      if (who === 'self') return ctx.self;
       if (who === 'summoned') return ctx.summoned;
       if (opp.kind === 'tamer') return { side: o, zone: 'beast' };
       if (who === 'target') return opp.mons[ctx.target] ? { side: o, zone: ctx.target } : null;
@@ -568,6 +748,11 @@
           case 'heal': sd.lp += op.n; this.ev(`${sd.name}의 LP가 ${op.n} 회복되었다.`, { k: 'heal', side: i, lp: 1 }); break;
           case 'draw': this.draw(i, op.n); break;
           case 'negate': res.negate = true; break;
+          case 'weather': this.setWeather(op.w); break;
+          case 'token': {
+            for (let k = 0; k < (op.n || 1); k++) { const z = this.freeZone(sd.mons); if (z < 0) break; sd.mons[z] = this.newMon(op.id, 'def', false); this.ev(`${J(X.CARDS[op.id].name, '이/가')} 나타났다!`, { k: 'summon', side: i, zone: z }); }
+            break;
+          }
           case 'destroy': this.unitDestroy(this.unit(op.who, ctx)); break;
           case 'status': this.unitStatus(this.unit(op.who, ctx), op.st); break;
           case 'bounce': this.unitBounce(this.unit(op.who, ctx)); break;
@@ -616,9 +801,10 @@
         const sd = this.side(owner), t = sd.st[idx], c = X.CARDS[t.id];
         sd.st[idx] = null; sd.grave.push(c.id);
         this.ev(`${sd.name}의 함정 발동! 「${c.name}」`, { k: 'trap', side: owner, card: c.id });
-        const u = ctx.type === 'beastMove' || ctx.type === 'switchIn' ? { side: ctx.side, zone: 'beast' } : { side: ctx.side, zone: ctx.zone, uid: ctx.uid };
+        const u = ctx.type === 'spell' ? null : ctx.type === 'beastMove' || ctx.type === 'switchIn' ? { side: ctx.side, zone: 'beast' } : { side: ctx.side, zone: ctx.zone, uid: ctx.uid };
         neg = !!this.runOps(c.ops, { side: owner, name: c.name, attacker: u, summoned: u }).negate;
       }
+      if (ctx.type === 'spell') return this.resolveSpell(ctx, neg);
       if (ctx.type === 'beastMove') this.beastStrike(ctx, neg);
       else if (ctx.type === 'attack') this.resolveAttack(ctx, neg);
       else if (ctx.type === 'switchIn') this.endTamerTurn(ctx.side);
@@ -632,10 +818,13 @@
       if (opp.kind === 'tamer') {
         // 카드 몬스터 -> 비스트: 비스트 룰의 데미지 공식으로 HP를 깎는다 (속성 상성 적용)
         if (this.active(o).hp <= 0) return;
+        if (opp.protect) { opp.protect = false; return this.ev(`${J(this.active(o).name, '은/는')} 방어 태세로 공격을 막아냈다!`, { k: 'buff', side: o }); }
         const b = this.active(o), e = X.eff(ca.attr, X.BEASTS[b.sp].types);
-        const d = this.hurtBeast(o, Battle.monHit(a, this.bDef(o), e * (0.9 + this.rnd() * 0.1), this.s.link));
+        const d = this.hurtBeast(o, Battle.monHit(a, this.bDef(o), e * (0.9 + this.rnd() * 0.1) * this.defMult(o, ca.attr), this.s.link));
         this.ev(`${b.name}에게 ${d}의 피해!${e > 1 ? ' 효과가 굉장했다!' : e < 1 ? ' 효과가 별로인 듯하다…' : ''}`, { k: 'hit', side: o, type: ca.attr, n: d });
-        this.checkFaint(o);
+        this.contact(o, { side: i, zone: ctx.zone, uid: ctx.uid });
+        const down = this.checkFaint(o);
+        if (down && ca.fx.onKill && sd.mons[ctx.zone] === A) this.runOps(ca.fx.onKill, { side: i, name: ca.name, self: { side: i, zone: ctx.zone } });
         return;
       }
       if (ctx.target === 'direct') return this.hurtLP(o, a);
@@ -643,17 +832,21 @@
       if (!T) return;
       const ct = X.CARDS[T.id], flipped = T.faceDown;
       if (flipped) { T.faceDown = false; this.ev(`뒷면 몬스터는 ${ct.name}! (DEF ${this.getDef(o, T)})`, { k: 'flip', side: o, zone: ctx.target }); }
+      // 전투 내성: 한 턴에 한 번 전투로 파괴되지 않는다
+      const kill = (side, zone, mon) => { const cc = X.CARDS[mon.id]; if (cc.fx.guard && !mon.guard) { mon.guard = true; this.ev(`${J(cc.name, '은/는')} 전투로 파괴되지 않았다!`, { k: 'buff', side, zone }); return false; } this.destroyMon(side, zone); return true; };
+      let won = false;
       if (T.pos === 'atk') {
         const t = this.getAtk(o, T);
-        if (a > t) { this.destroyMon(o, ctx.target); this.hurtLP(o, a - t); }
-        else if (a === t) { this.destroyMon(o, ctx.target); if (sd.mons[ctx.zone] === A) this.destroyMon(i, ctx.zone); }
-        else { this.destroyMon(i, ctx.zone); this.hurtLP(i, t - a); }
+        if (a > t) { won = kill(o, ctx.target, T); this.hurtLP(o, a - t); }
+        else if (a === t) { won = kill(o, ctx.target, T); if (sd.mons[ctx.zone] === A) kill(i, ctx.zone, A); }
+        else { kill(i, ctx.zone, A); this.hurtLP(i, t - a); }
       } else {
         const d = this.getDef(o, T);
-        if (a > d) { this.destroyMon(o, ctx.target); if (ca.fx.pierce) this.hurtLP(o, a - d, `관통! ${opp.name}에게 ${a - d} 데미지!`); }
+        if (a > d) { won = kill(o, ctx.target, T); if (ca.fx.pierce) this.hurtLP(o, a - d, `관통! ${opp.name}에게 ${a - d} 데미지!`); }
         else if (a < d) this.hurtLP(i, d - a, `수비를 뚫지 못했다! ${sd.name}에게 ${d - a} 반사 데미지!`);
         else this.ev('공격이 막혔다!');
       }
+      if (won && ca.fx.onKill && !this.over && sd.mons[ctx.zone] === A) this.runOps(ca.fx.onKill, { side: i, name: ca.name, self: { side: i, zone: ctx.zone } });
       if (flipped && ct.fx.onFlip && !this.over) { this.ev(`${ct.name}의 리버스 효과!`); this.runOps(ct.fx.onFlip, { side: o, name: ct.name }); }
     }
     static monHit(atk, def, mult, link) {
@@ -665,7 +858,7 @@
     // 스트라이크 = 공격 x K x (위력/60) x 자속 x 상성. 카드 룰대로 ATK/DEF와 비교한다.
     strikeBase(i, mv, attr) {
       const b = this.active(i), K = X.CROSS;
-      return this.bAtk(i) * this.K * (mv.pow / K.BASEPOW) * (X.BEASTS[b.sp].types.includes(mv.type) ? K.STAB : 1) * (attr ? X.eff(mv.type, [attr]) : 1);
+      return this.bAtk(i) * this.K * (mv.pow / K.BASEPOW) * (X.BEASTS[b.sp].types.includes(mv.type) ? K.STAB : 1) * (attr ? X.eff(mv.type, [attr]) : 1) * this.atkMult(i, mv) * (mv.fx.multi ? (mv.fx.multi[0] + mv.fx.multi[1]) / 2 : 1);
     }
     crossTamer(i, a) {
       const s = this.s, o = 1 - i, opp = this.side(o), b = this.active(i);
@@ -684,10 +877,11 @@
       if (!mv) return false;
       const zones = this.monZones(o);
       let target = null;
-      if (mv.pow > 0 || mv.fx.st || mv.fx.foe) {
+      if (mv.pow > 0 || mv.fx.st || mv.fx.foe || mv.fx.conf) {
         if (zones.length) { if (!opp.mons[a.target]) return false; target = a.target; }
         else target = mv.pow > 0 ? 'direct' : null;
       }
+      this.side(i).protect = false;
       if (!this.preMove(i)) { this.endTamerTurn(i); return true; }
       if (a.move >= 0) b.moves[a.move].pp--;
       this.ev(`${b.name}의 ${mv.name}!`, { k: 'move', side: i, type: mv.type, target });
@@ -699,12 +893,13 @@
         return true;
       }
       if (this.rnd() * 100 >= mv.acc) this.ev('그러나 빗나갔다!');
-      else this.selfOrFoeFx(i, mv, () => {
+      else { this.miscFx(i, mv); this.selfOrFoeFx(i, mv, () => {
         if (target == null) return this.ev('그러나 대상이 없다!');
         const u = { side: o, zone: target };
         if (mv.fx.st) this.unitStatus(u, mv.fx.st[0]);
+        if (mv.fx.conf) this.confuse(u, mv.fx.conf);
         if (mv.fx.foe) { const m = opp.mons[target], n = -300 * Math.abs(mv.fx.foe[1]); if (mv.fx.foe[0] === 'def') { m.defMod += n; this.ev(`${m.faceDown ? '세트 몬스터' : X.CARDS[m.id].name}의 DEF ${n}!`, { k: 'debuff', side: o, zone: target }); } else this.unitAtk(u, n); }
-      });
+      }); }
       this.endTamerTurn(i);
       return true;
     }
@@ -714,7 +909,7 @@
       const b = this.active(i), mv = ctx.mv === 'struggle' ? STRUGGLE : X.MOVES[ctx.mv];
       if (neg) { this.ev('공격은 무효가 되었다!'); return this.endTamerTurn(i); }
       if (this.rnd() * 100 >= mv.acc) { this.ev('그러나 빗나갔다!'); return this.endTamerTurn(i); }
-      const crit = this.rnd() < 1 / 16;
+      const crit = this.rnd() < (mv.fx.crit ? 1 / 4 : 1 / 16);
       const roll = (crit ? 1.4 : 1) * (0.92 + this.rnd() * 0.08);
       let kill = null;
       if (ctx.target === 'direct' || !opp.mons[ctx.target]) {
@@ -737,10 +932,13 @@
           m.atkMod -= n; m.defMod -= n;
           this.ev(`${J(c.name, '은/는')} 버텨냈지만 충격으로 ATK/DEF가 ${n} 감소했다!`, { k: 'debuff', side: o, zone: z });
           if (mv.fx.st && !m.status && this.rnd() * 100 < mv.fx.st[1]) this.unitStatus({ side: o, zone: z }, mv.fx.st[0]);
+          if (mv.fx.conf) this.confuse({ side: o, zone: z }, mv.fx.conf);
         }
         if (mv.fx.drain && b.hp > 0 && b.hp < b.maxhp) { b.hp = Math.min(b.maxhp, b.hp + Math.ceil(b.maxhp / 8)); this.ev(`${J(b.name, '은/는')} 생기를 흡수했다!`, { k: 'heal', side: i }); }
         if (flipped && c.fx.onFlip && !this.over) { this.ev(`${c.name}의 리버스 효과!`); this.runOps(c.fx.onFlip, { side: o, name: c.name }); }
       }
+      if (!this.halted() && mv.fx.recoil) this.recoil(i, 0.12, mv.name);
+      if (!this.halted() && b.item === 'orb') this.recoil(i, 0.1, '생명의 구슬');
       if (this.halted()) return;
       if (kill && !s.follow && this.bSpd(i) * this.K >= kill.lv * K.SPDLV) {
         s.follow = true;

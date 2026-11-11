@@ -84,7 +84,24 @@
     verdict: M('심판의 빛', 'light', 95, 95, 8),
     mend: M('치유의 빛', 'light', 0, 100, 8, { heal: 0.5 }),
 
-    nip: M('깨물기', 'dark', 55, 100, 25),
+    nip: M('깨물기', 'dark', 55, 100, 25, { flinch: 20 }),
+    // ── 확장 기술: 방어·연속기·반동기·급소기·날씨·혼란 ──
+    guardup: M('방어 태세', 'normal', 0, 100, 10, { protect: 1, pri: 3 }),
+    flurry: M('연속 할퀴기', 'normal', 18, 90, 20, { multi: [2, 5] }),
+    reckless: M('돌진 강타', 'normal', 100, 100, 10, { recoil: 0.25 }),
+    keenedge: M('급소 베기', 'normal', 60, 100, 15, { crit: 1 }),
+    dizzy: M('어지럼 춤', 'normal', 0, 100, 15, { conf: 100 }),
+    sunpray: M('쾌청 기원', 'fire', 0, 100, 5, { weather: 'sun' }),
+    raincall: M('비 부르기', 'water', 0, 100, 5, { weather: 'rain' }),
+    sandveil: M('모래 장막', 'earth', 0, 100, 5, { weather: 'sand' }),
+    flareblitz: M('화염 돌격', 'fire', 110, 100, 8, { recoil: 0.25, st: ['brn', 10] }),
+    seedvolley: M('씨앗 연사', 'grass', 22, 100, 20, { multi: [2, 5] }),
+    stonerain: M('바위 세례', 'earth', 24, 90, 15, { multi: [2, 5] }),
+    psyglare: M('현혹의 빛', 'light', 55, 100, 15, { conf: 30 }),
+    ambush: M('기습', 'dark', 65, 100, 10, { pri: 1, crit: 1 }),
+    skydive: M('급강하', 'wind', 85, 95, 10, { flinch: 30 }),
+    voltcrash: M('뇌전 충돌', 'elec', 105, 100, 8, { recoil: 0.25 }),
+    whirl: M('소용돌이 연타', 'water', 20, 95, 20, { multi: [2, 5] }),
     shade: M('그림자 발톱', 'dark', 70, 100, 15),
     eclipse: M('암흑 강타', 'dark', 90, 95, 8),
   };
@@ -176,4 +193,43 @@
   for (const k in X.ITEMS) X.ITEMS[k].id = k;
 
   X.STATUS = { psn: '독', brn: '화상', par: '마비', slp: '수면' };
+
+  // 특성: 종마다 하나. 크로스전에서는 카드 몬스터에게도 영향을 준다.
+  X.ABILITIES = {
+    blaze: { name: '불씨 본능', desc: 'HP가 1/3 이하일 때 불 기술의 위력 1.5배.' },
+    torrent: { name: '격류 본능', desc: 'HP가 1/3 이하일 때 물 기술의 위력 1.5배.' },
+    overgrow: { name: '신록 본능', desc: 'HP가 1/3 이하일 때 풀 기술의 위력 1.5배.' },
+    guts: { name: '오기', desc: '상태이상일 때 공격 1.5배.' },
+    intim: { name: '기선 제압', desc: '등장 시 상대의 공격을 1랭크 내린다. 카드 몬스터는 전체 ATK -200.' },
+    psn: { name: '독 가시', desc: '자신을 때린 상대를 30% 확률로 독에 걸리게 한다. 카드 몬스터에게도 통한다.' },
+    static: { name: '대전 체질', desc: '자신을 때린 상대를 30% 확률로 마비시킨다. 카드 몬스터에게도 통한다.' },
+    flame: { name: '달궈진 몸', desc: '자신을 때린 상대를 30% 확률로 화상 입힌다. 카드 몬스터에게도 통한다.' },
+    sturdy: { name: '옹골참', desc: 'HP가 가득일 때 쓰러질 공격을 받아도 1로 버틴다. 「파괴」 효과에도 버틴다.' },
+    speed: { name: '가속', desc: '매 턴 종료 시 스피드가 1랭크 오른다.' },
+    regen: { name: '빛의 가호', desc: '매 턴 종료 시 HP를 조금 회복한다.' },
+    thick: { name: '두꺼운 털가죽', desc: '불·물 속성 공격의 피해가 절반.' },
+    rain: { name: '비구름 몰이', desc: '등장 시 비를 내린다. 물 +50% / 불 -50%, 물 몬스터 ATK +300.' },
+    sand: { name: '모래 일으키기', desc: '등장 시 모래바람을 일으킨다. 땅 이외는 매 턴 피해, 땅 몬스터 DEF +400.' },
+    sun: { name: '햇살 부르기', desc: '등장 시 햇살이 강해진다. 불 +50% / 물 -50%, 불 몬스터 ATK +300.' },
+  };
+  const AB = { embercub: 'blaze', flarehound: 'blaze', infernox: 'blaze', aquaring: 'torrent', aqualune: 'torrent', tidedrake: 'torrent', leafy: 'overgrow', leafron: 'overgrow', forestar: 'overgrow',
+    squeako: 'guts', gnawlord: 'guts', flitwing: 'intim', stormhawk: 'intim', wriggle: 'psn', mothra: 'psn', sparklet: 'static', voltragon: 'static', pebblit: 'sturdy', craggon: 'sturdy',
+    finlet: 'speed', wavelord: 'speed', charcoal: 'flame', magmaros: 'sun', shadecat: 'intim', nightpard: 'guts', lumi: 'regen', seraphin: 'regen', molekin: 'sand', lilypad: 'rain', lotusprite: 'rain',
+    grizzle: 'thick', stormwing: 'static', arcalon: 'regen' };
+  for (const k in X.BEASTS) X.BEASTS[k].ab = AB[k] || 'guts';
+  // 확장 기술을 습득 목록에 추가 [종, 레벨, 기술]
+  for (const [sp, lv, mv] of [['embercub', 13, 'keenedge'], ['flarehound', 23, 'sunpray'], ['infernox', 45, 'flareblitz'], ['aquaring', 13, 'guardup'], ['aqualune', 23, 'raincall'], ['tidedrake', 39, 'whirl'],
+    ['leafy', 13, 'seedvolley'], ['leafron', 23, 'guardup'], ['forestar', 39, 'psyglare'], ['squeako', 11, 'flurry'], ['gnawlord', 31, 'reckless'], ['flitwing', 17, 'keenedge'], ['stormhawk', 33, 'skydive'],
+    ['mothra', 24, 'dizzy'], ['sparklet', 17, 'keenedge'], ['voltragon', 41, 'voltcrash'], ['pebblit', 16, 'guardup'], ['craggon', 31, 'stonerain'], ['craggon', 37, 'sandveil'], ['wavelord', 34, 'ambush'],
+    ['charcoal', 20, 'sunpray'], ['magmaros', 38, 'flareblitz'], ['shadecat', 17, 'ambush'], ['nightpard', 33, 'ambush'], ['lumi', 13, 'psyglare'], ['seraphin', 35, 'guardup'], ['molekin', 22, 'stonerain'],
+    ['lilypad', 16, 'raincall'], ['lotusprite', 30, 'whirl'], ['grizzle', 28, 'reckless'], ['stormwing', 1, 'skydive'], ['arcalon', 1, 'psyglare']]) {
+    X.BEASTS[sp].learn.push([lv, mv]); X.BEASTS[sp].learn.sort((a, b) => a[0] - b[0]);
+  }
+  // 지닌 도구: 비스트 한 마리가 하나씩 지닌다
+  Object.assign(X.ITEMS, {
+    leftovers: { id: 'leftovers', name: '남은 열매', price: 1500, hold: 1, desc: '[지닌 도구] 매 턴 HP를 조금 회복.' },
+    orb: { id: 'orb', name: '생명의 구슬', price: 2500, hold: 1, desc: '[지닌 도구] 공격 1.3배. 공격할 때마다 HP가 조금 깎인다.' },
+    sash: { id: 'sash', name: '기합의 띠', price: 1200, hold: 1, desc: '[지닌 도구] HP가 가득일 때 쓰러질 일격을 1번 버틴다.' },
+    charm: { id: 'charm', name: '속성 부적', price: 1800, hold: 1, desc: '[지닌 도구] 자기 속성과 같은 기술의 위력 1.2배.' },
+  });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

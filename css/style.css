@@ -477,3 +477,14 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 #battle.bg-coast .b-scn{top:calc(36% - 26px);height:26px;background:repeating-linear-gradient(90deg,#3f8ee8 0 40px,#58a4f0 40px 80px);animation:skyDrift 30s linear infinite reverse;filter:none}
 #battle.bg-city .b-scn{background:linear-gradient(90deg,#4a3c78 0 60px,transparent 60px 70px,#5a4a88 70px 150px,transparent 150px 164px,#3f3468 164px 230px,transparent 230px 240px) 0 100%/240px 70px repeat-x;filter:none;opacity:.85}
 #battle.bg-cave .b-scn,#battle.bg-indoor .b-scn{top:calc(36% - 88px)}
+
+/* ══ 특성·날씨 ══ */
+.tp-ab{font-size:11.5px;color:#d8c8ff;margin:1px 0}.tp-ab i{color:var(--gold);font-style:normal}
+.bd-ab{font-size:12.5px;color:var(--dim);background:rgba(0,0,0,.22);border-radius:6px;padding:4px 8px;margin-top:4px}.bd-ab b{color:#d8c8ff;margin-right:4px}
+#b-weather{flex:0 0 auto;font-size:12px;font-weight:700;background:rgba(255,255,255,.14);border-radius:6px;padding:2px 8px;margin-left:6px}
+.b-wfx{position:absolute;inset:0;z-index:0!important;pointer-events:none;opacity:0;transition:opacity .6s}
+#battle[data-w=sun] .b-wfx{opacity:1;background:radial-gradient(circle at 78% -6%,rgba(255,236,150,.75),rgba(255,200,90,.22) 34%,transparent 62%)}
+#battle[data-w=rain] .b-wfx{opacity:1;background:repeating-linear-gradient(105deg,transparent 0 22px,rgba(190,220,255,.4) 22px 24px,transparent 24px 48px),linear-gradient(rgba(20,40,90,.36),rgba(20,40,90,.12));background-size:96px 96px,100% 100%;animation:rainFall .35s linear infinite}
+@keyframes rainFall{to{background-position:-26px 96px,0 0}}
+#battle[data-w=sand] .b-wfx{opacity:1;background:repeating-linear-gradient(96deg,transparent 0 30px,rgba(230,200,140,.35) 30px 34px,transparent 34px 70px),linear-gradient(rgba(180,140,80,.3),rgba(180,140,80,.18));background-size:140px 100%,100% 100%;animation:sandBlow .5s linear infinite}
+@keyframes sandBlow{to{background-position:140px 0,0 0}}

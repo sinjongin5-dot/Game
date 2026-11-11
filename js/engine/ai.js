@@ -20,9 +20,12 @@
       let sc = 0;
       if (mv.pow > 0) {
         const stab = X.BEASTS[b.sp].types.includes(mv.type) ? 1.5 : 1;
-        const d = bt.dmgCalc(b.lv, bt.bAtk(i), bt.bDef(o), mv.pow, X.eff(mv.type, X.BEASTS[foe.sp].types) * stab * 0.92);
+        const d = bt.dmgCalc(b.lv, bt.bAtk(i), bt.bDef(o), mv.pow, X.eff(mv.type, X.BEASTS[foe.sp].types) * stab * 0.92 * bt.atkMult(i, mv) * bt.defMult(o, mv.type)) * (fx.multi ? (fx.multi[0] + fx.multi[1]) / 2 : 1);
         sc = Math.min(d, foe.hp) / foe.maxhp * 100 + (d >= foe.hp ? 60 + (fx.pri ? 20 : 0) : 0);
       } else if (fx.st) sc = foe.status ? 0 : fx.st[0] === 'slp' || fx.st[0] === 'par' ? 42 : 30;
+      else if (fx.conf) sc = bt.side(o).conf > 0 ? 0 : 32;
+      else if (fx.weather) sc = bt.s.weather ? 0 : X.BEASTS[b.sp].types.includes({ sun: 'fire', rain: 'water', sand: 'earth' }[fx.weather]) ? 38 : 12;
+      else if (fx.protect) sc = b.hp < b.maxhp * 0.5 ? 14 : 4;
       else if (fx.heal) sc = b.hp < b.maxhp * 0.4 ? 75 : 0;
       else if (fx.self) sc = sd.stages[fx.self[0]] < 2 && b.hp > b.maxhp * 0.6 ? 34 : 0;
       else if (fx.foe) sc = bt.side(o).stages[fx.foe[0]] > -2 ? 22 : 0;
@@ -51,7 +54,9 @@
           else sc = S * 0.4 + (m.pos === 'atk' ? bt.getAtk(o, m) * 0.15 : 0);
           consider({ type: 'move', move: k, target: z }, sc * acc);
         }
-      } else if (fx.st || fx.foe) {
+      } else if (fx.weather) { if (!bt.s.weather && X.BEASTS[b.sp].types.includes({ sun: 'fire', rain: 'water', sand: 'earth' }[fx.weather])) consider({ type: 'move', move: k }, 1100); }
+      else if (fx.protect) { if (b.hp < b.maxhp * 0.45 && zones.some((z) => !opp.mons[z].faceDown && opp.mons[z].pos === 'atk')) consider({ type: 'move', move: k }, 900 * X.rngNext(bt.aiRng)); }
+      else if (fx.st || fx.foe || fx.conf) {
         for (const z of zones) {
           const m = opp.mons[z];
           if (m.faceDown || m.pos !== 'atk') continue;
@@ -59,6 +64,7 @@
           if (a <= maxStrike) continue;
           if (fx.st && !m.status) consider({ type: 'move', move: k, target: z }, (fx.st[0] === 'psn' || fx.st[0] === 'brn' ? 900 : 1300) * acc);
           if (fx.foe) consider({ type: 'move', move: k, target: z }, 700 * acc);
+          if (fx.conf && !m.status) consider({ type: 'move', move: k, target: z }, 1200 * acc);
         }
       } else if (fx.heal) { if (b.hp < b.maxhp * 0.35) consider({ type: 'move', move: k }, 2600); }
       else if (fx.self) { if (sd.stages[fx.self[0]] < 2 && b.hp > b.maxhp * 0.6) consider({ type: 'move', move: k }, fx.self[0] === 'atk' ? 1300 + X.rngNext(bt.aiRng) * 400 : 500); }
@@ -83,6 +89,14 @@
 
     // 1) 드로우 계열 먼저
     for (let h = 0; h < sd.hand.length; h++) { const c = cards[sd.hand[h]]; if (c.kind === 'spell' && c.ops && c.ops[0].op === 'draw' && bt.spellInfo(i, h)) return { type: 'spell', hand: h }; }
+
+    // 1.5) 특수 소환과 기동 효과
+    for (let h = 0; h < sd.hand.length; h++) if (bt.canSpecial(i, h)) return { type: 'special', hand: h };
+    for (const z of bt.monZones(i)) {
+      if (!bt.canIgnite(i, z)) continue;
+      const g = cards[sd.mons[z].id].fx.ign;
+      if (g.cost === 'lp' ? sd.lp > 1500 && sd.deck.length > 3 : g.cost === 'self' ? (cross ? bt.active(o).hp > bt.active(o).maxhp * 0.4 : oppMax >= 1600 && oppMax > myAtkMax) : true) return { type: 'ign', zone: z };
+    }
 
     // 2) 일반 소환
     if (!sd.summoned) {
@@ -121,12 +135,19 @@
         zs.sort((a, b) => bt.getAtk(i, sd.mons[b]) - bt.getAtk(i, sd.mons[a]));
         return { type: 'spell', hand: h, target: c.equip.atk ? zs[0] : zs[zs.length - 1] };
       }
+      if (info.target === 'fusion') {
+        const zs = bt.monZones(i).filter((z) => !sd.mons[z].faceDown).sort((a, b) => bt.getAtk(i, sd.mons[a]) - bt.getAtk(i, sd.mons[b])).slice(0, 2);
+        const fid = bt.fusionOf(i, zs);
+        if (fid && cards[fid].atk >= bt.getAtk(i, sd.mons[zs[1]]) + 500) return { type: 'spell', hand: h, mats: zs };
+        continue;
+      }
       if (c.sub === 'cont') { if (sd.st.some((t) => t && t.id === c.id) || !bt.monZones(i).length) continue; return { type: 'spell', hand: h }; }
       const op = c.ops[0];
       let use = false, target;
       if (info.target === 'opp') target = pickOpp();
       switch (op.op) {
         case 'dmg': use = true; break;
+        case 'weather': { const attr = { sun: 'fire', rain: 'water', sand: 'earth' }[op.w]; use = (!s.weather || s.weather.w !== op.w) && bt.monZones(i).some((z) => cards[sd.mons[z].id].attr === attr); break; }
         case 'heal': use = sd.lp <= sd.maxLp * 0.7; break;
         case 'destroyST': use = true; break;
         case 'revive': use = sd.grave.some((id) => cards[id].kind === 'mon' && cards[id].atk >= 1200); break;
@@ -157,7 +178,7 @@
       if (!bt.canAttack(i, z)) continue;
       const a = bt.getAtk(i, sd.mons[z]);
       if (cross) return { type: 'attack', zone: z, target: 'beast' };
-      if (!oppZones.length) return { type: 'attack', zone: z, target: 'direct' };
+      if (!oppZones.length || cards[sd.mons[z].id].fx.direct) return { type: 'attack', zone: z, target: 'direct' };
       for (const t of oppZones) {
         const T = opp.mons[t];
         let sc = 0;

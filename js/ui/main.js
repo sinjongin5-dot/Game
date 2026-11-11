@@ -97,7 +97,7 @@
     },
 
     // ── 전투 진입 ──
-    mkTeam(spec) { return (typeof spec === 'function' ? spec(this) : spec).map(([sp, lv]) => X.makeBeast(sp, lv, this.holder())); },
+    mkTeam(spec) { return (typeof spec === 'function' ? spec(this) : spec).map(([sp, lv, item]) => { const b = X.makeBeast(sp, lv, this.holder()); if (item) b.item = item; return b; }); },
     async pickMode(force) {
       const p = this.p, canB = p.team.some((b) => b.hp > 0), canD = p.deck.length >= X.DECK_MIN;
       if (force) return force;

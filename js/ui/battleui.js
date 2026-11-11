@@ -72,7 +72,7 @@
       const mode = bt.mode === 'tt' ? '비스트 배틀' : bt.mode === 'dd' ? '듀얼' : '크로스 배틀';
       b.className = 'bg-' + (this.cfg.bg || 'field') + ' m-' + bt.mode;
       const scn = { field: 'T', forest: 'T', cave: '#', indoor: 'xb' }[this.cfg.bg || 'field'];
-      b.innerHTML = `<div class="b-sky"></div><div class="b-scn" ${scn ? `style="background-image:url(${A.prop(scn).url})"` : ''}></div><div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
+      b.innerHTML = `<div class="b-sky"></div><div class="b-scn" ${scn ? `style="background-image:url(${A.prop(scn).url})"` : ''}></div><div class="b-wfx"></div><div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><span id="b-weather" style="display:none"></span><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
         <div id="b-right"><div id="b-log"></div><div id="b-detail" class="hidden"></div></div>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);
@@ -91,6 +91,9 @@
       requestAnimationFrame(() => document.querySelectorAll('#battle [data-to]').forEach((f) => (f.style.width = f.dataset.to + '%')));
       if (this.meKind === 'duelist') this.renderHand();
       this.paintPick();
+      const w = v.weather && v.weather.w, wb = $('#b-weather');
+      $('#battle').dataset.w = w || '';
+      if (wb) { wb.textContent = w ? { sun: '☀ 쾌청', rain: '☂ 비', sand: '≋ 모래바람' }[w] + ' ' + v.weather.t : ''; wb.style.display = w ? '' : 'none'; }
     },
     hpCls: (p) => (p > 50 ? 'g' : p > 20 ? 'y' : 'r'),
     tamerHTML(sd, i) {
@@ -101,7 +104,8 @@
       const dots = sd.wild ? '' : `<div class="tp-team">${sd.team.map((t, k) => `<i class="${t.hp <= 0 ? 'x' : k === sd.active ? 'a' : ''}"></i>`).join('')}</div>`;
       return `<div class="tp-info"><div class="tp-owner">${sd.wild ? '야생 비스트' : sd.name}</div>
         <div class="tp-name">${b.name} <span class="lv">Lv.${b.lv}</span>${b.status ? `<span class="st st-${b.status}">${X.STATUS[b.status]}</span>` : ''}</div>
-        <div class="tp-types">${sp.types.map(typeChip).join('')}<span class="stg">${stg}</span></div>
+        <div class="tp-types">${sp.types.map(typeChip).join('')}<span class="stg">${stg}${sd.conf > 0 ? '<span class="dn">혼란</span>' : ''}${sd.protect ? '<span class="up">방어</span>' : ''}</span></div>
+        <div class="tp-ab" title="${X.ABILITIES[sp.ab].desc}">◆ ${X.ABILITIES[sp.ab].name}${b.item && (i === 0 || this.bt.mode === 'tt') ? ` · <i>${X.ITEMS[b.item].name}</i>` : ''}</div>
         <div class="hpbar"><div class="hpghost" style="width:${old}%" data-to="${pct}"></div><div class="hpfill ${this.hpCls(pct)}" style="width:${old}%" data-to="${pct}"></div></div>
         <div class="tp-hp">HP ${b.hp} / ${b.maxhp}</div>${dots}</div>
         <div class="tp-sprite zone" data-side="${i}" data-zone="beast"><div class="shadow"></div><img class="spr${i === 0 ? ' flip' : ''}${b.hp <= 0 ? ' down' : ''}" src="${A.beastUrl(b.sp)}"></div>`;
@@ -332,7 +336,8 @@
         const usable = b.moves.some((m) => m.pp > 0);
         const foeTypes = bt.side(1).kind === 'tamer' ? X.BEASTS[bt.active(1).sp].types : null;
         const btn = (mv, k, pp) => {
-          const info = mv.pow > 0 ? (cross ? `스트라이크 ${Math.round(bt.strikeBase(0, mv, null) / 10) * 10}` : `위력 ${mv.pow}`) : '변화';
+          const fxs = mv.fx || {}, tag = fxs.multi ? ' ×2~5' : fxs.recoil ? ' · 반동' : fxs.crit ? ' · 급소↑' : fxs.pri ? ' · 선공' : fxs.conf ? ' · 혼란' : fxs.flinch ? ' · 풀죽음' : fxs.weather ? ' · 날씨' : fxs.protect ? ' · 방어' : '';
+          const info = (mv.pow > 0 ? (cross ? `스트라이크 ${Math.round(bt.strikeBase(0, mv, null) / 10) * 10}` : `위력 ${mv.pow}`) : '변화') + tag;
           const e = foeTypes && mv.pow > 0 ? X.eff(mv.type, foeTypes) : 1;
           return `<button class="move" data-act="move" data-i="${k}" ${pp === 0 ? 'disabled' : ''} style="--tc:${X.TYPES[mv.type].color}"><b>${mv.name}</b><span>${X.TYPES[mv.type].name} · ${info}${e > 1 ? ' · <em class="up">효과 굉장</em>' : e < 1 ? ' · <em class="dn">효과 별로</em>' : ''}</span><span class="pp">${pp == null ? '' : `PP ${pp}/${mv.pp}`}</span></button>`;
         };
@@ -390,7 +395,7 @@
     },
     trapModal(req) {
       const sd = this.bt.side(0), m = $('#b-modal'), ctx = req.ctx;
-      const what = ctx.type === 'summon' ? '상대가 몬스터를 소환했다!' : ctx.type === 'switchIn' ? '상대가 비스트를 교체했다!' : '상대의 공격 선언!';
+      const what = ctx.type === 'spell' ? `상대가 「${X.CARDS[ctx.card].name}」을(를) 발동했다!` : ctx.type === 'summon' ? '상대가 몬스터를 소환했다!' : ctx.type === 'switchIn' ? '상대가 비스트를 교체했다!' : '상대의 공격 선언!';
       this.setMsg(what + ' 함정을 발동할까?');
       m.className = 'modal';
       m.innerHTML = `<div class="mbox"><div class="mtitle">${what}</div><div class="tlist">${req.options.map((z) => `<button class="trow trap" data-act="trap" data-i="${z}"><img src="${A.cardUrl(sd.st[z].id)}"><div><b>${X.CARDS[sd.st[z].id].name}</b> 발동<br><small>${X.CARDS[sd.st[z].id].text}</small></div></button>`).join('')}</div><button class="btn" data-act="notrap">발동하지 않는다</button></div>`;
@@ -399,8 +404,8 @@
     rulesModal() {
       const m = $('#b-modal'), mode = this.bt.mode, K = X.Battle.linkK(this.bt.s.link);
       const text = mode === 'tt' ? '<p><b>비스트 룰</b></p><p>양쪽이 동시에 행동을 고르고, 스피드가 빠른 쪽부터 움직인다. 상대의 비스트를 모두 쓰러뜨리면 승리.</p><p>속성 상성(2배/0.5배), 자속 보정(1.5배), 상태이상(독·화상·마비·수면)을 활용하자.</p>'
-        : mode === 'dd' ? '<p><b>카드 룰</b></p><p>턴마다 1장 드로우, 몬스터 일반 소환은 1회. ★5~6은 제물 1장, ★7 이상은 제물 2장.</p><p>공격 표시끼리는 ATK 비교(차이만큼 LP 데미지). 수비 표시는 DEF로 막고 LP는 안전하다.</p><p>함정은 세트한 다음 턴부터 상대 행동에 맞춰 발동. LP가 0이 되거나 덱이 떨어지면 패배.</p>'
-        : `<p><b>크로스 룰</b> — 각자 자기 규칙으로 싸운다. (링크 Lv.${this.bt.s.link})</p><p>● 테이머는 비스트가 모두 쓰러지면, 듀얼리스트는 LP가 0이 되면 패배.</p><p>● 비스트의 기술은 <b>스트라이크</b>(공격×${K.toFixed(0)}×위력/60×상성)가 된다. 몬스터의 ATK(수비 표시면 DEF) 이상이면 파괴하고, 공격 표시였다면 초과분이 LP 데미지. 못 부수면 충격으로 ATK/DEF를 스트라이크의 절반만큼 깎는다. 몬스터가 없으면 LP에 직접!</p><p>● 카드 몬스터의 공격은 비스트의 HP를 깎는다(속성 상성 적용). 반격 피해는 없다.</p><p>● <b>쾌속</b>: 비스트가 몬스터를 격파했을 때 스피드 환산치가 그 몬스터 레벨×400 이상이면 한 번 더 행동.</p><p>● 카드의 「파괴」는 비스트 최대 HP의 35% 피해, 효과 데미지는 선두 비스트가 대신 받는다. 상태이상은 양쪽 모두에 통한다 — 몬스터는 독(매 턴 ATK/DEF -200), 화상(ATK -30%), 마비·수면(공격 불가).</p>`;
+        : mode === 'dd' ? '<p><b>카드 룰</b></p><p>턴마다 1장 드로우, 몬스터 일반 소환은 1회. ★5~6은 제물 1장, ★7 이상은 제물 2장.</p><p>공격 표시끼리는 ATK 비교(차이만큼 LP 데미지). 수비 표시는 DEF로 막고 LP는 안전하다.</p><p>함정은 세트한 다음 턴부터 상대 행동에 맞춰 발동. 조건을 채우면 패에서 <b>특수 소환</b>, 「융합」으로 몬스터 2장을 합쳐 융합 몬스터 소환, 앞면 몬스터의 <b>기동 효과</b>는 한 턴에 한 번. LP가 0이 되거나 덱이 떨어지면 패배.</p>'
+        : `<p><b>크로스 룰</b> — 각자 자기 규칙으로 싸운다. (링크 Lv.${this.bt.s.link})</p><p>● 테이머는 비스트가 모두 쓰러지면, 듀얼리스트는 LP가 0이 되면 패배.</p><p>● 비스트의 기술은 <b>스트라이크</b>(공격×${K.toFixed(0)}×위력/60×상성)가 된다. 몬스터의 ATK(수비 표시면 DEF) 이상이면 파괴하고, 공격 표시였다면 초과분이 LP 데미지. 못 부수면 충격으로 ATK/DEF를 스트라이크의 절반만큼 깎는다. 몬스터가 없으면 LP에 직접!</p><p>● 카드 몬스터의 공격은 비스트의 HP를 깎는다(속성 상성 적용). 반격 피해는 없다.</p><p>● <b>특성·날씨</b>: 등장 특성 「기선 제압」은 몬스터 전체 ATK -200, 접촉 특성은 공격해 온 몬스터에게 상태이상. 쾌청/비는 불·물 몬스터의 ATK를 ±300, 모래바람은 땅 몬스터의 DEF를 +400 하고 비스트의 기술 위력도 바꾼다. 「방어 태세」는 다음 몬스터 공격 한 번을 막는다.</p><p>● <b>쾌속</b>: 비스트가 몬스터를 격파했을 때 스피드 환산치가 그 몬스터 레벨×400 이상이면 한 번 더 행동.</p><p>● 카드의 「파괴」는 비스트 최대 HP의 35% 피해, 효과 데미지는 선두 비스트가 대신 받는다. 상태이상은 양쪽 모두에 통한다 — 몬스터는 독(매 턴 ATK/DEF -200), 화상(ATK -30%), 마비·수면(공격 불가).</p>`;
       m.className = 'modal';
       m.innerHTML = `<div class="mbox wide rules">${text}<button class="btn" data-act="mclose">닫기</button></div>`;
       const prev = this.acts;
@@ -439,13 +444,20 @@
             };
             btns += `<button class="btn" data-act="s-atk">${info.need ? `제물 ${info.need}장 바쳐 ` : ''}소환 (공격 표시)</button><button class="btn" data-act="s-set">세트 (뒷면 수비)</button>`;
             acts['s-atk'] = () => go('atk'); acts['s-set'] = () => go('set');
-          } else btns += `<div class="cd-note">${sd.summoned ? '이번 턴은 이미 소환했다.' : bt.tributeNeed(c) ? `제물이 ${bt.tributeNeed(c)}장 필요하다.` : '몬스터 존이 가득 찼다.'}</div>`;
+          }
+          if (bt.canSpecial(0, h)) { btns = `<button class="btn big" data-act="s-sp">특수 소환</button>` + btns; acts['s-sp'] = () => this.done({ type: 'special', hand: h }); }
+          if (!info && !bt.canSpecial(0, h)) btns += `<div class="cd-note">${sd.summoned ? '이번 턴은 이미 소환했다.' : bt.tributeNeed(c) ? `제물이 ${bt.tributeNeed(c)}장 필요하다.` : '몬스터 존이 가득 찼다.'}</div>`;
         } else if (c.kind === 'spell') {
           const info = bt.spellInfo(0, h);
           if (info) {
             btns += `<button class="btn" data-act="cast">발동</button>`;
             acts.cast = () => {
               if (!info.target) return this.done({ type: 'spell', hand: h });
+              if (info.target === 'fusion') {
+                const mine = bt.monZones(0).filter((z) => !sd.mons[z].faceDown), mats = [];
+                const more = () => { this.cancelBtn(); this.pick(0, mine.filter((z) => !mats.includes(z)), mats.length ? `두 번째 소재를 고르자. → ${X.CARDS[bt.fusionOf(0, [mats[0], mine.find((z) => z !== mats[0])]) || 'fus_chimera'].name}?` : '융합 소재로 쓸 몬스터를 고르자. (1/2)', (z) => { mats.push(z); if (mats.length === 2) this.done({ type: 'spell', hand: h, mats }); else more(); }, (z) => (mats.length ? [X.CARDS[bt.fusionOf(0, [mats[0], z])].name, 'good'] : null)); };
+                return more();
+              }
               const side = info.target === 'opp' ? 1 : 0;
               const zones = bt.monZones(side).filter((z) => side === 1 || !sd.mons[z].faceDown);
               if (zones.length === 1) return this.done({ type: 'spell', hand: h, target: zones[0] });
@@ -480,6 +492,8 @@
             this.pick(1, zones, '공격할 대상을 고르자.', (t) => this.done({ type: 'attack', zone: z, target: t }), (t) => { const T = v.sides[1].mons[t]; if (T.hidden) return ['?', '']; const val = T.pos === 'atk' ? T.a : T.d; return [`${m.a} ${m.a > val ? '>' : m.a === val ? '=' : '<'} ${val}`, m.a > val ? 'good' : 'bad']; });
           };
         } else if (!m.faceDown && m.pos === 'atk' && bt.s.turn <= 1) btns += `<div class="cd-note">첫 턴에는 공격할 수 없다.</div>`;
+        if (bt.canAttack(0, z) && X.CARDS[m.id].fx.direct && bt.side(1).kind === 'duelist' && bt.monZones(1).length) { btns += `<button class="btn" data-act="direct">직접 공격</button>`; acts.direct = () => this.done({ type: 'attack', zone: z, target: 'direct' }); }
+        if (bt.canIgnite(0, z)) { btns += `<button class="btn big" data-act="ign">효과 발동</button>`; acts.ign = () => this.done({ type: 'ign', zone: z }); }
         if (bt.canChangePos(0, z)) { btns += `<button class="btn" data-act="pos">${m.faceDown ? '반전 소환' : m.pos === 'atk' ? '수비 표시로' : '공격 표시로'}</button>`; acts.pos = () => this.done({ type: 'pos', zone: z }); }
       }
       this.acts = acts;
