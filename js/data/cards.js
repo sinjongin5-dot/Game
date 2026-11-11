@@ -129,7 +129,36 @@
   spell('sandfield', '모래 폭풍', 'normal', 2, 'sand', '모래바람이 분다. 땅 몬스터 DEF +400. 땅 이외의 비스트는 매 턴 피해.', { ops: [{ op: 'weather', w: 'sand' }] });
   trap('spellseal', '마법 봉쇄', 'spell', 2, 'seal', '[카운터] 상대가 마법 카드를 발동했을 때: 그 발동을 무효로 한다.', [{ op: 'negate' }]);
   trap('ambushpit', '매복', 'attack', 2, 'snare', '상대 공격 선언 시: 「새끼새 토큰」 2장을 수비 표시로 특수 소환.', [{ op: 'token', id: 'tok_chick', n: 2 }]);
-  X.FUSIONS = { 'fire+wind': 'fus_blazewing', 'earth+water': 'fus_tidalrock', 'dark+light': 'fus_twilight', 'elec+wind': 'fus_stormbolt', 'grass+water': 'fus_yggdra', any: 'fus_chimera' };
+  // ══ 설빙·유적 확장 카드 ══
+  mon('icesprite', '서리 요정', 'ice', 2, 700, 800, 2, L('biped', ['#bfe8f4', '#ffffff', '#58b0e8'], { ears: 'leaf', wings: 1, size: 0.6 }),
+    '소환 시: 상대의 가장 강한 몬스터의 ATK -400.', { onSummon: [{ op: 'atk', who: 'strongest', n: -400 }] });
+  mon('frostknight', '빙결 기사', 'ice', 4, 1600, 1300, 2, L('biped', ['#8fd0e8', '#ffffff', '#c8d0e0'], { armor: 1, gear: 'sword', size: 0.86 }));
+  mon('snowwolf', '설원의 늑대', 'ice', 4, 1700, 700, 2, L('quad', ['#9fd8ec', '#ffffff', '#3f78d0'], { ears: 'point', tail: 'thin', mane: 1, size: 0.84 }),
+    '전투로 상대를 쓰러뜨릴 때마다 ATK +200.', { onKill: [{ op: 'atk', who: 'self', n: 200 }] });
+  mon('icewall', '얼음 성벽병', 'ice', 3, 300, 2100, 2, L('golem', ['#a8dcec', '#e8f8ff', '#607088'], { gear: 'shield', size: 0.82 }));
+  mon('glacierlord', '빙하의 군주', 'ice', 7, 2600, 2400, 3, L('biped', ['#6fc0e0', '#ffffff', '#3f78d0'], { horn: 2, robe: 1, gear: 'staff', wings: 1, size: 1.08 }),
+    '소환 시: 상대의 가장 강한 몬스터를 잠들게 한다.', { onSummon: [{ op: 'status', who: 'strongest', st: 'slp' }] });
+  mon('mummy', '유적의 미라', 'dark', 4, 1500, 1500, 2, L('biped', ['#d8c8a8', '#f8f0d8', '#7a5aa8'], { size: 0.84 }), '한 턴에 한 번, 전투로 파괴되지 않는다.', { guard: true });
+  mon('relicguard', '유적 파수병', 'earth', 4, 1400, 1700, 2, L('golem', ['#c8b888', '#fff8d8', '#58d0c0'], { gear: 'spear', size: 0.88 }));
+  mon('sandworm', '모래 벌레', 'earth', 5, 2100, 1200, 3, L('serpent', ['#c8a868', '#f0e0b8', '#e03a3a'], { horn: 2, size: 0.98 }),
+    '자신 필드에 몬스터가 없으면 패에서 특수 소환할 수 있다.', { special: 'empty' });
+  mon('sphinx', '수수께끼 석상', 'earth', 6, 2300, 2500, 3, L('quad', ['#d8b868', '#fff0c0', '#3f78d0'], { ears: 'point', wings: 1, mane: 1, size: 1.04 }),
+    '소환 시: 상대의 마법·함정 1장을 파괴.', { onSummon: [{ op: 'destroyST' }] });
+  mon('phoenix', '재의 불사조', 'fire', 6, 2200, 1600, 3, L('bird', ['#f0672e', '#ffe9a0', '#f2c318'], { horn: 1, size: 1.02 }),
+    '파괴 시: 상대에게 800 데미지.', { onDestroy: [{ op: 'dmg', n: 800 }] });
+  mon('stormcaller', '폭풍 술사', 'wind', 3, 900, 900, 2, L('biped', ['#58b8b0', '#f0fff8', '#f2c318'], { robe: 1, gear: 'staff', mane: 1, size: 0.74 }),
+    '[기동] 한 턴에 한 번: 이번 턴 자신 몬스터 전체의 ATK +300.', { ign: { ops: [{ op: 'atk', who: 'allOwn', n: 300, temp: true }] } });
+  mon('fus_glacier', '빙하룡 프로스트타이드', 'ice', 8, 2700, 2600, 9, L('serpent', ['#8fe0f0', '#ffffff', '#3c8df0'], { horn: 2, wings: 1, ears: 'fin', size: 1.12 }),
+    '[융합: 얼음+물] 소환 시: 상대 몬스터 전체의 ATK -500.', { onSummon: [{ op: 'atk', who: 'allOpp', n: -500 }] });
+  mon('fus_steam', '증기거신 스팀로어', 'fire', 8, 2600, 2200, 9, L('golem', ['#d8e0e8', '#ffffff', '#f0672e'], { horn: 2, tail: 'flame', size: 1.12 }),
+    '[융합: 불+얼음] 소환 시: 상대에게 800 데미지.', { onSummon: [{ op: 'dmg', n: 800 }] });
+  spell('whiteout', '빙결 폭풍', 'normal', 2, 'wind', '상대 몬스터 전체의 ATK -400.', { ops: [{ op: 'atk', who: 'allOpp', n: -400 }] });
+  spell('excavate', '유물 발굴', 'normal', 2, 'book', '덱에서 레벨 4 이하 몬스터 1장을 패에 넣고, 1장 드로우.', { ops: [{ op: 'search' }, { op: 'draw', n: 1 }] });
+  spell('gracerain', '은총의 비', 'normal', 3, 'heal', 'LP를 1500 회복.', { ops: [{ op: 'heal', n: 1500 }] });
+  spell('landslide', '대지 붕괴', 'normal', 3, 'pit', '상대 몬스터 1장을 파괴하고, 상대에게 300 데미지.', { target: 'opp', ops: [{ op: 'destroy', who: 'target' }, { op: 'dmg', n: 300 }] });
+  trap('icecoffin', '얼음 관', 'attack', 3, 'barrier', '상대 공격 선언 시: 공격을 무효로 하고 그 몬스터를 잠들게 한다.', [{ op: 'negate' }, { op: 'status', who: 'attacker', st: 'slp' }]);
+  trap('cursedtomb', '저주받은 무덤', 'summon', 2, 'curse', '상대가 몬스터를 소환했을 때: 그 몬스터의 ATK -800.', [{ op: 'atk', who: 'summoned', n: -800 }]);
+  X.FUSIONS = { 'ice+water': 'fus_glacier', 'fire+ice': 'fus_steam', 'fire+wind': 'fus_blazewing', 'earth+water': 'fus_tidalrock', 'dark+light': 'fus_twilight', 'elec+wind': 'fus_stormbolt', 'grass+water': 'fus_yggdra', any: 'fus_chimera' };
   C.tok_chick.token = true;
 
   X.CARDS = C;
@@ -137,6 +166,8 @@
   // 덱 프리셋: {카드ID: 장수}
   const D = (o) => { const a = []; for (const k in o) for (let i = 0; i < o[k]; i++) a.push(k); return a; };
   X.DECKS = {
+    ice: D({ icesprite: 2, frostknight: 3, snowwolf: 2, icewall: 2, crystalturtle: 1, rainmaiden: 1, scout: 2, glacierlord: 1, deepwarden: 2, whiteout: 2, fusion: 1, spring: 1, icecoffin: 1, lightbarrier: 1, spellseal: 1, rainfield: 1 }),
+    relic: D({ mummy: 3, relicguard: 2, sandworm: 2, sphinx: 1, effigy: 1, wraith: 2, irongolem: 2, earthtitan: 1, phoenix: 1, archsage: 1, excavate: 2, landslide: 1, sandfield: 1, rebirth: 1, fusion: 1, cursedtomb: 2, icecoffin: 1, mirrorwall: 1, spellseal: 1 }),
     starter: D({ leafsprite: 2, embergob: 2, dropknight: 2, stoneguard: 2, windblade: 2, boltimp: 1, lampmonk: 1, bookworm: 1, whelp: 1, shadowrat: 1, fireball: 1, spring: 1, steelsword: 1, hex: 1, lightbarrier: 1 }),
     novice: D({ leafsprite: 2, embergob: 2, shadowrat: 2, stoneguard: 2, boltimp: 2, bookworm: 2, windblade: 2, whelp: 1, fireball: 2, spring: 1, steelsword: 1, thornmail: 1 }),
     mira1: D({ windblade: 2, whelp: 2, dropknight: 2, boltimp: 2, lampmonk: 1, embergob: 2, stoneguard: 1, bookworm: 2, fireball: 2, steelsword: 2, hex: 1, lightbarrier: 1 }),

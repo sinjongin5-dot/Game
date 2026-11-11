@@ -120,6 +120,10 @@
       const res = await X.BattleUI.run({ sides: [me, foe], link: b.lvl, expSide: mode === 'beast' ? 0 : null, foeLook: npc.look, intro: `${X.josa(npc.name, '이/가')} 승부를 걸어왔다! 【${label}】`, bg: X.OW.map.bg || 'indoor' });
       await this.afterBattle(me);
       if (res.winner === 0) {
+        const stt = (p.stats = p.stats || {});
+        stt.wins = (stt.wins || 0) + 1; if (label === '크로스 배틀') stt.cross = (stt.cross || 0) + 1;
+        stt[mode === 'beast' ? 'beastWins' : 'deckWins'] = (stt[mode === 'beast' ? 'beastWins' : 'deckWins'] || 0) + 1;
+        if (opts.rematch) stt.rematch = (stt.rematch || 0) + 1;
         const first = !p.defeated[id];
         p.defeated[id] = 1;
         const gold = opts.rematch ? Math.floor(b.reward / 4) : b.reward;
@@ -169,6 +173,29 @@
           await X.Cine.evolve(oldSp, old, b);
           for (const m of r.news) { if (b.moves.length < 4) { b.moves.push({ id: m, pp: X.MOVES[m].pp }); await this.say(`${X.josa(b.name, '은/는')} ${X.josa(X.MOVES[m].name, '을/를')} 배웠다!`); } else await X.Menu.learnMove(b, m); }
         }
+      }
+    },
+    // 배틀 타워: 연승할수록 강해지는 상대. 이길 때마다 BP를 얻는다.
+    async tower() {
+      const p = this.p, nm = '배틀 타워 접수원', stt = (p.stats = p.stats || {});
+      for (;;) {
+        const c = await this.choose(`배틀 타워에 어서 오세요! 최고 기록 ${stt.tower || 0}연승 · 보유 ${p.bp || 0} BP`, ['도전한다', 'BP 교환소', '설명을 듣는다', '그만둔다'], nm, 3);
+        if (c === 3) return;
+        if (c === 2) { await this.say(['타워에서는 층마다 무작위 상대가 나옵니다. 테이머일 수도, 듀얼리스트일 수도 있죠.', '층이 오를수록 상대가 강해지고, 매 층 승리 후 회복해 드립니다.', '이길 때마다 층수만큼 BP를 얻고, 지면 도전이 끝납니다. BP는 교환소에서 희귀한 도구와 카드로 바꿀 수 있어요.'], nm); continue; }
+        if (c === 1) { await X.Menu.bpShop(); continue; }
+        const top = Math.max(12, ...p.team.map((b) => b.lv)), h = this.holder(), rnd = () => X.rngNext(h);
+        let floor = 0;
+        for (;;) {
+          floor++;
+          this.healAll();
+          const lvl = Math.min(70, top - 3 + floor), [npc, bt] = X.TOWER.make(this, floor, lvl, rnd);
+          const r = await this.fight(npc, bt, { id: 'tower', noLoss: true, rematch: false });
+          if (r !== 'win') { floor--; await this.say(`도전 종료! 이번 기록은 ${floor}연승입니다.`, nm); break; }
+          p.bp = (p.bp || 0) + floor; stt.tower = Math.max(stt.tower || 0, floor);
+          sfx('get');
+          if ((await this.choose(`${floor}연승! ${floor} BP를 얻었습니다. (보유 ${p.bp} BP)`, ['다음 층으로', '여기서 그만둔다'], nm, 1)) !== 0) break;
+        }
+        this.healAll(); this.save();
       }
     },
     async whiteout() {

@@ -13,13 +13,15 @@
     wind: { name: '바람', color: '#6fd0c8' },
     light: { name: '빛', color: '#f5e79a' },
     dark: { name: '어둠', color: '#7a5aa8' },
+    ice: { name: '얼음', color: '#8fe0f0' },
   };
   const CHART = {
-    fire: { grass: 2, wind: 2, fire: 0.5, water: 0.5, earth: 0.5 },
+    fire: { grass: 2, wind: 2, ice: 2, fire: 0.5, water: 0.5, earth: 0.5 },
+    ice: { grass: 2, wind: 2, earth: 2, fire: 0.5, water: 0.5, ice: 0.5 },
     water: { fire: 2, earth: 2, water: 0.5, grass: 0.5 },
     grass: { water: 2, earth: 2, fire: 0.5, grass: 0.5, wind: 0.5 },
     elec: { water: 2, wind: 2, elec: 0.5, grass: 0.5, earth: 0.5 },
-    earth: { fire: 2, elec: 2, grass: 0.5, wind: 0.5 },
+    earth: { fire: 2, elec: 2, ice: 2, grass: 0.5, wind: 0.5 },
     wind: { grass: 2, earth: 2, elec: 0.5 },
     light: { dark: 2, light: 0.5 },
     dark: { light: 2, dark: 0.5 },
@@ -85,6 +87,10 @@
     mend: M('치유의 빛', 'light', 0, 100, 8, { heal: 0.5 }),
 
     nip: M('깨물기', 'dark', 55, 100, 25, { flinch: 20 }),
+    frostbite: M('얼음 조각', 'ice', 40, 100, 25),
+    icefang: M('서리 송곳니', 'ice', 65, 95, 15, { flinch: 20 }),
+    blizzard: M('눈보라', 'ice', 100, 85, 8),
+    icicles: M('고드름 연사', 'ice', 22, 100, 20, { multi: [2, 5] }),
     // ── 확장 기술: 방어·연속기·반동기·급소기·날씨·혼란 ──
     guardup: M('방어 태세', 'normal', 0, 100, 10, { protect: 1, pri: 3 }),
     flurry: M('연속 할퀴기', 'normal', 18, 90, 20, { multi: [2, 5] }),
@@ -180,6 +186,35 @@
     arcalon: B('아르카론', ['light', 'dark'], [100, 110, 100, 100], [[1, 'radiance'], [1, 'shade'], [1, 'mend'], [50, 'verdict'], [50, 'eclipse']],
       { catchRate: 8, xp: 300, look: { shape: 'quad', c: ['#f0f0ff', '#3a2a58', '#f5e79a'], ears: 'point', horn: 2, wings: 1, mane: 1, tail: 'flame', size: 1.08 }, desc: '대융합 때 태어났다는, 두 세계의 경계에 선 존재.' }),
   };
+  // ── 설빙 고개 · 고대 유적의 비스트 ──
+  Object.assign(X.BEASTS, {
+    frostpup: B('눈꼬리', ['ice'], [48, 56, 45, 60], [[1, 'claw'], [5, 'frostbite'], [9, 'howl'], [12, 'dash'], [18, 'icefang']],
+      { evo: [26, 'frostfang'], catchRate: 150, xp: 66, look: { shape: 'quad', c: ['#bfe8f4', '#ffffff', '#58b0e8'], ears: 'point', tail: 'thin', size: 0.66 }, desc: '눈밭을 구르며 논다. 꼬리로 눈을 뿌린다.' }),
+    frostfang: B('설랑', ['ice'], [72, 94, 66, 98], [[1, 'frostbite'], [1, 'howl'], [26, 'icefang'], [29, 'keenedge'], [33, 'rouse'], [38, 'blizzard']],
+      { catchRate: 70, xp: 168, look: { shape: 'quad', c: ['#9fd8ec', '#ffffff', '#3f78d0'], ears: 'point', tail: 'thin', mane: 1, size: 0.95 }, desc: '눈보라 속에서 무리를 이끄는 은빛 늑대.' }),
+    snowmoth: B('서리나방', ['ice', 'wind'], [60, 58, 62, 84], [[1, 'gust'], [1, 'frostbite'], [20, 'dizzy'], [27, 'gale'], [33, 'icicles'], [38, 'blizzard']],
+      { catchRate: 100, xp: 140, look: { shape: 'bird', c: ['#d8f0ff', '#ffffff', '#8fb8e0'], ears: 'antenna', size: 0.84 }, desc: '날갯가루가 닿은 곳에는 서리가 내린다.' }),
+    glacub: B('얼음돌이', ['ice', 'earth'], [55, 60, 80, 25], [[1, 'ram'], [1, 'brace'], [8, 'frostbite'], [14, 'mud'], [22, 'rockfall'], [27, 'icicles']],
+      { evo: [32, 'glaciem'], catchRate: 140, xp: 70, look: { shape: 'golem', c: ['#a8dcec', '#e8f8ff', '#607088'], size: 0.66 }, desc: '몸의 절반이 만년설로 되어 있다.' }),
+    glaciem: B('빙산거인', ['ice', 'earth'], [88, 98, 118, 35], [[1, 'frostbite'], [1, 'brace'], [32, 'icicles'], [34, 'burrow'], [39, 'guardup'], [43, 'blizzard'], [47, 'quake']],
+      { catchRate: 50, xp: 178, look: { shape: 'golem', c: ['#8cc8dc', '#e8f8ff', '#3f78d0'], horn: 2, size: 1.02 }, desc: '걸어 다니는 빙산. 지나간 길은 얼어붙는다.' }),
+    wisplet: B('도깨비불씨', ['fire', 'dark'], [42, 58, 40, 70], [[1, 'cinder'], [6, 'glare'], [11, 'nip'], [17, 'wisp'], [23, 'shade']],
+      { evo: [30, 'lanternox'], catchRate: 130, xp: 68, look: { shape: 'blob', c: ['#5a4a78', '#f0672e', '#ffcf3a'], ears: 'point', tail: 'flame', size: 0.6 }, desc: '유적의 어둠 속을 떠다니는 작은 불.' }),
+    lanternox: B('귀등롱', ['fire', 'dark'], [68, 96, 64, 98], [[1, 'cinder'], [1, 'wisp'], [30, 'shade'], [33, 'flamefang'], [38, 'ambush'], [42, 'blaze'], [46, 'eclipse']],
+      { catchRate: 55, xp: 172, look: { shape: 'biped', c: ['#3a2a58', '#f0672e', '#ffcf3a'], horn: 2, robe: 1, tail: 'flame', size: 0.94 }, desc: '길 잃은 자를 등불로 홀린다는 유적의 주인.' }),
+    sandsting: B('모래침', ['earth', 'dark'], [50, 66, 62, 58], [[1, 'claw'], [6, 'mud'], [12, 'nip'], [18, 'toxin'], [24, 'burrow']],
+      { evo: [32, 'scorpike'], catchRate: 130, xp: 70, look: { shape: 'quad', c: ['#c8a868', '#f0e0b8', '#7a5aa8'], ears: 'none', tail: 'bolt', horn: 2, size: 0.64 }, desc: '모래 속에 숨어 꼬리 침만 내놓는다.' }),
+    scorpike: B('사막제왕', ['earth', 'dark'], [76, 104, 96, 72], [[1, 'mud'], [1, 'toxin'], [32, 'burrow'], [35, 'stonerain'], [39, 'sandveil'], [43, 'eclipse'], [47, 'quake']],
+      { catchRate: 50, xp: 176, look: { shape: 'quad', c: ['#a88848', '#f0e0b8', '#5a3a78'], ears: 'none', tail: 'bolt', horn: 2, mane: 1, size: 0.98 }, desc: '모래 폭풍과 함께 나타나는 유적의 사냥꾼.' }),
+    relicore: B('유적핵', ['earth', 'light'], [80, 84, 104, 50], [[1, 'glint'], [1, 'rockfall'], [1, 'guardup'], [40, 'radiance'], [44, 'quake'], [48, 'verdict']],
+      { catchRate: 45, xp: 185, look: { shape: 'golem', c: ['#c8b888', '#fff8d8', '#58d0c0'], horn: 1, size: 0.9 }, desc: '고대인이 만든 수호 장치. 가슴의 핵이 빛난다.' }),
+    minidrake: B('아기비룡', ['wind', 'fire'], [52, 64, 50, 62], [[1, 'gust'], [1, 'cinder'], [14, 'wingcut'], [20, 'flamefang'], [28, 'skydive']],
+      { evo: [36, 'wyverun'], catchRate: 60, xp: 90, look: { shape: 'quad', c: ['#d86a4a', '#ffe0b8', '#f2c318'], horn: 2, wings: 1, tail: 'flame', size: 0.66 }, desc: '아직 불을 제대로 뿜지 못해 재채기를 한다.' }),
+    wyverun: B('적풍비룡', ['wind', 'fire'], [84, 108, 78, 102], [[1, 'wingcut'], [1, 'flamefang'], [36, 'skydive'], [40, 'blaze'], [45, 'tempest'], [50, 'flareblitz']],
+      { catchRate: 30, xp: 220, look: { shape: 'serpent', c: ['#c8381a', '#ffe0b8', '#f2c318'], horn: 2, wings: 1, tail: 'flame', size: 1.08 }, desc: '붉은 바람을 타고 설산을 넘는 비룡.' }),
+    glacion: B('빙룡 글라시온', ['ice', 'water'], [100, 104, 96, 96], [[1, 'icefang'], [1, 'tidal'], [1, 'guardup'], [1, 'blizzard'], [50, 'nap']],
+      { catchRate: 10, xp: 300, look: { shape: 'serpent', c: ['#8fe0f0', '#ffffff', '#3f78d0'], horn: 2, wings: 1, ears: 'fin', tail: 'fin', mane: 1, size: 1.12 }, desc: '만년설 아래 잠들어 있던 얼음의 용.' }),
+  });
   for (const k in X.BEASTS) X.BEASTS[k].id = k;
 
   X.ITEMS = {
@@ -215,7 +250,8 @@
   const AB = { embercub: 'blaze', flarehound: 'blaze', infernox: 'blaze', aquaring: 'torrent', aqualune: 'torrent', tidedrake: 'torrent', leafy: 'overgrow', leafron: 'overgrow', forestar: 'overgrow',
     squeako: 'guts', gnawlord: 'guts', flitwing: 'intim', stormhawk: 'intim', wriggle: 'psn', mothra: 'psn', sparklet: 'static', voltragon: 'static', pebblit: 'sturdy', craggon: 'sturdy',
     finlet: 'speed', wavelord: 'speed', charcoal: 'flame', magmaros: 'sun', shadecat: 'intim', nightpard: 'guts', lumi: 'regen', seraphin: 'regen', molekin: 'sand', lilypad: 'rain', lotusprite: 'rain',
-    grizzle: 'thick', stormwing: 'static', arcalon: 'regen' };
+    grizzle: 'thick', stormwing: 'static', arcalon: 'regen', frostpup: 'intim', frostfang: 'intim', snowmoth: 'regen', glacub: 'sturdy', glaciem: 'sturdy',
+    wisplet: 'flame', lanternox: 'flame', sandsting: 'sand', scorpike: 'sand', relicore: 'sturdy', minidrake: 'guts', wyverun: 'intim', glacion: 'regen' };
   for (const k in X.BEASTS) X.BEASTS[k].ab = AB[k] || 'guts';
   // 확장 기술을 습득 목록에 추가 [종, 레벨, 기술]
   for (const [sp, lv, mv] of [['embercub', 13, 'keenedge'], ['flarehound', 23, 'sunpray'], ['infernox', 45, 'flareblitz'], ['aquaring', 13, 'guardup'], ['aqualune', 23, 'raincall'], ['tidedrake', 39, 'whirl'],

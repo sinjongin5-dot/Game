@@ -214,6 +214,12 @@
       case 'p': floor(); R(5, 10, 6, 5, '#b86a48'); g.fillStyle = '#3f9a48'; g.beginPath(); g.arc(8, 6, 5, 0, 7); g.fill(); R(6, 3, 2, 2, '#62bf5c'); break;
       case 'z': fill('#e8e0d0'); R(4, 11, 8, 4, '#a8a294'); R(6, 3, 4, 8, '#c8c2b4'); R(5, 1, 6, 4, '#d8d2c4'); R(4, 11, 8, 1, '#c8c2b4'); break;
       case 'e': fill('#2a2438'); R(0, 0, 16, 1, '#f5e79a'); R(0, 15, 16, 1, '#f5e79a'); R(7, 0, 2, 16, '#3a3450'); break; // 듀얼 필드 바닥
+      case 'n': fill('#eef4fa'); dots('#d8e4f0', 9); dots('#ffffff', 6); break; // 눈
+      case 'j': fill('#dfe9f2'); dots('#c8d8e8', 10, 2, 1); dots('#ffffff', 5); break; // 눈밭 수풀 바닥
+      case 'i': fill('#a8dcf4'); R(2, 3, 6, 1, '#e0f6ff'); R(9, 8, 5, 1, '#e0f6ff'); R(4, 12, 4, 1, '#7ac0e8'); R(11, 4, 1, 3, '#7ac0e8'); break; // 얼음
+      case 'u': fill('#cdb98c'); R(0, 0, 16, 1, '#b5a074'); R(0, 0, 1, 16, '#b5a074'); R(8, 0, 1, 8, '#bca87c'); R(0, 8, 16, 1, '#bca87c'); R(4, 8, 1, 8, '#bca87c'); dots('#dccba0', 5); break; // 유적 바닥
+      case 'v': fill('#bca87c'); dots('#9a8660', 10, 2, 1); R(3, 4, 4, 2, '#9a8660'); R(10, 10, 3, 2, '#9a8660'); R(11, 3, 2, 2, '#dccba0'); break; // 유적 잔해
+      case '7': fill('#7a6848'); break; // 유적 벽 밑
       case '1': fill('#8f897c'); dots('#7d776b', 9, 2, 1); dots('#a59f92', 5); break; // 바위 지대 바닥
       case '2': fill('#2a2230'); dots('#221a28', 8, 2, 2); break; // 동굴 벽 밑
       case '3': fill('#5a5248'); break; // 건물 기초
@@ -248,6 +254,9 @@
     sera: { hair: '#58b0e8', top: '#f4f4ff', bot: '#3f78d0', coat: '#3f78d0' },
     mujin: { hair: '#c8381a', top: '#3a3030', bot: '#5a3020' },
     noah: { hair: '#1a1626', top: '#5a3a78', bot: '#1a1626', coat: '#3a2a58' },
+    seolhwa: { hair: '#d8f0ff', top: '#f4faff', bot: '#58b0e8', coat: '#8fe0f0' },
+    anu: { hair: '#2a2230', top: '#d8b868', bot: '#7a5a38', hat: '#f2c94c' },
+    tower: { hair: '#8a58c0', top: '#2a2438', bot: '#2a2438', hat: '#f2c94c' },
     aria: { hair: '#f5e79a', top: '#f8f8ff', bot: '#c8a040', coat: '#e03a3a' },
   };
   // 캐릭터: 24x32, 4방향 x 4프레임 걷기 (0·2 서기, 1·3 발 내딛기)
@@ -302,7 +311,7 @@
   }
 
   // ── 2.5D 소품: 지면 위에 세워지는 스프라이트 (폭 16px, 높이 가변) ──
-  const PROP_H = { T: 30, '^': 24, '#': 26, f: 12, S: 16, C: 24, ':': 7, xb: 30, xs: 8, k: 26, p: 22, t: 11, c: 13, h: 22, z: 26 };
+  const PROP_H = { I: 32, j: 7, U: 28, T: 30, '^': 24, '#': 26, f: 12, S: 16, C: 24, ':': 7, xb: 30, xs: 8, k: 26, p: 22, t: 11, c: 13, h: 22, z: 26 };
   const propCache = {};
   function prop(key) {
     if (propCache[key]) return propCache[key];
@@ -310,6 +319,9 @@
     const R = (x, y, w, hh, c) => { g.fillStyle = c; g.fillRect(x, y, w, hh); };
     const Cc = (x, y, r, c) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
     switch (key) {
+      case 'I': R(7, 24, 3, 8, '#5a3820'); g.fillStyle = '#1f6a4a'; for (const [y, w] of [[4, 6], [10, 10], [17, 14]]) { g.beginPath(); g.moveTo(8, y - 4); g.lineTo(8 + w / 2, y + 8); g.lineTo(8 - w / 2, y + 8); g.fill(); } g.fillStyle = '#f4faff'; for (const [y, w] of [[4, 4], [10, 7], [17, 10]]) { g.beginPath(); g.moveTo(8, y - 4); g.lineTo(8 + w / 2, y + 3); g.lineTo(8 - w / 2, y + 3); g.fill(); } break;
+      case 'j': g.fillStyle = '#a8c0d8'; for (let x = 0; x < 16; x += 2) g.fillRect(x, (x * 7) % 3, 1, 7); g.fillStyle = '#ffffff'; for (let x = 1; x < 16; x += 4) g.fillRect(x, 1 + (x % 3), 1, 6); break;
+      case 'U': R(0, 0, 16, 28, '#b89c68'); R(0, 0, 16, 3, '#dcc890'); R(0, 3, 16, 1, '#8a7448'); R(0, 12, 16, 1, '#8a7448'); R(0, 20, 16, 1, '#8a7448'); R(7, 4, 1, 8, '#8a7448'); R(3, 13, 1, 7, '#8a7448'); R(11, 13, 1, 7, '#8a7448'); R(7, 21, 1, 7, '#8a7448'); R(4, 6, 2, 2, '#58d0c0'); R(12, 15, 2, 2, '#58d0c0'); R(0, 25, 16, 3, '#7a6848'); break;
       case 'T': R(6, 21, 4, 9, '#6a4428'); R(6, 21, 1, 9, '#8a5c38'); Cc(8, 12, 8, '#256e30'); Cc(8, 10, 7.5, '#2f8a3c'); Cc(6, 7, 4.5, '#48a850'); Cc(11, 13, 3.5, '#1f5f2a'); R(4, 5, 2, 1, '#7ad070'); R(6, 4, 2, 1, '#7ad070'); break;
       case '^': R(0, 5, 16, 19, '#827c70'); g.fillStyle = '#9a9488'; g.beginPath(); g.moveTo(0, 8); g.lineTo(4, 1); g.lineTo(8, 6); g.lineTo(12, 0); g.lineTo(16, 7); g.lineTo(16, 12); g.lineTo(0, 12); g.fill(); R(3, 3, 1, 6, '#b8b2a4'); R(11, 2, 1, 7, '#b8b2a4'); R(0, 20, 16, 4, '#69645a'); R(6, 12, 1, 7, '#69645a'); R(13, 14, 1, 6, '#69645a'); break;
       case '#': R(0, 0, 16, 26, '#3f3446'); R(0, 0, 16, 3, '#66566a'); R(0, 3, 16, 1, '#2a2230'); R(4, 7, 1, 9, '#2a2230'); R(11, 12, 1, 10, '#2a2230'); R(7, 16, 3, 1, '#2a2230'); R(0, 22, 16, 4, '#2a2230'); R(1, 9, 2, 1, '#5a4c5c'); R(12, 6, 2, 1, '#5a4c5c'); break;

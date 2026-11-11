@@ -95,7 +95,8 @@
     open(tab) {
       const p = G.p;
       let cur = tab || 'team', sel = 0, cardSel = null, useItem = null;
-      const tabs = [['team', '비스트'], ['deck', '덱'], ['bag', '가방'], ['info', '링커'], ['save', '저장'], ['close', '닫기']];
+      const tabs = [['team', '비스트'], ['deck', '덱'], ['bag', '가방'], ['quest', '의뢰'], ['info', '링커'], ['save', '저장'], ['close', '닫기']];
+      p.quests = p.quests || {};
       const body = () => {
         if (cur === 'team') {
           if (!p.team.length) return '<div class="hint">아직 비스트가 없다.</div>';
@@ -115,6 +116,11 @@
         if (cur === 'bag') {
           const ids = Object.keys(p.bag).filter((k) => p.bag[k] > 0);
           return `<div class="gold">소지금 ${p.gold} G</div><div class="tlist">${ids.length ? ids.map((k) => `<button class="trow" data-act="use" data-id="${k}"><div><b>${X.ITEMS[k].name}</b> ×${p.bag[k]}<br><small>${X.ITEMS[k].desc}</small></div></button>`).join('') : '<div class="hint">가방이 비어 있다.</div>'}</div>`;
+        }
+        if (cur === 'quest') {
+          const rw = (r) => [r.gold ? r.gold + ' G' : '', r.item ? X.ITEMS[r.item[0]].name + ' ×' + r.item[1] : '', r.card ? '카드 「' + X.CARDS[r.card[0]].name + '」 ×' + r.card[1] : ''].filter(Boolean).join(' · ');
+          const done = X.QUESTS.filter((q) => p.quests[q.id]).length;
+          return `<div class="quest">의뢰 달성 ${done} / ${X.QUESTS.length} · 타워 최고 ${(p.stats && p.stats.tower) || 0}연승 · ${p.bp || 0} BP</div><div class="qlist">${X.QUESTS.map((q) => { const c = Math.min(q.goal, q.cur(G)), ok = c >= q.goal, got = p.quests[q.id]; return `<div class="qrow${got ? ' got' : ok ? ' ok' : ''}"><div><b>${q.name}</b><small>${q.desc}</small><div class="xpbar"><div style="width:${(c / q.goal) * 100}%"></div></div></div><div class="qr"><small>${rw(q.reward)}</small>${got ? '<span class="up">수령 완료</span>' : ok ? `<button class="btn big" data-act="claim" data-id="${q.id}">보상 받기</button>` : `<span>${c} / ${q.goal}</span>`}</div></div>`; }).join('')}</div>`;
         }
         if (cur === 'info') {
           const all = Object.keys(X.BEASTS), seen = all.filter((k) => p.seen[k]).length, caught = all.filter((k) => p.caught[k]).length;
@@ -147,6 +153,13 @@
             if (!p.bag[useItem]) useItem = null;
           }
           sel = k; m.paint();
+        },
+        claim: (d, m) => {
+          const q = X.QUESTS.find((x) => x.id === d.id), r = q.reward;
+          if (p.quests[q.id] || q.cur(G) < q.goal) return;
+          p.quests[q.id] = 1;
+          if (r.gold) p.gold += r.gold; if (r.item) G.give(r.item[0], r.item[1]); if (r.card) G.giveCard(r.card[0], r.card[1]);
+          G.sfx('win'); G.toast(`의뢰 「${q.name}」 달성!`); m.paint();
         },
         nouse: (d, m) => { useItem = null; m.paint(); },
         hold: (d, m) => { const b = p.team[sel]; if (b.item) G.give(b.item); p.bag[d.id]--; b.item = d.id; G.sfx('get'); m.paint(); },
@@ -188,6 +201,14 @@
         single: (d, m) => { const pr = SINGLE_PRICE[X.CARDS[d.id].tier]; if (p.gold < pr) return; p.gold -= pr; G.giveCard(d.id); det = d.id; G.sfx('get'); m.paint(); },
         x: (d, m) => m.close(),
       }, { cls: 'wide', hover: (d) => { det = d.hover; const e = $('#shop-det'); if (e) e.innerHTML = X.cardDetail(det); } });
+    },
+    bpShop() {
+      const p = G.p, T = X.TOWER;
+      return modal(() => `<div class="mtitle">BP 교환소 <span class="gold">${p.bp || 0} BP</span></div><div class="tlist">${Object.entries(T.bp).map(([k, c]) => `<button class="trow" data-act="bi" data-id="${k}" ${(p.bp || 0) < c ? 'disabled' : ''}><div><b>${X.ITEMS[k].name}</b> <span class="price">${c} BP</span> <small>(보유 ${p.bag[k] || 0})</small><br><small>${X.ITEMS[k].desc}</small></div></button>`).join('')}${Object.entries(T.bpCards).map(([k, c]) => `<button class="trow" data-act="bc" data-id="${k}" ${(p.bp || 0) < c ? 'disabled' : ''}><img src="${A.cardUrl(k)}"><div><b>${X.CARDS[k].name}</b> <span class="price">${c} BP</span> <small>(보유 ${p.cards[k] || 0})</small><br><small>${X.CARDS[k].text}</small></div></button>`).join('')}</div><button class="btn" data-act="x">나가기</button>`, {
+        bi: (d, m) => { const c = T.bp[d.id]; if ((p.bp || 0) < c) return; p.bp -= c; G.give(d.id); G.sfx('get'); m.paint(); },
+        bc: (d, m) => { const c = T.bpCards[d.id]; if ((p.bp || 0) < c) return; p.bp -= c; G.giveCard(d.id); G.sfx('get'); m.paint(); },
+        x: (d, m) => m.close(),
+      }, { cls: 'mid' });
     },
     showCards(title, ids) {
       return modal(() => `<div class="mtitle">${title}</div><div class="reveal">${ids.map((id) => `<div class="rv">${X.cardHTML(id)}<small>${X.CARDS[id].text || (X.CARDS[id].kind === 'mon' ? 'ATK ' + X.CARDS[id].atk + ' / DEF ' + X.CARDS[id].def : '')}</small></div>`).join('')}</div><button class="btn big" data-act="x">확인</button>`, { x: (d, m) => m.close() }, { cls: 'mid', onA: (m) => m.close() });

@@ -38,6 +38,8 @@
     cave: [[26, '#b8a8c8', 2, 4, -3, 1]],
     city: [[18, '#ffe9a8', 3, 5, -6, 1]],
     indoor: [[14, '#fff4d0', 2, 3, -4, 1]],
+    snow: [[46, '#ffffff', 3, -14, 46, 0], [20, '#e8f4ff', 2, -8, 30, 0]],
+    ruins: [[24, '#f0dca0', 2, 5, -3, 1]],
   };
 
   const OW = (X.OW = {
@@ -77,6 +79,8 @@
     base(ch) {
       const m = this.map;
       if ('TfS:'.includes(ch)) return ch === ':' ? ':' : '.';
+      if (ch === 'I') return 'n';
+      if (ch === 'U') return '7';
       if (ch === '^' || ch === 'C') return '1';
       if (ch === '#') return '2';
       if (ROOF.includes(ch)) return '3';
@@ -89,7 +93,7 @@
     propKey(ch, x, y) {
       const m = this.map;
       if (ch === 'x') return y === m.h - 1 ? 'xs' : 'xb';
-      return 'T^#fSC:kptchz'.includes(ch) ? ch : null;
+      return 'T^#fSC:kptchzIjU'.includes(ch) ? ch : null;
     },
     build() {
       const m = this.map, pl = this.plane, bg = m.bg || 'indoor';
@@ -117,11 +121,11 @@
           let n = 1;
           while (x + n < m.w && this.propKey(m.tiles[y][x + n], x + n, y) === k) n++;
           const P = A.prop(k), h = P.h * 3;
-          const d = board(x * TS, (y + (k === ':' ? 1 : 0.98)) * TS, n * TS, h, 'prop p-' + (k === ':' ? 'grass' : k), `background-image:url(${P.url});background-size:${TS}px ${h}px`);
-          if (k === 'T' || k === ':') d.firstChild.style.animationDelay = -((x * 37 + y * 91) % 40) / 10 + 's';
+          const d = board(x * TS, (y + (k === ':' || k === 'j' ? 1 : 0.98)) * TS, n * TS, h, 'prop p-' + (k === ':' || k === 'j' ? 'grass' : k === 'I' ? 'T' : k), `background-image:url(${P.url});background-size:${TS}px ${h}px`);
+          if (k === 'T' || k === ':' || k === 'I' || k === 'j') d.firstChild.style.animationDelay = -((x * 37 + y * 91) % 40) / 10 + 's';
           pl.appendChild(d);
-          if (k === 'T' || k === 'p' || k === 'z') for (let i = 0; i < n; i++) sh((x + i) * 16 + 9, y * 16 + 15, 7, 2.5, 0.28);
-          if ((k === '#' || k === '^' || k === 'xb') && y + 1 < m.h) { g.fillStyle = 'rgba(10,8,24,0.22)'; g.fillRect(x * 16, (y + 1) * 16, n * 16, 3); }
+          if (k === 'T' || k === 'I' || k === 'p' || k === 'z') for (let i = 0; i < n; i++) sh((x + i) * 16 + 9, y * 16 + 15, 7, 2.5, 0.28);
+          if ((k === '#' || k === '^' || k === 'xb' || k === 'U') && y + 1 < m.h) { g.fillStyle = 'rgba(10,8,24,0.22)'; g.fillRect(x * 16, (y + 1) * 16, n * 16, 3); }
           x += n;
         }
       }
@@ -138,7 +142,7 @@
         }
       }
       // 구름 그림자 (실외)
-      if (!m.indoor && bg !== 'cave') { const c = el('div', 'f3 clouds'); c.style.cssText = `width:${m.w * TS}px;height:${m.h * TS}px;transform:translateZ(1px)`; pl.appendChild(c); }
+      if (!m.indoor && bg !== 'cave' && bg !== 'ruins') { const c = el('div', 'f3 clouds'); c.style.cssText = `width:${m.w * TS}px;height:${m.h * TS}px;transform:translateZ(1px)`; pl.appendChild(c); }
       // 플레이어
       this.plShadow = el('div', 'f3 shadow3');
       this.plEl = board(0, 0, CW, CH, 'ent');
@@ -197,7 +201,7 @@
       const nx = pl.x + dx, ny = pl.y + dy;
       const w = this.map.warps.find((v) => v.x === nx && v.y === ny);
       if (w && w.gate) { const msg = w.gate(G); if (msg) { G.held.length = 0; return G.run(() => G.say(msg)); } }
-      if (this.passable(nx, ny)) { pl.moving = true; pl.t = 0; const c = this.tile(nx, ny); this.puff(c === ':' ? nx * TS : pl.x * TS, ((c === ':' ? ny : pl.y) + FEET) * TS, c === ':'); }
+      if (this.passable(nx, ny)) { pl.moving = true; pl.t = 0; const c = this.tile(nx, ny); { const gr = c === ':' || c === 'j'; this.puff(gr ? nx * TS : pl.x * TS, ((gr ? ny : pl.y) + FEET) * TS, gr); } }
     },
 
     onStep() {
@@ -222,7 +226,7 @@
         }
       }
       const c = this.tile(pl.x, pl.y);
-      if (m.enc && (c === ':' || c === ';') && Math.random() < m.enc.rate) {
+      if (m.enc && ':;jv'.includes(c) && Math.random() < m.enc.rate) {
         const total = m.enc.list.reduce((a, e) => a + e[3], 0);
         let r = Math.random() * total, pick = m.enc.list[0];
         for (const e of m.enc.list) { if ((r -= e[3]) < 0) { pick = e; break; } }

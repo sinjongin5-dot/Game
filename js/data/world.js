@@ -212,6 +212,7 @@
   room('cardia_hall', '카드리아 듀얼 홀', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [4, 1, 'k'], [6, 1, 'k']], [
     trainer('ch_t1', 3, 6, 'right', 'duelist_m', '견습 듀얼리스트 도윤', duelist('novice', 8, 300, { pack: 'pack1' }), '세라 님께 도전하려면 나부터 넘어야 해!', '크윽… 덱을 다시 짜야겠어.', { sight: 2 }),
     { id: 'sera', x: 5, y: 2, look: 'sera', name: '듀얼 마스터 세라', dir: 'down', battle: duelist('sera', 11, 900), script: async (G, n) => {
+      if (G.flag('champion')) return rematch(G, n, duelist('champion', 56, 4000));
       if (G.flag('emblem_wave')) return G.say('물은 형태가 없기에 어떤 그릇에도 담기지. 크로스 링커인 너처럼 말이야.', n.name);
       await G.say(['어서 와요, 도전자. 나는 이 홀의 마스터, 세라.', '비스트든 덱이든, 당신의 방식으로 오세요. 나의 물의 덱이 모두 받아 줄 테니.'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -316,6 +317,7 @@
   room('leafa_gym', '리파 테이머 도장', 11, 10, [[1, 1, 'p'], [9, 1, 'p'], [2, 4, 'p'], [8, 4, 'p']], [
     trainer('lg_t1', 7, 6, 'left', 'tamer_f', '도장 수련생 다래', tamer([['mothra', 15], ['lilypad', 15]], 15, 500), '관장님께 가려면 먼저 저를 이기세요!', '수련이 부족했네요…', { sight: 2 }),
     { id: 'gaon', x: 5, y: 2, look: 'gaon', name: '도장 관장 가온', dir: 'down', battle: tamer([['mothra', 16], ['lilypad', 16], ['leafron', 18, 'leftovers']], 17, 1400), script: async (G, n) => {
+      if (G.flag('champion')) return rematch(G, n, tamer([['mothra', 55], ['lotusprite', 56, 'leftovers'], ['forestar', 58, 'charm']], 57, 4000));
       if (G.flag('emblem_leaf')) return G.say('비스트도 카드도, 결국 그걸 믿는 사람의 마음이 힘이 되는 거지.', n.name);
       await G.say(['허허, 크로스 링커라는 젊은이가 자네로군.', '나는 가온. 평생 풀의 비스트와 살아온 테이머일세.', '카드로 덤벼도 좋네. 내 비스트들은 종이 한 장에 쓰러지지 않으니!'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -434,7 +436,7 @@
       'T..RRRRR......==......PPPPP..T',
       'T..WwDwW......==......WwDwW..T',
       'T....=........==........=....T',
-      'T....====================....T',
+      'T....=========================',
       'T.............==.............T',
       'T..HHHH.......==.......GGGG..T',
       'T..HHHH.......==.......GGGG..T',
@@ -448,11 +450,15 @@
     warps: [door(5, 8, 'cross_gym'), door(24, 8, 'cross_hall'), door(4, 14, 'cross_heal'), door(24, 14, 'cross_mart'),
       Object.assign(door(14, 4, 'arena'), { gate: (G) => (G.p.emblems.length >= 4 ? null : `접수원: 크로스 리그는 엠블럼 4개를 모은 사람만 입장할 수 있습니다. (현재 ${G.p.emblems.length}개)`) }),
       Object.assign(door(15, 4, 'arena'), { gate: (G) => (G.p.emblems.length >= 4 ? null : `접수원: 크로스 리그는 엠블럼 4개를 모은 사람만 입장할 수 있습니다. (현재 ${G.p.emblems.length}개)`) }),
-      ...edge([14, 15], [19], 'cave', null, 1, 'down').map((w) => Object.assign(w, { tx: w.x - 3 }))],
+      ...edge([14, 15], [19], 'cave', null, 1, 'down').map((w) => Object.assign(w, { tx: w.x - 3 })),
+      { x: 29, y: 10, to: 'snowpass', tx: 1, ty: 9, dir: 'right' }],
     npcs: [
       talk('cc_a', 10, 11, 'tamer_m', '테이머', ['크로스 시티는 테이머와 듀얼리스트가 함께 사는 유일한 도시야.', '서쪽은 테이머 도장, 동쪽은 듀얼 홀. 두 엠블럼을 다 따야 리그에 나갈 수 있지.']),
       talk('cc_b', 19, 11, 'duelist_f', '듀얼리스트', ['챔피언 아리아 님은 상대가 고른 것의 "반대 방식"으로 싸우신대.', '비스트로 도전하면 덱으로, 덱으로 도전하면 비스트로. 그게 크로스 리그의 전통이래.']),
       talk('cc_c', 13, 6, 'kid', '소년', ['리그 경기장은 저 금빛 지붕 건물이야! 나도 크면 나갈 거야!']),
+      talk('cc_d', 27, 9, 'tamer_f', '여행자', ['동쪽 길은 설빙 고개로 이어져. 눈밭에는 얼음 비스트가 살고, 그 너머엔 서리 마을이 있어.']),
+      { id: 'tower', x: 20, y: 17, look: 'tower', name: '배틀 타워 접수원', dir: 'down', script: (G) => G.tower() },
+      { id: 'board', x: 9, y: 17, look: 'clerk', name: '의뢰 게시판 담당', dir: 'down', script: async (G) => { await G.say('크로스 시티 의뢰소입니다. 달성한 의뢰의 보상을 받아 가세요!', '의뢰 게시판 담당'); await X.Menu.open('quest'); } },
     ],
   };
   healRoom('cross_heal', 'crosscity', 4, 15);
@@ -466,6 +472,7 @@
   room('cross_gym', '크로스 시티 테이머 도장', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [2, 5, 'p'], [8, 5, 'p']], [
     trainer('xg_t1', 3, 6, 'right', 'tamer_m', '도장 수련생 철민', tamer([['charcoal', 29], ['craggon', 30]], 30, 1100), '무진 관장님의 불꽃을 보려면 나부터다!', '뜨거운 승부였다…!', { sight: 2 }),
     { id: 'mujin', x: 5, y: 2, look: 'mujin', name: '도장 관장 무진', dir: 'down', battle: tamer([['craggon', 31], ['flarehound', 32, 'charm'], ['magmaros', 33]], 33, 2400), script: async (G, n) => {
+      if (G.flag('champion')) return rematch(G, n, tamer([['craggon', 57, 'sash'], ['wyverun', 57], ['infernox', 58, 'charm'], ['magmaros', 59, 'orb']], 58, 5000));
       if (G.flag('emblem_magma')) return G.say('불은 대지를 만나 용암이 된다. 섞인다는 건, 약해지는 게 아니다.', n.name);
       await G.say(['왔는가, 크로스 링커. 나는 무진. 불과 대지의 테이머다.', '분리단 놈들은 섞이는 걸 두려워하지. 하지만 내 비스트를 봐라.', '불과 대지가 섞여 용암이 되었다! 자, 네 힘을 보여라!'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -478,6 +485,7 @@
   room('cross_hall', '크로스 시티 듀얼 홀', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [4, 1, 'k'], [6, 1, 'k']], [
     trainer('xh_t1', 7, 6, 'left', 'duelist_f', '엘리트 듀얼리스트 서린', duelist('elite', 30, 1100, { pack: 'pack3' }), '노아 님의 어둠에 닿기 전에, 내 바람부터 넘어 봐.', '바람이 멎었네…', { sight: 2 }),
     { id: 'noah', x: 5, y: 2, look: 'noah', name: '듀얼 마스터 노아', dir: 'down', battle: duelist('dark', 34, 2400), script: async (G, n) => {
+      if (G.flag('champion')) return rematch(G, n, duelist('zero', 58, 5000));
       if (G.flag('emblem_shadow')) return G.say('어둠은 빛이 있어야 존재한다. 테이머와 듀얼리스트도 그런 사이일지 모르지.', n.name);
       await G.say(['…왔군. 나는 노아. 어둠의 덱을 다루는 자.', '함정, 리버스, 파괴. 듀얼의 진짜 무서움을 가르쳐 주마.', '비스트로 오든 덱으로 오든, 어둠은 평등하다.'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -544,6 +552,146 @@
     { id: 'zero', x: 6, y: 5, look: 'zero', name: '제로', dir: 'up', show: (G) => G.flag('zero_seen') && !G.p.defeated.zero2, script: (G) => G.say('…챔피언에게 말을 걸어라. 승부는 그 앞에서다.', '제로') },
   ], ['crosscity', 14, 5], { floor: 'a' });
 
+
+  // ═════════ 확장 지역: 설빙 고개 · 서리 마을 · 고대 유적 ═════════
+  // 챔피언 이후의 재대결. 관장·마스터가 전력을 다한다.
+  async function rematch(G, n, battle, line) {
+    const c = await G.choose(line || '챔피언이 된 그대와 전력으로 다시 겨뤄 보고 싶군. 어떤가?', ['재대결한다', '그만둔다'], n.name, 1);
+    if (c !== 0) return;
+    G.healAll();
+    if ((await G.fight(n, battle, { id: n.id + '_re', rematch: true })) === 'win') await G.say('…완패다. 역시 챔피언이야.', n.name);
+  }
+  X.REMATCH = rematch;
+  MAPS.snowpass = {
+    id: 'snowpass', name: '설빙 고개', bg: 'snow',
+    tiles: [
+      '^^^^^^^^^^^C^^^^^^^^^^^^',
+      '^nnjjjjnnn===nnnnnnnnnI^',
+      'Innjjjjnnnn=nnnIInnnnnnI',
+      'Innnnnnnnnn=nnnIInnjjjnI',
+      'InnIInnnnnn=nnnnnnnjjjnI',
+      'InnIInniinn=nnnnnnnjjjnI',
+      'Innnnnniinn=====nnnnnnnI',
+      'Innnnnnnnnnnnnn=nnnnnnnI',
+      'Innjjjnnnnnnnnn=nnIInnnI',
+      '================nnIInnnI',
+      'InnjjjnnnnnnnnnnnnnnnnnI',
+      'Innnnnnnnnnnn===========',
+      'InnnnIInnnnnnnnnnnjjjnnI',
+      'InnnnIInnnnnnnnnnnjjjnnI',
+      'InnnnnnnnniinnnnnnnnnnnI',
+      'InjjjnnnnniinnnnnIInnnnI',
+      'InjjjnnnnnnnnnnnnIInnnnI',
+      'IIIIIIIIIIIIIIIIIIIIIIII',
+    ],
+    enc: { rate: 0.12, list: [['frostpup', 30, 34, 26], ['snowmoth', 31, 35, 18], ['glacub', 30, 34, 22], ['grizzle', 32, 35, 14], ['flitwing', 30, 33, 12], ['minidrake', 32, 35, 8]] },
+    signs: {},
+    warps: [{ x: 0, y: 9, to: 'crosscity', tx: 28, ty: 10, dir: 'left' }, { x: 23, y: 11, to: 'frostholm', tx: 1, ty: 8, dir: 'right' }, { x: 11, y: 0, to: 'ruins', tx: 11, ty: 16, dir: 'up', gate: (G) => (G.p.emblems.length >= 4 ? null : '굳게 닫힌 석문이다. 네 개의 홈이 파여 있다… 엠블럼 4개가 필요한 것 같다.') }],
+    npcs: [
+      trainer('sp1', 13, 4, 'left', 'tamer_f', '설산 테이머 은설', tamer([['frostpup', 32], ['snowmoth', 33]], 33, 1300), '이 추위에 여기까지 오다니! 몸 좀 녹일 겸 한 판 하자!', '후우… 오히려 땀이 나네.', { sight: 2 }),
+      trainer('sp2', 9, 10, 'up', 'duelist_m', '빙결 듀얼리스트 한울', duelist('ice', 34, 1400, { pack: 'pack3' }), '얼음 덱의 차가운 맛을 보여 주지.', '내 얼음이 녹아 버렸군…', { sight: 3 }),
+      trainer('sp3', 17, 13, 'up', 'tamer_m', '등반가 태산', tamer([['glacub', 33], ['grizzle', 34], ['frostfang', 34]], 34, 1400), '고개 너머 서리 마을까지는 금방이야. 나를 넘는다면 말이지!', '정상은 아직 멀었구먼.', { sight: 3 }),
+      talk('sp_tip', 8, 7, 'elder', '산지기', ['북쪽 석문은 고대 유적으로 통한다네. 엠블럼 넷을 가진 자만 문이 열린다지.', '동쪽으로 가면 서리 마을. 얼음 비스트의 달인 설화가 도장을 지키고 있어.', '얼음 속성은 풀·바람·땅에 강하고, 불과 땅 기술에 약하다네.']),
+      { id: 'glacion', x: 20, y: 15, look: null, beast: 'glacion', name: '빙룡 글라시온', dir: 'down', show: (G) => G.flag('frost') && !G.flag('glacion'), script: async (G) => {
+        await X.Cine.shock();
+        await G.say('크오오오— (만년설을 깨고 얼음의 용이 모습을 드러냈다!)', null);
+        const r = await G.wildBattle('glacion', 45, { legend: true });
+        if (r === 'captured' || r === 'win') { G.setFlag('glacion'); G.refresh(); }
+      } },
+    ],
+  };
+  MAPS.frostholm = {
+    id: 'frostholm', name: '서리 마을', bg: 'snow',
+    tiles: [
+      'IIIIIIIIIIIIIIIIIIIIIIII',
+      'InnnnnnnnnnnnnnnnnnnnnnI',
+      'InnBBBBBnnnnnnnnHHHHnnnI',
+      'InnBBBBBnnnnnnnnHHHHnnnI',
+      'InnWwDwWnnnnnnnnWDwWnnnI',
+      'Innnn=nnnnnnnnnnn=nnnnnI',
+      'Innnn=============nnnnnI',
+      'Innnnnnnnnn=nnnnnnnnnnnI',
+      '============nnnnnnnnnnnI',
+      'Innnnnnnnnn=nnnnnnnnnnnI',
+      'InnGGGGnnnn=nnnnYYYYnnnI',
+      'InnGGGGnnnn=nnnnYYYYnnnI',
+      'InnWDwWnnnn=nnnnWDwWnnnI',
+      'Innn==============nnnnnI',
+      'InnnnnnnnnnnnnnnnnnnnnnI',
+      'IIIIIIIIIIIIIIIIIIIIIIII',
+    ],
+    warps: [door(5, 4, 'frost_gym'), door(17, 4, 'frost_heal'), door(4, 12, 'frost_house'), door(17, 12, 'frost_mart'), { x: 0, y: 8, to: 'snowpass', tx: 22, ty: 11, dir: 'left' }],
+    npcs: [
+      talk('fh_a', 9, 9, 'tamer_f', '마을 사람', ['서리 마을에 온 걸 환영해! 여긴 일 년 내내 눈이 내려.', '설화 관장님을 이기면 만년설 깊은 곳의 무언가가 깨어난다는 전설이 있어.']),
+      talk('fh_b', 14, 8, 'kid', '눈사람 만드는 아이', ['눈꼬리는 26레벨에 설랑으로 진화한대!', '아기비룡은 정말 드물어. 고개의 눈밭을 한참 뒤져야 해.']),
+    ],
+  };
+  healRoom('frost_heal', 'frostholm', 17, 5);
+  martRoom('frost_mart', 'frostholm', 17, 13, ['supercap', 'hipotion', 'cure', 'revive', 'sash', 'charm', 'leftovers', 'orb'], [
+    { id: 'fm_card', x: 6, y: 4, look: 'duelist_f', name: '설원의 카드 상인', dir: 'left', script: async (G) => {
+      if (!G.flag('deck')) return G.say('덱이 생기면 다시 오렴.', '설원의 카드 상인');
+      await G.say('얼음과 유적의 카드, 구경하고 가.', '설원의 카드 상인');
+      await G.openCardShop({ packs: ['pack2', 'pack3'], singles: ['icesprite', 'frostknight', 'snowwolf', 'icewall', 'glacierlord', 'whiteout', 'icecoffin', 'excavate', 'stormcaller', 'gracerain', 'cursedtomb'] });
+    } },
+  ]);
+  room('frost_house', '서리 마을 민가', 9, 7, [[1, 1, 'k'], [7, 1, 'p'], [4, 3, 't']], [
+    { id: 'fh_gran', x: 5, y: 2, look: 'elder', name: '비룡 지기', dir: 'down', script: async (G) => {
+      if (G.flag('drake_gift')) return G.say('그 녀석, 36레벨이 되면 붉은 바람을 타는 비룡이 된단다. 잘 키워 주렴.', '비룡 지기');
+      if (G.p.emblems.length < 3) return G.say('엠블럼을 셋은 모은 테이머라야 이 아이를 맡길 수 있겠구나.', '비룡 지기');
+      G.setFlag('drake_gift'); G.addBeast('minidrake', 28);
+      await G.say(['둥지에서 떨어진 아기 비룡을 돌보고 있었단다.', '너라면 믿고 맡길 수 있겠어. (아기비룡이 동료가 되었다!)'], '비룡 지기');
+    } },
+  ], ['frostholm', 4, 13]);
+  room('frost_gym', '서리 테이머 도장', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [2, 5, 'p'], [8, 5, 'p']], [
+    trainer('fg_t1', 3, 6, 'right', 'tamer_f', '도장 수련생 눈송이', tamer([['snowmoth', 35], ['glaciem', 36]], 36, 1500), '설화 님의 얼음은 그 누구도 녹이지 못해요!', '녹았다… 내가 먼저…', { sight: 2 }),
+    { id: 'seolhwa', x: 5, y: 2, look: 'seolhwa', name: '도장 관장 설화', dir: 'down', battle: tamer([['snowmoth', 37], ['glaciem', 37, 'sash'], ['frostfang', 39, 'charm']], 38, 3000), script: async (G, n) => {
+      if (G.flag('frost')) { if (G.flag('champion')) return rematch(G, n, tamer([['snowmoth', 56], ['glaciem', 57, 'leftovers'], ['wavelord', 56], ['frostfang', 58, 'orb']], 57, 5000)); return G.say('만년설 아래에서 무언가가 깨어났어. 고개 남쪽을 살펴보렴.', n.name); }
+      await G.say(['어서 와. 나는 설화, 이 설원의 관장이야.', '리그와는 상관없는 도장이지만, 여기서 얻는 건 엠블럼보다 값질지도 몰라.', '비스트든 덱이든 좋아. 내 얼음을 녹여 봐!'], n.name);
+      if ((await G.fight(n)) !== 'win') return;
+      G.setFlag('frost'); G.give('orb'); G.giveCard('glacierlord', 1);
+      await G.say(['…따뜻한 승부였어. 얼음도 가끔은 녹고 싶어 하거든.', '「서리 훈장」 대신 이걸 줄게. (생명의 구슬, 빙하의 군주를 받았다!)', '그리고 들었니? 방금 고개 쪽에서 얼음 깨지는 소리가 났어…'], n.name);
+      G.refresh();
+    } },
+  ], ['frostholm', 5, 5]);
+  MAPS.ruins = {
+    id: 'ruins', name: '고대 유적', bg: 'ruins',
+    tiles: [
+      'UUUUUUUUUUUUUUUUUUUUUUUU',
+      'UuuuuvvvvuuuuuuuvvvuuuuU',
+      'UuuuuvvvvuuUUUuuvvvuuuuU',
+      'UuuUUuuuuuuUUUuuuuuuUUuU',
+      'UuuUUuuuuuuuuuuuuuuuUUuU',
+      'UuuuuuuUUuuuuuuUUuuuuuuU',
+      'UvvvuuuUUuuuuuuUUuuvvvuU',
+      'UvvvuuuuuuuuuuuuuuuvvvuU',
+      'UvvvuuuuuuuuuuuuuuuvvvuU',
+      'UuuuuuUUUuuuuuuUUUuuuuuU',
+      'UuuuuuUUUuuuuuuUUUuuuuuU',
+      'UuuuuuuuuuuvvuuuuuuuuuuU',
+      'UuuUUuuuuuuvvuuuuuuUUuuU',
+      'UuuUUuuuuuuuuuuuuuuUUuuU',
+      'UuuuuuuuvvuuuuvvuuuuuuuU',
+      'UuuuuuuuvvuuuuvvuuuuuuuU',
+      'UuuuuuuuuuuuuuuuuuuuuuuU',
+      'UUUUUUUUUUUuuUUUUUUUUUUU',
+    ],
+    enc: { rate: 0.11, list: [['wisplet', 40, 44, 24], ['sandsting', 40, 44, 24], ['molekin', 40, 43, 16], ['lanternox', 44, 46, 10], ['scorpike', 44, 46, 10], ['relicore', 44, 46, 8]] },
+    warps: [...edge([11, 12], [17], 'snowpass', 11, 1, 'down')],
+    npcs: [
+      trainer('ru1', 6, 13, 'right', 'duelist_f', '유적 탐사가 리안', duelist('relic', 42, 2200, { pack: 'pack3' }), '이 유적의 카드는 내가 먼저 찾았어! 넘보지 마!', '…좋아, 같이 탐사하자.', { sight: 4 }),
+      trainer('ru2', 17, 7, 'left', 'grunt', '분리단 잔당', tamer([['lanternox', 43], ['scorpike', 43], ['nightpard', 44]], 43, 2200), '제로 님은 떠났어도 난 포기 못 해! 이 유적의 힘으로 세계를 가를 거다!', '…사실 나도 알아. 이미 끝났다는 거.', { sight: 4 }),
+      trainer('ru3', 12, 9, 'down', 'duelist_m', '유적의 듀얼리스트 카심', duelist('dark', 44, 2400, { pack: 'pack3' }), '수호자님께 가려면 나의 어둠부터 지나가라.', '빛이 드는군…', { sight: 3 }),
+      { id: 'anu', x: 10, y: 1, look: 'anu', name: '유적의 수호자 아누', dir: 'down', sight: 3, battle: { kind: 'both', team: [['relicore', 47, 'sash'], ['scorpike', 47], ['lanternox', 47], ['glaciem', 48, 'leftovers']], deck: 'relic', lvl: 48, reward: 5000 }, script: async (G, n) => {
+        if (G.p.defeated.anu) { if (G.flag('champion')) return rematch(G, n, { kind: 'both', team: [['relicore', 60, 'sash'], ['scorpike', 60, 'charm'], ['wyverun', 60], ['arcalon', 62, 'leftovers']], deck: 'relic', lvl: 60, reward: 8000 }, '유적은 그대를 기억한다. 다시 시험받겠는가?'); return G.say('대융합의 기록은 그대의 것이다. 두 힘을 잇는 자여.', n.name); }
+        await G.say(['……백 년 만의 방문자로군.', '나는 아누. 대융합의 날부터 이 유적을 지켜 온 자.', '그날 두 세계가 왜 합쳐졌는지 알고 싶은가? 그렇다면 증명하라.', '그대가 고른 것의 반대로 싸우겠다. 그것이 대융합의 예법이다.'], n.name);
+        if ((await G.fight(n)) !== 'win') return;
+        G.giveCard('sphinx', 1); G.giveCard('fusion', 2); G.give('leftovers');
+        await G.say(['……훌륭하다. 진실을 말해 주지.', '대융합은 재앙이 아니었다. 메말라 가던 두 세계가 서로를 살리려 손을 맞잡은 것이지.', '비스트는 카드의 세계에 생명을, 카드는 비스트의 세계에 기억을 주었다.', '그러니 섞이는 것을 두려워 마라. (수수께끼 석상, 융합 2장, 남은 열매를 받았다!)'], n.name);
+      } },
+      talk('ru_stone', 3, 1, 'elder', '비문 연구가', ['이 벽의 비문을 해독했다네. "얼음과 물은 빙하룡이, 불과 얼음은 증기의 거신이 된다."', '융합의 조합식이 유적에 남아 있었던 게야!']),
+    ],
+  };
+
   // 문(door) 워프 보정: 실내 맵의 입구 좌표로 연결
   for (const m of Object.values(MAPS)) {
     for (const w of m.warps) if (w.door) { const t = MAPS[w.to]; w.tx = t.entry[0]; w.ty = t.entry[1]; w.dir = 'up'; }
@@ -553,7 +701,50 @@
   }
 
   X.WORLD = { maps: MAPS, start: { map: 'home', x: 4, y: 4, dir: 'down' } };
-  X.BLOCK = 'T~^#fSRBPGYHWwxcthkpz';
+  X.BLOCK = 'T~^#fSRBPGYHWwxcthkpzIUi';
+  // ── 의뢰: 진행도는 플레이어 상태에서 계산한다. 보상은 메뉴/의뢰소에서 수령 ──
+  const caught = (G) => Object.keys(X.BEASTS).filter((k) => G.p.caught[k]).length;
+  const owned = (G) => Object.keys(G.p.cards).filter((k) => G.p.cards[k] > 0).length;
+  const st = (G, k) => (G.p.stats && G.p.stats[k]) || 0;
+  const Q = (id, name, desc, goal, cur, reward) => ({ id, name, desc, goal, cur, reward });
+  X.QUESTS = [
+    Q('c5', '초보 수집가', '비스트를 5종 포획한다.', 5, caught, { gold: 800, item: ['supercap', 5] }),
+    Q('c15', '숙련 수집가', '비스트를 15종 포획한다.', 15, caught, { gold: 2500, item: ['charm', 1] }),
+    Q('c30', '도감의 달인', '비스트를 30종 포획한다.', 30, caught, { gold: 8000, item: ['orb', 1] }),
+    Q('k40', '카드 애호가', '카드를 40종 모은다.', 40, owned, { gold: 1500, card: ['tome', 1] }),
+    Q('k70', '카드 박사', '카드를 70종 모은다.', 70, owned, { gold: 6000, card: ['lumiel', 1] }),
+    Q('w10', '승부사', '트레이너·듀얼리스트에게 10번 승리한다.', 10, (G) => st(G, 'wins'), { gold: 1000, item: ['hipotion', 3] }),
+    Q('w40', '백전노장', '트레이너·듀얼리스트에게 40번 승리한다.', 40, (G) => st(G, 'wins'), { gold: 6000, item: ['leftovers', 1] }),
+    Q('x5', '경계를 넘는 자', '크로스 배틀에서 5번 승리한다.', 5, (G) => st(G, 'cross'), { gold: 1500, card: ['fusion', 1] }),
+    Q('x20', '크로스 마스터', '크로스 배틀에서 20번 승리한다.', 20, (G) => st(G, 'cross'), { gold: 7000, card: ['arcadragon', 1] }),
+    Q('d10', '듀얼리스트의 길', '덱으로 싸워 10번 승리한다.', 10, (G) => st(G, 'deckWins'), { gold: 2000, card: ['spellseal', 1] }),
+    Q('b10', '테이머의 길', '비스트로 싸워 10번 승리한다.', 10, (G) => st(G, 'beastWins'), { gold: 2000, item: ['sash', 1] }),
+    Q('t5', '타워 도전자', '배틀 타워에서 5연승한다.', 5, (G) => st(G, 'tower'), { gold: 2000, item: ['revive', 3] }),
+    Q('t12', '타워의 강자', '배틀 타워에서 12연승한다.', 12, (G) => st(G, 'tower'), { gold: 6000, card: ['wraith', 2] }),
+    Q('t25', '타워의 전설', '배틀 타워에서 25연승한다.', 25, (G) => st(G, 'tower'), { gold: 15000, item: ['orb', 2] }),
+    Q('frost', '얼음을 녹인 자', '서리 마을 도장 관장 설화를 이긴다.', 1, (G) => (G.flag('frost') ? 1 : 0), { gold: 3000, card: ['icecoffin', 1] }),
+    Q('anu', '대융합의 진실', '고대 유적의 수호자 아누를 이긴다.', 1, (G) => (G.p.defeated.anu ? 1 : 0), { gold: 5000, card: ['gracerain', 1] }),
+    Q('leg', '전설을 잇는 자', '전설의 비스트 3마리를 모두 포획한다.', 3, (G) => ['stormwing', 'arcalon', 'glacion'].filter((k) => G.p.caught[k]).length, { gold: 10000, item: ['leftovers', 2] }),
+    Q('re5', '챔피언의 증명', '재대결에서 5번 승리한다.', 5, (G) => st(G, 'rematch'), { gold: 10000, card: ['fusion', 2] }),
+  ];
+  // 배틀 타워: 층마다 상대를 만들어 낸다
+  X.TOWER = {
+    decks: [[0, ['novice', 'mira1', 'sera', 'grunt']], [18, ['forestduel', 'fire', 'water', 'mira2']], [30, ['elite', 'admin', 'ice', 'dark']], [42, ['mira3', 'relic', 'zero', 'champion']]],
+    names: ['타워 테이머', '타워 듀얼리스트', '떠돌이 승부사', '엘리트 테이머', '카드 장인', '무명의 도전자'],
+    looks: [['tamer_m', 'tamer_f', 'fisher', 'kid'], ['duelist_m', 'duelist_f', 'noah', 'mira']],
+    bp: { hipotion: 4, revive: 6, sash: 12, charm: 16, leftovers: 22, orb: 30 },
+    bpCards: { fusion: 10, spellseal: 14, wraith: 18, glacierlord: 24, sphinx: 24, phoenix: 26, lumiel: 34, nox: 34, arcadragon: 60 },
+    make(G, floor, lvl, rnd) {
+      const pick = (a) => a[Math.floor(rnd() * a.length)], kind = rnd() < 0.5 ? 'tamer' : 'duelist';
+      const npc = { id: 'tower', name: `${floor}층 ${pick(this.names)}`, look: pick(this.looks[kind === 'tamer' ? 0 : 1]) };
+      if (kind === 'duelist') { let pool = this.decks[0][1]; for (const [l, d] of this.decks) if (lvl >= l) pool = d; return [npc, duelist(pick(pool), lvl, 0)]; }
+      const base = Object.keys(X.BEASTS).filter((k) => X.BEASTS[k].catchRate >= 30 && !Object.values(X.BEASTS).some((b) => b.evo && b.evo[1] === k));
+      const n = Math.min(5, 2 + Math.floor(floor / 4)), team = [];
+      for (let i = 0; i < n; i++) team.push([evoAt(pick(base), lvl), lvl - (i ? 1 : 0), floor >= 8 && rnd() < 0.35 ? pick(['sash', 'charm', 'leftovers', 'orb']) : undefined]);
+      return [npc, tamer(team, lvl, 0)];
+    },
+  };
+
   X.QUEST = function (G) {
     const p = G.p;
     if (!p.team.length) return '느티 연구소에서 첫 비스트를 받자.';
@@ -564,7 +755,9 @@
     if (!p.defeated.admin) return '북쪽 물결 해안을 지나 잿빛 동굴을 돌파하자.';
     if (p.emblems.length < 4) return '크로스 시티의 테이머 도장과 듀얼 홀에서 엠블럼을 얻자.';
     if (!G.flag('champion')) return '크로스 아레나에서 리그를 제패하자!';
+    if (!G.flag('frost')) return '크로스 시티 동쪽 설빙 고개 너머, 서리 마을의 도장에 도전해 보자.';
+    if (!p.defeated.anu) return '설빙 고개 북쪽의 고대 유적에서 수호자를 만나자.';
     if (!G.flag('arcalon')) return '잿빛 동굴 깊은 곳에 전설의 비스트가 나타났다는 소문이…';
-    return '대륙의 챔피언! 도감과 카드 컬렉션을 완성해 보자.';
+    return '대륙의 챔피언! 배틀 타워 기록과 의뢰, 도감과 카드 컬렉션을 완성해 보자.';
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
