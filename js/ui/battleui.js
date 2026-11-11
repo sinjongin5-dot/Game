@@ -75,6 +75,7 @@
         <div id="b-right"><div id="b-log"></div><div id="b-detail" class="hidden"></div></div>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);
+      b.classList.add('intro'); setTimeout(() => b.classList.remove('intro'), 900);
 
     },
 
@@ -100,7 +101,7 @@
       return `<div class="tp-info"><div class="tp-owner">${sd.wild ? '야생 비스트' : sd.name}</div>
         <div class="tp-name">${b.name} <span class="lv">Lv.${b.lv}</span>${b.status ? `<span class="st st-${b.status}">${X.STATUS[b.status]}</span>` : ''}</div>
         <div class="tp-types">${sp.types.map(typeChip).join('')}<span class="stg">${stg}</span></div>
-        <div class="hpbar"><div class="hpfill ${this.hpCls(pct)}" style="width:${old}%" data-to="${pct}"></div></div>
+        <div class="hpbar"><div class="hpghost" style="width:${old}%" data-to="${pct}"></div><div class="hpfill ${this.hpCls(pct)}" style="width:${old}%" data-to="${pct}"></div></div>
         <div class="tp-hp">HP ${b.hp} / ${b.maxhp}</div>${dots}</div>
         <div class="tp-sprite zone" data-side="${i}" data-zone="beast"><div class="shadow"></div><img class="spr${i === 0 ? ' flip' : ''}${b.hp <= 0 ? ' down' : ''}" src="${A.beastUrl(b.sp)}"></div>`;
     },
@@ -148,8 +149,9 @@
     async play() {
       const evs = this.bt.events.splice(0);
       for (const e of evs) {
+        const gh = this.snapGhost(e.fx), prevLp = this.v ? this.v.sides.map((sd) => sd.lp) : null;
         this.render(X.Battle.viewFor(e.s, 0));
-        this.fx(e.fx);
+        this.fx(e.fx, gh, prevLp);
         this.addLog(e.text);
         await this.message(e.text, e.fx && e.fx.k === 'turn' ? 520 : 480 + Math.min(700, e.text.length * 22));
       }
@@ -159,41 +161,94 @@
       ms /= G.speed || 1;
       return new Promise((res) => { const t = setTimeout(done, ms); const self = this; function done() { clearTimeout(t); self.skipFn = null; res(); } this.skipFn = done; });
     },
-    // 대상 요소 위에 떠오르는 숫자
-    floatNum(elm, text, cls) {
-      if (!elm) return;
-      const host = $('#battle'), hr = host.getBoundingClientRect(), r = elm.getBoundingClientRect(), k = 960 / hr.width;
-      const d = el('div', 'dmg ' + (cls || ''), text);
-      d.style.left = (r.left - hr.left + r.width / 2) * k + 'px'; d.style.top = (r.top - hr.top + r.height * 0.35) * k + 'px';
-      host.appendChild(d); setTimeout(() => d.remove(), 950);
+    // ── 연출 ──
+    box(elm) { const hr = $('#battle').getBoundingClientRect(), r = elm.getBoundingClientRect(), k = 960 / hr.width; return { x: (r.left - hr.left + r.width / 2) * k, y: (r.top - hr.top + r.height / 2) * k, w: r.width * k, h: r.height * k }; },
+    spawn(cls, x, y, html, ms, css) { const d = el('div', cls, html || ''); d.style.cssText = `left:${x}px;top:${y}px;${css || ''}`; $('#battle').appendChild(d); setTimeout(() => d.remove(), ms); return d; },
+    // 진영/존 -> 화면 요소 (몬스터 스프라이트, 비스트 스프라이트, 또는 플레이어 패널)
+    unitEl(side, zone) {
+      if (typeof zone === 'number') return $(`#bs${side} .mz[data-zone="${zone}"] .holo`) || $(`#bs${side} .mz[data-zone="${zone}"]`);
+      return (zone !== 'direct' && $(`#bs${side} .spr`)) || $(`#bs${side} .dp-info`);
     },
-    // 타격 지점에서 튀는 픽셀 파편
-    sparks(elm, color) {
+    floatNum(elm, text, cls) { if (!elm) return; const b = this.box(elm); this.spawn('dmg ' + (cls || ''), b.x, b.y - b.h * 0.15, text, 950); },
+    sparks(elm, color, n = 12) {
       if (!elm) return;
-      const host = $('#battle'), hr = host.getBoundingClientRect(), r = elm.getBoundingClientRect(), k = 960 / hr.width;
-      const x = (r.left - hr.left + r.width / 2) * k, y = (r.top - hr.top + r.height * 0.5) * k;
-      for (let i = 0; i < 12; i++) {
-        const p = el('i', 'spark'), a = Math.random() * 6.28, d = 30 + Math.random() * 60;
-        p.style.cssText = `left:${x}px;top:${y}px;background:${color || '#fff'};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`;
-        host.appendChild(p); setTimeout(() => p.remove(), 520);
-      }
+      const b = this.box(elm);
+      for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, d = 30 + Math.random() * 70; this.spawn('spark', b.x, b.y, '', 520, `background:${color || '#fff'};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`); }
+      this.spawn('ringfx', b.x, b.y, '', 420, `--c:${color || '#fff'}`);
     },
-    fx(f) {
+    // 떠오르거나 가라앉는 기호 (강화 ▲ / 약화 ▼ / 회복 + / 상태이상 ●)
+    glyphs(elm, ch, color, down) {
+      if (!elm) return;
+      const b = this.box(elm);
+      for (let i = 0; i < 6; i++) this.spawn('glyph' + (down ? ' dn' : ''), b.x + (Math.random() - 0.5) * b.w * 0.7, b.y + (Math.random() - 0.3) * b.h * 0.5, ch, 900, `color:${color};animation-delay:${i * 70}ms`);
+    },
+    // 사라지는 유닛의 잔상: 렌더 전에 찍어 두었다가(ghosts) 렌더 후에 부서지거나 쓰러지는 모습을 재생
+    snapGhost(f) {
+      if (!f || (f.k !== 'destroy' && f.k !== 'faint')) return null;
+      const e = f.k === 'faint' ? $(`#bs${f.side} .spr:not(.down)`) : $(`#bs${f.side} .mz[data-zone="${f.zone}"] .holo`);
+      return e ? { src: e.src, b: this.box(e), flip: f.side === 0 } : null;
+    },
+    playGhost(f, gh) {
+      const { src, b, flip } = gh, css = `width:${b.w}px;height:${b.h}px;margin:${-b.h / 2}px 0 0 ${-b.w / 2}px;--fl:${flip ? -1 : 1}`;
+      if (f.k === 'faint') return this.spawn('ghost faint', b.x, b.y, `<img src="${src}">`, 800, css);
+      // 네 조각으로 갈라져 흩어진다
+      [['0 50% 50% 0', -1, -1], ['0 0 50% 50%', 1, -1], ['50% 50% 0 0', -1, 1], ['50% 0 0 50%', 1, 1]].forEach(([clip, dx, dy]) => this.spawn('ghost shard', b.x, b.y, `<img src="${src}">`, 620, `${css};clip-path:inset(${clip});--dx:${dx * (30 + Math.random() * 30)}px;--dy:${dy * (24 + Math.random() * 26)}px;--rot:${dx * dy * 25}deg`));
+      this.spawn('flashfx', b.x, b.y, '', 300);
+    },
+    // 속성 탄환
+    shoot(from, to, color, then) {
+      const a = this.box(from), b = this.box(to), dx = b.x - a.x, dy = b.y - a.y, dur = 330 / (G.speed || 1);
+      const o = this.spawn('orb', a.x, a.y, '', dur + 60, `--c:${color}`);
+      if (o.animate) o.animate([{ transform: 'translate(-50%,-50%) scale(.3)' }, { transform: `translate(calc(-50% + ${dx * 0.5}px),calc(-50% + ${dy * 0.5 - 46}px)) scale(1.15)`, offset: 0.5 }, { transform: `translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px)) scale(.9)` }], { duration: dur, easing: 'ease-in', fill: 'forwards' });
+      for (let i = 1; i <= 5; i++) setTimeout(() => { const t = i / 6; this.spawn('spark', a.x + dx * t, a.y + dy * t - Math.sin(t * Math.PI) * 46, '', 400, `background:${color};--dx:${(Math.random() - 0.5) * 30}px;--dy:${10 + Math.random() * 20}px`); }, dur * i / 6);
+      setTimeout(then, dur);
+    },
+    rollLP(side, from, to) {
+      const e = $(`#bs${side} .lp b`);
+      if (!e || from === to) return;
+      const t0 = performance.now(), dur = 450;
+      const step = (now) => { const cur = $(`#bs${side} .lp b`); if (!cur) return; const k = Math.min(1, (now - t0) / dur); cur.textContent = Math.round(from + (to - from) * k); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    },
+    replay(elm, cls, vars) { if (!elm) return; for (const k in vars || {}) elm.style.setProperty(k, vars[k]); elm.classList.remove(cls); void elm.offsetWidth; elm.classList.add(cls); },
+    fx(f, gh, prevLp) {
       if (!f) return;
-      // 공격자 돌진
+      const opp = 1 - f.side, oppKind = this.v.sides[opp] && this.v.sides[opp].kind;
+      if (gh) this.playGhost(f, gh);
+      if (f.k === 'turn') this.spawn('turnban' + (f.side === 0 ? ' me' : ''), 330, 243, f.side === 0 ? '나의 턴' : '상대의 턴', 900);
+      // 공격: 대상 방향으로 돌진하거나, 속성 기술이면 기를 모아 탄환을 쏜다
       if (f.k === 'move' || f.k === 'attack') {
-        const a = f.k === 'attack' ? $(`#bs${f.side} .mz[data-zone="${f.zone}"] .holo`) : $(`#bs${f.side} .spr`);
-        if (a) { a.classList.remove('lunge'); void a.offsetWidth; a.classList.add('lunge'); }
+        const a = this.unitEl(f.side, f.k === 'attack' ? f.zone : 'beast');
+        const tz = f.k === 'attack' ? (f.target === 'beast' ? 'beast' : f.target) : this.bt.mode === 'tt' ? (f.type && X.MOVES && f.target !== null ? 'beast' : 'beast') : f.target;
+        const hasTarget = f.k === 'attack' || this.bt.mode === 'tt' || (f.target !== null && f.target !== undefined);
+        const t = hasTarget ? (oppKind === 'tamer' ? this.unitEl(opp, 'beast') : this.unitEl(opp, tz)) : null;
+        if (a && t) {
+          const A = this.box(a), B = this.box(t);
+          if (f.k === 'move' && f.type && f.type !== 'normal') { this.replay(a, 'charge'); const c = X.TYPES[f.type].color; setTimeout(() => this.shoot(a, t, c, () => this.sparks(t, c, 6)), 170 / (G.speed || 1)); }
+          else this.replay(a, 'lunge', { '--lx': (B.x - A.x) * 0.6 + 'px', '--ly': (B.y - A.y) * 0.6 + 'px' });
+        } else if (a) this.replay(a, 'charge');
       }
       const tgt = f.zone != null && f.zone !== 'beast' ? $(`#bs${f.side} .mz[data-zone="${f.zone}"]`) : $(`#bs${f.side} .tp-sprite`) || $(`#bs${f.side} .dp-info`);
-      const cls = { hit: 'fx-hit', destroy: 'fx-destroy', faint: 'fx-faint', summon: 'fx-pop', flip: 'fx-pop', enter: 'fx-pop', heal: 'fx-heal', buff: 'fx-buff', debuff: 'fx-debuff', status: 'fx-debuff', lp: 'fx-hit', levelup: 'fx-buff', capsule: 'fx-capsule', trap: 'fx-trap', spell: 'fx-buff' }[f.k];
+      const unit = this.unitEl(f.side, f.zone != null && f.zone !== 'beast' ? f.zone : 'beast');
+      const cls = { destroy: 'fx-destroy', summon: 'fx-pop', flip: 'fx-pop', enter: 'fx-pop', heal: 'fx-heal', buff: 'fx-buff', debuff: 'fx-debuff', status: 'fx-debuff', lp: 'fx-hit', levelup: 'fx-buff', capsule: 'fx-capsule', trap: 'fx-trap', spell: 'fx-buff' }[f.k];
       if (f.k === 'hit' || f.k === 'lp' || f.k === 'destroy') G.sfx('hit'); else if (f.k === 'faint') G.sfx('faint'); else if (f.k === 'heal' || f.k === 'levelup') G.sfx('heal'); else if (['summon', 'spell', 'trap', 'set', 'draw'].includes(f.k)) G.sfx('card');
       const target = f.k === 'lp' ? $(`#bs${f.side} .lp`) : f.k === 'trap' || f.k === 'spell' ? $(`#bs${f.side} .dp-info`) : tgt;
-      if (f.k === 'hit') { this.sparks(tgt, f.type ? X.TYPES[f.type].color : '#fff'); if (f.n) this.floatNum(tgt, '-' + f.n, 'bad'); }
-      if (f.k === 'lp' && f.n) this.floatNum(target, '-' + f.n, 'bad big');
-      if (f.k === 'destroy') this.sparks(tgt, '#ffd24a');
+      const side = $('#bs' + f.side);
+      if (f.k === 'hit') {
+        const c = f.type ? X.TYPES[f.type].color : '#fff';
+        this.sparks(unit, c);
+        this.replay(unit, 'recoil', { '--rx': (f.side === 0 ? -18 : 18) + 'px', '--ry': (f.side === 0 ? 14 : -14) + 'px' });
+        this.replay(side, 'quake');
+        if (f.n) this.floatNum(unit, '-' + f.n, 'bad');
+      }
+      if (f.k === 'lp') { this.replay(side, 'quake big'.split(' ')[0]); this.replay($('#battle'), 'bigshake'); if (f.n) this.floatNum(target, '-' + f.n, 'bad big'); if (prevLp) this.rollLP(f.side, prevLp[f.side], this.v.sides[f.side].lp); }
+      if (f.k === 'heal') { this.glyphs(unit, '+', '#8ff09a'); if (f.lp && prevLp) this.rollLP(f.side, prevLp[f.side], this.v.sides[f.side].lp); }
+      if (f.k === 'buff' || f.k === 'levelup') this.glyphs(unit, '▲', '#ffd24a');
+      if (f.k === 'debuff') this.glyphs(unit, '▼', '#c08af0', true);
+      if (f.k === 'status') this.glyphs(unit, '●', '#c08af0');
+      if (f.k === 'summon' || f.k === 'flip' || f.k === 'enter') { const b = this.box(tgt); this.spawn('pillar', b.x, b.y + b.h * 0.3, '', 600); }
       if (target && cls) { target.classList.add(cls); if (f.type) target.style.setProperty('--fx', X.TYPES[f.type].color); }
-      if ((f.k === 'spell' || f.k === 'trap') && f.card) this.showDetail(X.cardDetail(f.card, `<div class="cd-note">${f.side === 0 ? '내가' : '상대가'} 발동</div>`), true);
+      if ((f.k === 'spell' || f.k === 'trap') && f.card) { this.showDetail(X.cardDetail(f.card, `<div class="cd-note">${f.side === 0 ? '내가' : '상대가'} 발동</div>`), true); this.spawn('cardcast', 330, 240, X.cardHTML(f.card), 800); }
     },
     result(text, good) {
       return new Promise((res) => {

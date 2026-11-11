@@ -163,7 +163,7 @@
       const nx = pl.x + dx, ny = pl.y + dy;
       const w = this.map.warps.find((v) => v.x === nx && v.y === ny);
       if (w && w.gate) { const msg = w.gate(G); if (msg) { G.held.length = 0; return G.run(() => G.say(msg)); } }
-      if (this.passable(nx, ny)) { pl.moving = true; pl.t = 0; }
+      if (this.passable(nx, ny)) { pl.moving = true; pl.t = 0; const c = this.tile(nx, ny); this.puff(c === ':' ? nx * TS : pl.x * TS, ((c === ':' ? ny : pl.y) + FEET) * TS, c === ':'); }
     },
 
     onStep() {
@@ -192,7 +192,13 @@
         G.run(async () => { await this.flash(); await G.wildBattle(pick[0], lv); });
       }
     },
-    async flash() { for (let i = 0; i < 2; i++) { await G.fade(true); await G.fade(false); } },
+    // 조우 연출: 화면이 원형으로 닫힌다
+    async flash() { const f = document.querySelector('#fade'); G.sfx('ok'); f.classList.add('iris'); await X.wait(700); f.classList.add('on'); f.classList.remove('iris'); },
+    // 지면 위의 짧은 효과 (발먼지, 풀잎)
+    puff(x, y, grass) {
+      if (grass) for (let i = 0; i < 5; i++) { const d = board(x + 14 + Math.random() * 20, y + 2, 8, 8 + Math.random() * 16, ''); d.appendChild(el('div', 'leaf')).style.cssText = `--dx:${(Math.random() - 0.5) * 50}px;--dy:${-20 - Math.random() * 26}px`; this.plane.appendChild(d); setTimeout(() => d.remove(), 520); }
+      else { const d = el('div', 'f3'); d.style.transform = `translate3d(${x + 11}px,${y - 8}px,2px)`; d.appendChild(el('div', 'puff')); this.plane.appendChild(d); setTimeout(() => d.remove(), 440); }
+    },
 
     interact() {
       const pl = this.pl, [dx, dy] = DIRS[pl.dir];
@@ -217,7 +223,10 @@
       let cx, cy;
       if (m.indoor) { cx = mw / 2; cy = mh / 2 + 30; }
       else { cx = Math.max(380, Math.min(mw - 380, px + TS / 2)); cy = Math.max(200, Math.min(mh - 120, py)); }
-      this.plane.style.transform = `translate3d(${-cx}px,${-cy}px,0)`;
+      // 카메라는 목표를 부드럽게 따라간다 (맵을 옮긴 직후에는 즉시 이동)
+      if (this._camMap !== m) { this._camMap = m; this.cx = cx; this.cy = cy; }
+      this.cx += (cx - this.cx) * 0.16; this.cy += (cy - this.cy) * 0.16;
+      this.plane.style.transform = `translate3d(${-this.cx}px,${-this.cy}px,0)`;
       // 플레이어
       const bob = pl.moving ? Math.abs(Math.sin((pl.t / STEP) * Math.PI)) * 4 : 0;
       this.plEl.style.transform = boardM(px, py, TS + bob * 2);

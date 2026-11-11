@@ -292,9 +292,70 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 @keyframes dmgUp{0%{transform:translate(-50%,-30%) scale(.5);opacity:0}15%{transform:translate(-50%,-70%) scale(1.25);opacity:1}100%{transform:translate(-50%,-190%) scale(1);opacity:0}}
 .spark{position:absolute;z-index:5!important;width:7px;height:7px;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.5);animation:spark .5s ease-out forwards}
 @keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
-.b-opp .spr.lunge,.b-opp .holo.lunge{animation:lungeD .42s}.b-me .spr.lunge{animation:lungeUF .42s}.b-me .holo.lunge{animation:lungeUF .42s}
-@keyframes lungeD{40%{transform:translate(-60px,70px) scale(1.12)}}
-@keyframes lungeUF{0%,100%{transform:scaleX(-1)}40%{transform:translate(70px,-70px) scale(-1.12,1.12)}}
 .bb{margin-left:6px;flex:0 0 auto;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700}
 .bb:first-of-type{margin-left:auto}.bb.on{background:var(--gold);color:#1a1626}
 #b-msg{flex:1;min-width:0}
+
+/* ══ 애니메이션 ══ */
+.spr.flip,.b-me .holo{--fl:-1}
+/* 돌진: 뒤로 움츠렸다가 대상 방향으로 튀어나간다 */
+.spr.lunge,.holo.lunge{animation:lunge .46s cubic-bezier(.3,.1,.3,1)!important}
+@keyframes lunge{0%{transform:scaleX(var(--fl,1))}18%{transform:translate(calc(var(--lx)*-.12),calc(var(--ly)*-.12)) scale(calc(var(--fl,1)*1.08),.9)}48%{transform:translate(var(--lx),var(--ly)) scale(calc(var(--fl,1)*1.14),1.14)}100%{transform:scaleX(var(--fl,1))}}
+/* 기 모으기 */
+.spr.charge,.holo.charge{animation:charge .4s ease-out!important}
+@keyframes charge{0%{transform:scaleX(var(--fl,1))}35%{transform:scale(calc(var(--fl,1)*1.12),.84);filter:brightness(1.7)}70%{transform:scale(calc(var(--fl,1)*.94),1.1) translateY(-8px)}100%{transform:scaleX(var(--fl,1))}}
+/* 피격: 번쩍이며 밀려났다 돌아온다 */
+.spr.recoil,.holo.recoil{animation:recoil .42s ease-out!important}
+@keyframes recoil{0%{transform:scaleX(var(--fl,1));filter:brightness(4) saturate(0)}12%{filter:brightness(1)}22%{transform:translate(var(--rx),var(--ry)) scaleX(var(--fl,1)) rotate(6deg);filter:brightness(4) saturate(0)}34%{filter:brightness(1)}55%{transform:translate(calc(var(--rx)*-.3),0) scaleX(var(--fl,1))}100%{transform:scaleX(var(--fl,1))}}
+.b-side.quake{animation:quake .3s}@keyframes quake{25%{translate:-5px 2px}50%{translate:5px -2px}75%{translate:-3px 1px}}
+#battle.bigshake{animation:bigshake .38s}@keyframes bigshake{20%{translate:-9px 4px}40%{translate:8px -5px}60%{translate:-6px 3px}80%{translate:4px -2px}}
+.orb{position:absolute;z-index:5!important;width:26px;height:26px;border-radius:50%;background:radial-gradient(#fff 0 30%,var(--c) 55%);box-shadow:0 0 0 3px rgba(0,0,0,.35),0 0 18px 6px var(--c);transform:translate(-50%,-50%);pointer-events:none;image-rendering:pixelated}
+.ringfx{position:absolute;z-index:5!important;width:20px;height:20px;margin:-10px;border-radius:50%;border:4px solid var(--c);pointer-events:none;animation:ringfx .4s ease-out forwards}
+@keyframes ringfx{to{transform:scale(6);opacity:0;border-width:1px}}
+.flashfx{position:absolute;z-index:5!important;width:40px;height:40px;margin:-20px;border-radius:50%;background:#fff;pointer-events:none;animation:ringfx .3s ease-out forwards}
+.glyph{position:absolute;z-index:5!important;font:900 20px sans-serif;text-shadow:0 2px 0 #000;pointer-events:none;opacity:0;animation:glyphUp .8s ease-out forwards}
+.glyph.dn{animation-name:glyphDn}
+@keyframes glyphUp{0%{opacity:0;transform:translateY(20px) scale(.5)}25%{opacity:1}100%{opacity:0;transform:translateY(-50px) scale(1.2)}}
+@keyframes glyphDn{0%{opacity:0;transform:translateY(-30px) scale(.5)}25%{opacity:1}100%{opacity:0;transform:translateY(40px) scale(1.2)}}
+.ghost{position:absolute;z-index:4!important;pointer-events:none}.ghost img{width:100%;height:100%;display:block;transform:scaleX(var(--fl,1))}
+.ghost.shard{animation:shard .6s cubic-bezier(.2,.6,.4,1) forwards}
+@keyframes shard{0%{filter:brightness(3)}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.6);opacity:0}}
+.ghost.faint{transform-origin:50% 100%;animation:faintG .78s ease-in forwards}
+@keyframes faintG{0%{filter:brightness(2.5) saturate(0)}20%{transform:translateY(-10px);filter:none}100%{transform:translateY(46px) scaleY(.12);opacity:0;filter:brightness(.4)}}
+.spr.down,.spr.flip.down{opacity:0!important;animation:none!important}
+/* 등장 */
+.pillar{position:absolute;z-index:3!important;width:70px;height:170px;margin:-170px 0 0 -35px;background:linear-gradient(transparent,rgba(255,244,190,.85));border-radius:35px 35px 6px 6px;pointer-events:none;transform-origin:50% 100%;animation:pillar .58s ease-out forwards;mix-blend-mode:screen}
+@keyframes pillar{0%{transform:scaleX(.1);opacity:0}25%{transform:scaleX(1);opacity:1}100%{transform:scaleX(.05);opacity:0}}
+.fx-pop .holo{animation:rise .5s cubic-bezier(.2,1.5,.4,1)!important}
+@keyframes rise{0%{transform:translateY(34px) scale(calc(var(--fl,1)*.2),.2);opacity:0;filter:brightness(4)}60%{filter:brightness(1.6)}100%{transform:scaleX(var(--fl,1))}}
+.fx-pop .spr{animation:enter .5s cubic-bezier(.2,1.5,.4,1)!important}
+@keyframes enter{0%{transform:scale(calc(var(--fl,1)*.1),.1);filter:brightness(5)}60%{filter:brightness(1.5)}100%{transform:scaleX(var(--fl,1))}}
+.cardcast{position:absolute;z-index:5!important;margin:-58px 0 0 -46px;pointer-events:none;animation:cardcast .78s ease-out forwards}
+@keyframes cardcast{0%{transform:translateY(60px) scale(.3) rotateY(180deg);opacity:0}30%{transform:scale(1.5);opacity:1}75%{transform:scale(1.4);opacity:1;filter:brightness(1.5)}100%{transform:scale(2.2);opacity:0}}
+/* 턴 알림 */
+.turnban{position:absolute;z-index:5!important;transform:translate(-50%,-50%);font:400 44px "Jua",sans-serif;color:#fff;letter-spacing:6px;white-space:nowrap;padding:4px 80px;background:linear-gradient(90deg,transparent,rgba(224,74,90,.85) 25%,rgba(224,74,90,.85) 75%,transparent);text-shadow:0 3px 0 rgba(0,0,0,.5);pointer-events:none;animation:turnban .85s cubic-bezier(.2,.8,.3,1) forwards}
+.turnban.me{background:linear-gradient(90deg,transparent,rgba(60,141,240,.85) 25%,rgba(60,141,240,.85) 75%,transparent)}
+@keyframes turnban{0%{transform:translate(-160%,-50%) skewX(-18deg);opacity:0}25%,70%{transform:translate(-50%,-50%) skewX(-8deg);opacity:1}100%{transform:translate(60%,-50%) skewX(-18deg);opacity:0}}
+/* HP 잔상 바: 깎인 만큼 흰 띠가 남았다가 따라 줄어든다 */
+.hpbar{position:relative}.hpfill{position:relative}
+.hpghost{position:absolute;left:0;top:0;height:100%;background:#fff;border-radius:4px;transition:width .5s .4s ease-in}
+/* 전투 시작/종료 */
+#battle.intro .b-opp{animation:slideR .7s cubic-bezier(.2,.9,.3,1)}#battle.intro .b-me{animation:slideL .7s cubic-bezier(.2,.9,.3,1)}
+#battle.intro #b-right,#battle.intro .b-bottom{animation:slideU .6s ease-out}
+@keyframes slideR{from{transform:translateX(700px)}}@keyframes slideL{from{transform:translateX(-700px)}}@keyframes slideU{from{transform:translateY(160px);opacity:0}}
+.res-box{animation:resIn .5s cubic-bezier(.2,1.6,.4,1)}@keyframes resIn{from{transform:scale(.2) rotate(-8deg);opacity:0}}
+.good .res-title{animation:shine 1.2s infinite alternate}@keyframes shine{to{text-shadow:0 0 26px #ffd24a,0 0 6px #fff}}
+.card.ok{animation:okPulse 1.2s infinite alternate}@keyframes okPulse{to{box-shadow:0 0 0 2px var(--gold),0 0 14px 2px rgba(242,201,76,.7)}}
+#b-hand .card{animation:deal .35s cubic-bezier(.2,1.3,.4,1) backwards}@keyframes deal{from{transform:translateY(90px) rotate(8deg);opacity:0}}
+.st{animation:stPulse .9s infinite alternate}@keyframes stPulse{to{filter:brightness(1.5)}}
+/* 필드: 발먼지와 풀잎, 조우 연출 */
+.puff{width:26px;height:12px;border-radius:50%;background:rgba(255,255,255,.75);animation:puff .42s ease-out forwards}
+@keyframes puff{from{transform:scale(.3);opacity:.9}to{transform:scale(1.6) translateY(-6px);opacity:0}}
+.leaf{width:8px;height:8px;background:#58b85a;box-shadow:0 0 0 1px #2c7a38;animation:leaf .5s ease-out forwards}
+@keyframes leaf{to{transform:translate(var(--dx),var(--dy)) rotate(200deg);opacity:0}}
+#fade.iris{opacity:1;background:transparent;overflow:hidden;transition:none}
+#fade.iris::before{content:"";position:absolute;left:50%;top:50%;width:1300px;height:1300px;margin:-650px;border-radius:50%;box-shadow:0 0 0 2000px #000;animation:iris .7s cubic-bezier(.6,0,.9,.4) forwards}
+@keyframes iris{0%{transform:scale(1)}18%{transform:scale(.8)}30%{transform:scale(.88)}100%{transform:scale(0)}}
+#dialog{animation:dlgIn .18s ease-out}@keyframes dlgIn{from{transform:translateY(24px);opacity:0}}
+.ov{animation:ovIn .2s cubic-bezier(.2,1.3,.4,1)}@keyframes ovIn{from{transform:scale(.9);opacity:0}}
+@media (prefers-reduced-motion:reduce){.turnban,.cardcast,.pillar,#battle.intro *{animation:none!important}}
