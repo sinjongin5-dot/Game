@@ -316,7 +316,7 @@
   ], ['leafa', 4, 13]);
   room('leafa_gym', '리파 테이머 도장', 11, 10, [[1, 1, 'p'], [9, 1, 'p'], [2, 4, 'p'], [8, 4, 'p']], [
     trainer('lg_t1', 7, 6, 'left', 'tamer_f', '도장 수련생 다래', tamer([['mothra', 15], ['lilypad', 15]], 15, 500), '관장님께 가려면 먼저 저를 이기세요!', '수련이 부족했네요…', { sight: 2 }),
-    { id: 'gaon', x: 5, y: 2, look: 'gaon', name: '도장 관장 가온', dir: 'down', battle: tamer([['mothra', 16], ['lilypad', 16], ['leafron', 18, 'leftovers']], 17, 1400), script: async (G, n) => {
+    { id: 'gaon', x: 5, y: 2, look: 'gaon', name: '도장 관장 가온', dir: 'down', battle: tamer([['mothra', 15], ['grizzle', 15], ['lilypad', 16], ['leafron', 18, 'leftovers']], 17, 1400), script: async (G, n) => {
       if (G.flag('champion')) return rematch(G, n, tamer([['mothra', 55], ['lotusprite', 56, 'leftovers'], ['forestar', 58, 'charm']], 57, 4000));
       if (G.flag('emblem_leaf')) return G.say('비스트도 카드도, 결국 그걸 믿는 사람의 마음이 힘이 되는 거지.', n.name);
       await G.say(['허허, 크로스 링커라는 젊은이가 자네로군.', '나는 가온. 평생 풀의 비스트와 살아온 테이머일세.', '카드로 덤벼도 좋네. 내 비스트들은 종이 한 장에 쓰러지지 않으니!'], n.name);
@@ -406,7 +406,8 @@
     npcs: [
       trainer('v1', 9, 13, 'right', 'grunt', '분리단 단원', tamer([['shadecat', 23], ['molekin', 24]], 24, 800), '여기서부터는 분리단의 구역이다! 돌아가라!', '칫… 비스트만으론 부족했나.', { sight: 4 }),
       trainer('v2', 17, 8, 'left', 'grunt', '분리단 단원', duelist('admin', 25, 850, { pack: 'pack2' }), '세계는 갈라져야 순수해진다! 내 덱이 그걸 증명하지!', '순수한 덱이… 섞인 녀석에게 지다니.', { sight: 4 }),
-      { id: 'admin', x: 11, y: 2, look: 'admin', name: '분리단 간부 벡스', dir: 'down', sight: 4, show: (G) => !G.p.defeated.admin, battle: tamer([['charcoal', 24], ['molekin', 25], ['nightpard', 26]], 26, 1500), script: async (G, n) => {
+      trainer('v3', 21, 7, 'left', 'grunt', '분리단 단원', tamer([['charcoal', 26], ['sparklet', 26], ['shadecat', 27]], 27, 900), '벡스 님께 가는 길은 내가 막는다!', '막지 못했다…', { sight: 3 }),
+      { id: 'admin', x: 11, y: 2, look: 'admin', name: '분리단 간부 벡스', dir: 'down', sight: 4, show: (G) => !G.p.defeated.admin, battle: tamer([['charcoal', 24], ['voltragon', 24], ['molekin', 25], ['nightpard', 26]], 26, 1500), script: async (G, n) => {
         await G.say(['네가 소문의 크로스 링커로군. 우리 단원들을 귀찮게 했다지?', '대융합은 재앙이었다. 테이머는 테이머끼리, 듀얼리스트는 듀얼리스트끼리 사는 게 옳아.', '제로 님이 크로스 리그에서 그걸 증명하실 거다. 넌 여기서 끝이고!'], n.name);
         if ((await G.fight(n)) !== 'win') return;
         G.give('revive', 2);
@@ -471,7 +472,8 @@
   ]);
   room('cross_gym', '크로스 시티 테이머 도장', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [2, 5, 'p'], [8, 5, 'p']], [
     trainer('xg_t1', 3, 6, 'right', 'tamer_m', '도장 수련생 철민', tamer([['charcoal', 29], ['craggon', 30]], 30, 1100), '무진 관장님의 불꽃을 보려면 나부터다!', '뜨거운 승부였다…!', { sight: 2 }),
-    { id: 'mujin', x: 5, y: 2, look: 'mujin', name: '도장 관장 무진', dir: 'down', battle: tamer([['craggon', 31], ['flarehound', 32, 'charm'], ['magmaros', 33]], 33, 2400), script: async (G, n) => {
+    trainer('xg_t2', 7, 4, 'left', 'tamer_f', '도장 수련생 불새', tamer([['lanternox', 31], ['wyverun', 31], ['magmaros', 32]], 32, 1200), '관장님 앞에 서려면 불길을 한 번 더 건너야지!', '내 불꽃도 아직 멀었네.', { sight: 2 }),
+    { id: 'mujin', x: 5, y: 2, look: 'mujin', name: '도장 관장 무진', dir: 'down', battle: tamer([['craggon', 32, 'sash'], ['wyverun', 32], ['infernox', 33, 'charm'], ['magmaros', 33, 'leftovers']], 33, 2400), script: async (G, n) => {
       if (G.flag('champion')) return rematch(G, n, tamer([['craggon', 57, 'sash'], ['wyverun', 57], ['infernox', 58, 'charm'], ['magmaros', 59, 'orb']], 58, 5000));
       if (G.flag('emblem_magma')) return G.say('불은 대지를 만나 용암이 된다. 섞인다는 건, 약해지는 게 아니다.', n.name);
       await G.say(['왔는가, 크로스 링커. 나는 무진. 불과 대지의 테이머다.', '분리단 놈들은 섞이는 걸 두려워하지. 하지만 내 비스트를 봐라.', '불과 대지가 섞여 용암이 되었다! 자, 네 힘을 보여라!'], n.name);
@@ -484,6 +486,7 @@
   ], ['crosscity', 5, 9]);
   room('cross_hall', '크로스 시티 듀얼 홀', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [4, 1, 'k'], [6, 1, 'k']], [
     trainer('xh_t1', 7, 6, 'left', 'duelist_f', '엘리트 듀얼리스트 서린', duelist('elite', 30, 1100, { pack: 'pack3' }), '노아 님의 어둠에 닿기 전에, 내 바람부터 넘어 봐.', '바람이 멎었네…', { sight: 2 }),
+    trainer('xh_t2', 3, 4, 'right', 'duelist_m', '엘리트 듀얼리스트 진혁', duelist('fire', 33, 1200, { pack: 'pack3' }), '융합의 불꽃을 본 적 있나? 지금 보여 주지!', '융합 소재가 모자랐어…', { sight: 2 }),
     { id: 'noah', x: 5, y: 2, look: 'noah', name: '듀얼 마스터 노아', dir: 'down', battle: duelist('dark', 34, 2400), script: async (G, n) => {
       if (G.flag('champion')) return rematch(G, n, duelist('zero', 58, 5000));
       if (G.flag('emblem_shadow')) return G.say('어둠은 빛이 있어야 존재한다. 테이머와 듀얼리스트도 그런 사이일지 모르지.', n.name);
@@ -499,7 +502,9 @@
   // ═════════ 크로스 아레나 (리그) ═════════
   room('arena', '크로스 아레나', 13, 11, [[1, 1, 'z'], [11, 1, 'z'], [1, 8, 'c'], [2, 8, 'c'], [5, 1, 'k'], [7, 1, 'k']], [
     { id: 'ar_nurse', x: 1, y: 9, look: 'nurse', name: '리그 의무관', dir: 'up', script: async (G) => { G.healAll(); G.sfx('heal'); await G.say('경기 전에 컨디션을 회복해 드렸습니다!', '리그 의무관'); } },
-    { id: 'leon3', x: 3, y: 5, look: 'leon', name: '라이벌 레온', dir: 'right', battle: { kind: 'tamer', team: (G) => [['stormhawk', 37], ['gnawlord', 37], ['voltragon', 37], [rivalStarter(G, 38), 38]], lvl: 38, reward: 2500 }, script: async (G, n) => {
+    trainer('aq1', 9, 8, 'left', 'tamer_m', '리그 예선 진출자 호연', tamer([['gnawlord', 37], ['wavelord', 37], ['frostfang', 37], ['scorpike', 38]], 38, 2000), '준결승 전에 몸풀기 상대가 필요하지 않아? 예선의 실력을 보여 주지!', '역시 준결승 진출자는 다르군.', { sight: 0 }),
+    trainer('aq2', 4, 8, 'right', 'duelist_f', '리그 예선 진출자 세아', duelist('elite', 39, 2000, { pack: 'pack3' }), '예선에서 아깝게 떨어졌지만, 내 덱은 진짜야. 확인해 볼래?', '…다음 리그에선 꼭 본선에 갈 거야.', { sight: 0 }),
+    { id: 'leon3', x: 3, y: 5, look: 'leon', name: '라이벌 레온', dir: 'right', battle: { kind: 'tamer', team: (G) => [['stormhawk', 37], ['gnawlord', 37, 'orb'], ['voltragon', 37], ['craggon', 37, 'sash'], ['nightpard', 37], [rivalStarter(G, 38), 38, 'charm']], lvl: 38, reward: 2500 }, script: async (G, n) => {
       if (G.p.defeated.leon3) return G.say('…나도 카드, 다시 해 볼까. 아, 아무것도 아니야!', n.name);
       await G.say(['준결승 상대는 나다. 여기까지 올 줄 알았어.', '난 끝까지 테이머로 싸운다. 그게 내 방식이니까!', '전력으로 와라, 라이벌!'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -513,7 +518,7 @@
       await G.say(['…역시 넌 대단해. 듀얼리스트로서도, 테이머로서도.', '이 카드, 결승에서 써 줘. (천사장 루미엘을 받았다!)'], n.name);
     } },
     { id: 'aria', x: 6, y: 2, look: 'aria', name: '챔피언 아리아', dir: 'down',
-      battle: { kind: 'both', team: (G) => [['seraphin', 41], ['magmaros', 41], ['nightpard', 42], [thirdStarter(G, 43), 43, 'leftovers']], deck: 'champion', lvl: 44, reward: 6000 }, script: async (G, n) => {
+      battle: { kind: 'both', team: (G) => [['seraphin', 41, 'leftovers'], ['magmaros', 41], ['glaciem', 41, 'sash'], ['wyverun', 42], ['nightpard', 42, 'orb'], [thirdStarter(G, 43), 43, 'charm']], deck: 'champion', lvl: 44, reward: 6000 }, script: async (G, n) => {
         if (G.flag('champion')) {
           const c = await G.choose('다시 한번 겨뤄 보겠나, 챔피언?', ['도전한다', '그만둔다'], n.name);
           if (c === 0) { G.healAll(); if ((await G.fight(n, null, { rematch: true })) === 'win') await G.say('역시 그대는 진짜다. 언제든 다시 오게.', n.name); }
@@ -531,12 +536,12 @@
           const zero = MAPS.arena.npcs.find((x) => x.id === 'zero');
           if (!G.p.defeated.zero1) {
             await G.say('먼저 카드의 힘으로!', '제로');
-            if ((await G.fight(zero, duelist('zero', 40, 0), { id: 'zero1' })) !== 'win') return;
+            if ((await G.fight(zero, duelist('zero', 49, 0, { lpx: 1.25 }), { id: 'zero1' })) !== 'win') return;
             G.healAll();
             await G.say(['…제법이군. (아리아가 재빨리 그대의 비스트와 덱을 회복시켜 주었다!)'], '제로');
           }
           await G.say('이번엔 비스트의 힘으로! 양쪽 모두에서 널 꺾어야 의미가 있다!', '제로');
-          if ((await G.fight(zero, tamer([['nightpard', 40], ['seraphin', 40], ['wavelord', 40], ['voltragon', 41]], 40, 4000), { id: 'zero2' })) !== 'win') return;
+          if ((await G.fight(zero, Object.assign(tamer([['nightpard', 49], ['seraphin', 49], ['wavelord', 49], ['lanternox', 49], ['voltragon', 50]], 49, 4000), { items: 2 }), { id: 'zero2' })) !== 'win') return;
           await G.say(['……졌다. 카드로도, 비스트로도.', '너는 두 힘을 가지고도 외톨이가 아니구나. 라이벌이 있고, 동료가 있고.', '…내가 틀렸던 건, 세계가 아니라 나 자신이었나.', '(제로는 크로스 링커를 내려놓고 조용히 아레나를 떠났다.)'], '제로');
           G.healAll(); G.refresh();
           await G.say(['…고맙네. 리그를, 아니 이 대륙을 지켜 주었군.', '자, 방해꾼은 사라졌다. 컨디션은 회복시켜 두었네.', '준비가 되면 다시 말을 걸게. 진짜 결승을 시작하지!'], n.name);
@@ -644,7 +649,7 @@
   ], ['frostholm', 4, 13]);
   room('frost_gym', '서리 테이머 도장', 11, 10, [[1, 1, 'z'], [9, 1, 'z'], [2, 5, 'p'], [8, 5, 'p']], [
     trainer('fg_t1', 3, 6, 'right', 'tamer_f', '도장 수련생 눈송이', tamer([['snowmoth', 35], ['glaciem', 36]], 36, 1500), '설화 님의 얼음은 그 누구도 녹이지 못해요!', '녹았다… 내가 먼저…', { sight: 2 }),
-    { id: 'seolhwa', x: 5, y: 2, look: 'seolhwa', name: '도장 관장 설화', dir: 'down', battle: tamer([['snowmoth', 37], ['glaciem', 37, 'sash'], ['frostfang', 39, 'charm']], 38, 3000), script: async (G, n) => {
+    { id: 'seolhwa', x: 5, y: 2, look: 'seolhwa', name: '도장 관장 설화', dir: 'down', battle: tamer([['snowmoth', 37], ['wavelord', 37], ['glaciem', 37, 'sash'], ['lotusprite', 37], ['frostfang', 39, 'charm']], 38, 3000), script: async (G, n) => {
       if (G.flag('frost')) { if (G.flag('champion')) return rematch(G, n, tamer([['snowmoth', 56], ['glaciem', 57, 'leftovers'], ['wavelord', 56], ['frostfang', 58, 'orb']], 57, 5000)); return G.say('만년설 아래에서 무언가가 깨어났어. 고개 남쪽을 살펴보렴.', n.name); }
       await G.say(['어서 와. 나는 설화, 이 설원의 관장이야.', '리그와는 상관없는 도장이지만, 여기서 얻는 건 엠블럼보다 값질지도 몰라.', '비스트든 덱이든 좋아. 내 얼음을 녹여 봐!'], n.name);
       if ((await G.fight(n)) !== 'win') return;
@@ -691,6 +696,30 @@
       talk('ru_stone', 3, 1, 'elder', '비문 연구가', ['이 벽의 비문을 해독했다네. "얼음과 물은 빙하룡이, 불과 얼음은 증기의 거신이 된다."', '융합의 조합식이 유적에 남아 있었던 게야!']),
     ],
   };
+
+  // ═════════ 난이도 곡선 ═════════
+  // 각 상대의 기준 레벨. 맵 데이터의 팀/덱 레벨은 이 값에 맞춰 통째로 옮겨진다.
+  // 모든 트레이너와 싸우고 야생에서 조금 단련하면 보스보다 2~3레벨 낮게 도착하도록 맞췄다 (tools/curve.js로 확인).
+  const LEVELS = { leon1: 5, r1a: 5, r1b: 6, r1c: 7, mira0: 6, ch_t1: 10, sera: 12, f1: 13, f2: 14, f3: 15, grunt1: 16, lg_t1: 18, gaon: 22, leon2: 22,
+    c1: 21, c2: 22, c3: 23, mira2: 25, v1: 25, v2: 26, v3: 27, admin: 30, xg_t1: 29, xg_t2: 30, mujin: 34, xh_t1: 31, xh_t2: 32, noah: 38,
+    sp1: 35, sp2: 36, sp3: 37, fg_t1: 38, seolhwa: 41, aq1: 42, aq2: 43, leon3: 46, mira3: 47, aria: 52, ru1: 50, ru2: 51, ru3: 52, anu: 57 };
+  X.LEVELS = LEVELS;
+  const ITEMS = { gaon: 1, leon2: 1, admin: 1, mujin: 2, seolhwa: 2, leon3: 2, aria: 3, anu: 3 };
+  const LPX = { sera: 1.1, grunt1: 1.1, mira2: 1.1, noah: 1.4, mira3: 1.25, aria: 1.3, anu: 1.5 };
+  const WILD = { route1: 1, forest: 3, coast: 3, cave: 3, snowpass: 3, ruins: 5 };
+  for (const m of Object.values(MAPS)) {
+    if (m.enc && WILD[m.id]) m.enc.list = m.enc.list.map(([sp, a, b, w]) => [sp, a + WILD[m.id], b + WILD[m.id], w]);
+    for (const n of m.npcs) {
+      const b = n.battle;
+      if (!b) continue;
+      if (ITEMS[n.id]) b.items = ITEMS[n.id];
+      if (LPX[n.id]) b.lpx = LPX[n.id];
+      const d = LEVELS[n.id] == null ? 0 : LEVELS[n.id] - b.lvl;
+      if (!d) continue;
+      b.lvl += d;
+      if (b.team) { const t = b.team, sh = (l) => l.map(([sp, lv, it]) => [sp, Math.max(2, lv + d), it]); b.team = typeof t === 'function' ? (G) => sh(t(G)) : sh(t); }
+    }
+  }
 
   // 문(door) 워프 보정: 실내 맵의 입구 좌표로 연결
   for (const m of Object.values(MAPS)) {

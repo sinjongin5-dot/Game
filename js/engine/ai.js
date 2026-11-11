@@ -14,6 +14,7 @@
   function ttAI(bt, i) {
     const o = 1 - i, sd = bt.side(i), b = bt.active(i), foe = bt.active(o), moves = usableMoves(bt, i);
     if (sd.wild) return { type: 'move', move: moves[Math.floor(X.rngNext(bt.aiRng) * moves.length)] };
+    const heal = potion(bt, i); if (heal) return heal;
     let best = moves[0], bs = -1;
     for (const k of moves) {
       const mv = bt.moveOf(i, k), fx = mv.fx;
@@ -35,8 +36,16 @@
     return { type: 'move', move: best };
   }
 
+  // 보스 테이머는 가방의 회복약을 쓴다 (체력이 30% 아래일 때)
+  function potion(bt, i) {
+    const sd = bt.side(i), b = bt.active(i);
+    if (!sd.bag || b.hp <= 0 || b.hp > b.maxhp * 0.3) return null;
+    const k = ['hipotion', 'potion'].find((x) => sd.bag[x] > 0);
+    return k ? { type: 'item', item: k, target: sd.active } : null;
+  }
   function crossTamerAI(bt, i) {
     const o = 1 - i, sd = bt.side(i), opp = bt.side(o), b = bt.active(i), zones = bt.monZones(o);
+    const heal = potion(bt, i); if (heal) return heal;
     let best = null, bs = -1, maxStrike = 0;
     const consider = (a, sc) => { if (sc > bs) { bs = sc; best = a; } };
     const moves = usableMoves(bt, i);

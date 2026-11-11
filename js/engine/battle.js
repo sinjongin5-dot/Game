@@ -82,7 +82,7 @@
       if (text) this.ev(text);
       const es = this.s.expSide;
       if (winner != null && winner === es && this.side(es).kind === 'tamer' && this.side(1 - es).kind === 'duelist')
-        this.giveExp(es, this.side(1 - es).expLv * 42 * X.EXP_MULT);
+        this.giveExp(es, this.side(1 - es).expLv * 42 * X.expMult(this.side(1 - es).expLv));
     }
 
     request(i) {
@@ -278,7 +278,7 @@
       sd.down.push(sd.active); b.status = null; b.slp = 0;
       this.ev(`${sd.wild ? '야생의 ' : ''}${J(b.name, '은/는')} 쓰러졌다!`, { k: 'faint', side: i });
       const o = 1 - i;
-      if (s.expSide === o && this.side(o).kind === 'tamer') this.giveExp(o, Math.floor((X.BEASTS[b.sp].xp * b.lv) / 7 * (s.wild ? 1 : 1.5) * X.EXP_MULT));
+      if (s.expSide === o && this.side(o).kind === 'tamer') this.giveExp(o, Math.floor((X.BEASTS[b.sp].xp * b.lv) / 7 * (s.wild ? 1 : 1.5) * X.expMult(b.lv)));
       if (!this.aliveCount(i)) { this.finish(o, 'ko', `${J(sd.name, '은/는')} 더 싸울 비스트가 없다!`); return true; }
       if (s.wait && s.wait.kind === 'switch') { if (!s.wait.sides.includes(i)) s.wait.sides.push(i); }
       else s.wait = { kind: 'switch', sides: [i] };

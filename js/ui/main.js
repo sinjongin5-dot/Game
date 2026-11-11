@@ -113,10 +113,11 @@
       const lp = X.lpForLevel(b.lvl);
       const me = mode === 'beast' ? B.tamer(p.name, p.team, { bag: p.bag }) : B.duelist(p.name, p.deck, lp);
       let foe;
-      if (kind === 'tamer') { foe = B.tamer(npc.name, this.mkTeam(b.team)); for (const x of foe.team) p.seen[x.sp] = 1; }
-      else foe = B.duelist(npc.name, X.DECKS[b.deck], lp, { expLv: b.lvl });
+      // 보스는 회복약을 들고 나오고(테이머), LP가 더 많다(듀얼리스트)
+      if (kind === 'tamer') { foe = B.tamer(npc.name, this.mkTeam(b.team), { bag: b.items ? { hipotion: b.items } : null }); for (const x of foe.team) p.seen[x.sp] = 1; }
+      else foe = B.duelist(npc.name, X.DECKS[b.deck], Math.round((lp * (b.lpx || 1)) / 100) * 100, { expLv: b.lvl });
       const label = mode === 'beast' ? (kind === 'tamer' ? '비스트 배틀' : '크로스 배틀') : kind === 'tamer' ? '크로스 배틀' : '듀얼';
-      await X.Cine.vs({ name: p.name, look: 'hero' }, { name: npc.name, look: npc.look }, label);
+      await X.Cine.vs({ name: p.name, look: 'hero' }, { name: npc.name, look: npc.look }, `${label} · 상대 Lv.${b.lvl}`);
       const res = await X.BattleUI.run({ sides: [me, foe], link: b.lvl, expSide: mode === 'beast' ? 0 : null, foeLook: npc.look, intro: `${X.josa(npc.name, '이/가')} 승부를 걸어왔다! 【${label}】`, bg: X.OW.map.bg || 'indoor' });
       await this.afterBattle(me);
       if (res.winner === 0) {
@@ -199,9 +200,9 @@
       }
     },
     async whiteout() {
-      const p = this.p, loss = Math.min(p.gold, Math.floor(p.gold * 0.1));
+      const p = this.p, loss = Math.min(p.gold, Math.floor(p.gold * 0.15));
       p.gold -= loss;
-      await this.say(['눈앞이 캄캄해졌다…', loss ? `정신을 차려 보니 링커 센터였다. (${loss}골드를 잃었다)` : '정신을 차려 보니 익숙한 곳이었다.']);
+      await this.say(['눈앞이 캄캄해졌다…', '(상대가 한 수 위였다. 비스트를 더 단련하거나 덱을 강화해서 다시 도전하자.)', loss ? `정신을 차려 보니 링커 센터였다. (${loss}골드를 잃었다)` : '정신을 차려 보니 익숙한 곳이었다.']);
       this.healAll();
       await this.fade(true);
       X.OW.load(p.respawn.map, p.respawn.x, p.respawn.y, 'down');

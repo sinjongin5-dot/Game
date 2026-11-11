@@ -2,7 +2,9 @@
 (function (root) {
   const X = root.XG;
 
-  X.EXP_MULT = 4; // 짧은 플레이 타임에 맞춘 성장 배율
+  // 경험치 배율: 상대 레벨이 높을수록 커진다. 초반은 천천히, 후반은 강한 상대와 싸워야 오른다.
+  // (tools/ 곡선 모델로 맞춤: 모든 트레이너 + 야생 약간이면 보스보다 2~3레벨 낮게 도착한다)
+  X.expMult = (lv) => 1.0 + lv * 0.13;
   X.expFor = (lv) => Math.floor(0.8 * lv * lv * lv);
 
   X.calcStats = function (b) {
