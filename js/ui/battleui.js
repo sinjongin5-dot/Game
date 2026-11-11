@@ -36,6 +36,7 @@
       const h = G.pushInput({ a: () => this.skipFn && this.skipFn(), b: () => this.cancelPick() });
       const prevScene = G.scene;
       await G.fade(true);
+      X.Cine.bars(false); // 필드 연출용 레터박스는 전투 화면을 가리지 않도록 걷는다
       this.build();
       G.scene = 'battle';
       this.render(bt.view(0));

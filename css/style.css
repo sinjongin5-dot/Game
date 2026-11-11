@@ -591,3 +591,4 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 .qrow.ok{border-left-color:var(--gold);box-shadow:inset 0 0 14px rgba(242,201,76,.2)}.qrow.got{opacity:.55;border-left-color:var(--good)}
 .qr{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:13px;white-space:nowrap}
 .tabs{width:104px}.tab{padding:8px}
+#battle:not(.hidden)~.lbar{height:0!important}
