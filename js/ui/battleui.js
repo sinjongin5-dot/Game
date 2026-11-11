@@ -9,10 +9,17 @@
 
   // 카드 상세 HTML (전투/덱 편집/상점 공용)
   X.cardDetail = function (id, extra) {
-    const c = X.CARDS[id];
-    const head = c.kind === 'mon' ? `${typeChip(c.attr)} <span class="lvl">★${c.lv}</span> <b>ATK ${c.atk}</b> / <b>DEF ${c.def}</b>` : `<span class="chip k-${c.kind}">${KIND_KO[c.kind]}${c.sub ? '·' + SUB_KO[c.sub] : ''}</span>`;
-    const tr = c.kind === 'mon' && c.lv >= 5 ? `<div class="cd-note">제물 ${c.lv >= 7 ? 2 : 1}장이 필요</div>` : '';
-    return `<div class="cd"><div class="cd-art k-${c.kind}"><img src="${A.cardUrl(id)}"></div><div class="cd-body"><div class="cd-name">${c.name}</div><div class="cd-head">${head}</div>${tr}<div class="cd-text">${c.text || (c.kind === 'mon' ? '효과 없는 일반 몬스터.' : '')}</div>${extra || ''}</div></div>`;
+    const c = X.CARDS[id], mon = c.kind === 'mon';
+    const line = mon ? `${X.TYPES[c.attr].name} · ${c.tier === 9 ? (c.token ? '토큰' : '융합') : c.text ? '효과' : '일반'} 몬스터` : `${KIND_KO[c.kind]} 카드${c.sub ? ' · ' + SUB_KO[c.sub] : c.trigger === 'spell' ? ' · 카운터' : ''}`;
+    const tr = mon && c.lv >= 5 && c.tier !== 9 ? `<div class="cd-note">제물 ${c.lv >= 7 ? 2 : 1}장이 필요</div>` : '';
+    return `<div class="cd"><div class="bigcard k-${c.kind}${mon && c.text ? ' fxm' : ''}" style="--ac:${mon ? X.TYPES[c.attr].color : '#fff'}">
+      <div class="bc-head"><span class="bc-name">${c.name}</span>${mon ? `<span class="bc-attr">${X.TYPES[c.attr].name}</span>` : ''}</div>
+      ${mon ? `<div class="bc-stars">${'★'.repeat(c.lv)}</div>` : ''}
+      <div class="bc-art"><img src="${A.cardUrl(id)}"></div>
+      <div class="bc-line">${line}</div>
+      <div class="bc-text">${c.text || (mon ? '효과 없는 일반 몬스터.' : '')}</div>
+      ${mon ? `<div class="bc-stat"><span>ATK <b>${c.atk}</b></span><span>DEF <b>${c.def}</b></span></div>` : ''}
+    </div>${tr}${extra || ''}</div>`;
   };
   // 작은 카드 (패/컬렉션)
   X.cardHTML = function (id, attrs, badge, cls) {
@@ -73,9 +80,16 @@
       b.className = 'bg-' + (this.cfg.bg || 'field') + ' m-' + bt.mode;
       const scn = { field: 'T', forest: 'T', cave: '#', indoor: 'xb' }[this.cfg.bg || 'field'];
       b.innerHTML = `<div class="b-sky"></div><div class="b-scn" ${scn ? `style="background-image:url(${A.prop(scn).url})"` : ''}></div><div class="b-wfx"></div><div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><span id="b-weather" style="display:none"></span><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
-        <div id="b-right"><div id="b-log"></div><div id="b-detail" class="hidden"></div></div>
+        <div id="b-right"><div id="b-turn"></div><div id="b-log"></div><div id="b-detail" class="hidden"></div></div><svg id="b-aim" viewBox="0 0 960 600"><defs><marker id="aimh" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#ffd24a"/></marker></defs><path d=""/></svg>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);
+      // 대상 선택 중: 공격자에서 가리킨 대상까지 조준선을 긋는다
+      b.onmouseover = (e) => {
+        const p = this.picking, z = e.target.closest && e.target.closest('.zone.pick'), path = $('#b-aim path');
+        if (!p || !p.from || !z || !document.contains(p.from)) return path.setAttribute('d', '');
+        const A1 = this.box(p.from), B1 = this.box(z), mx = (A1.x + B1.x) / 2, my = Math.min(A1.y, B1.y) - 50;
+        path.setAttribute('d', `M${A1.x},${A1.y} Q${mx},${my} ${B1.x},${B1.y}`);
+      };
       b.classList.add('intro'); setTimeout(() => b.classList.remove('intro'), 900);
 
     },
@@ -91,9 +105,19 @@
       requestAnimationFrame(() => document.querySelectorAll('#battle [data-to]').forEach((f) => (f.style.width = f.dataset.to + '%')));
       if (this.meKind === 'duelist') this.renderHand();
       this.paintPick();
+      this.paintTurn(v);
       const w = v.weather && v.weather.w, wb = $('#b-weather');
       $('#battle').dataset.w = w || '';
       if (wb) { wb.textContent = w ? { sun: '☀ 쾌청', rain: '☂ 비', sand: '≋ 모래바람' }[w] + ' ' + v.weather.t : ''; wb.style.display = w ? '' : 'none'; }
+    },
+    paintTurn(v) {
+      const e = $('#b-turn'); if (!e) return;
+      if (this.bt.mode === 'tt') { e.innerHTML = `<b>ROUND ${Math.max(1, v.turn + (this.bt.over ? 0 : 1))}</b><span class="ph on">동시 선택</span><span class="ph">스피드 순 행동</span>`; return; }
+      const sd = v.sides[v.cur], mine = v.cur === 0;
+      let ph = 1;
+      if (sd.kind === 'duelist') { if (sd.mons.some((m) => m && m.attacks > 0)) ph = 2; }
+      const names = sd.kind === 'duelist' ? ['DRAW', 'MAIN', 'BATTLE', 'END'] : ['행동 선택', '기술', '턴 종료'];
+      e.innerHTML = `<b class="${mine ? 'me' : 'op'}">TURN ${v.turn} · ${mine ? '나' : '상대'}</b>${names.map((n, k) => `<span class="ph${k === (sd.kind === 'duelist' ? ph : 0) ? ' on' : k < (sd.kind === 'duelist' ? ph : 0) ? ' done' : ''}">${n}</span>`).join('')}`;
     },
     hpCls: (p) => (p > 50 ? 'g' : p > 20 ? 'y' : 'r'),
     tamerHTML(sd, i) {
@@ -102,12 +126,17 @@
       this.prevHp[i] = { active: sd.active, pct };
       const stg = Object.entries(sd.stages).filter(([, n]) => n).map(([k, n]) => `<span class="${n > 0 ? 'up' : 'dn'}">${{ atk: '공', def: '방', spd: '속' }[k]}${n > 0 ? '▲' : '▼'}${Math.abs(n)}</span>`).join('');
       const dots = sd.wild ? '' : `<div class="tp-team">${sd.team.map((t, k) => `<i class="${t.hp <= 0 ? 'x' : k === sd.active ? 'a' : ''}"></i>`).join('')}</div>`;
-      return `<div class="tp-info"><div class="tp-owner">${sd.wild ? '야생 비스트' : sd.name}</div>
+      const look = sd.wild ? null : i === 1 ? this.cfg.foeLook || 'tamer_m' : 'hero';
+      const need = X.expFor(b.lv + 1) - X.expFor(b.lv), have = b.exp - X.expFor(b.lv);
+      return `<div class="tp-info plate" style="--tc:${X.TYPES[sp.types[0]].color}">
+        ${look ? `<img class="pl-ava" src="${A.charUrl(look)}">` : ''}
+        <div class="tp-owner">${sd.wild ? '야생 비스트' : sd.name}</div>
         <div class="tp-name">${b.name} <span class="lv">Lv.${b.lv}</span>${b.status ? `<span class="st st-${b.status}">${X.STATUS[b.status]}</span>` : ''}</div>
         <div class="tp-types">${sp.types.map(typeChip).join('')}<span class="stg">${stg}${sd.conf > 0 ? '<span class="dn">혼란</span>' : ''}${sd.protect ? '<span class="up">방어</span>' : ''}</span></div>
         <div class="tp-ab" title="${X.ABILITIES[sp.ab].desc}">◆ ${X.ABILITIES[sp.ab].name}${b.item && (i === 0 || this.bt.mode === 'tt') ? ` · <i>${X.ITEMS[b.item].name}</i>` : ''}</div>
-        <div class="hpbar"><div class="hpghost" style="width:${old}%" data-to="${pct}"></div><div class="hpfill ${this.hpCls(pct)}" style="width:${old}%" data-to="${pct}"></div></div>
-        <div class="tp-hp">HP ${b.hp} / ${b.maxhp}</div>${dots}</div>
+        <div class="hpbar big"><div class="hpghost" style="width:${old}%" data-to="${pct}"></div><div class="hpfill ${this.hpCls(pct)}" style="width:${old}%" data-to="${pct}"></div><div class="hpticks"></div></div>
+        <div class="pl-foot">${dots}<div class="tp-hp">HP <b>${b.hp}</b> / ${b.maxhp}</div></div>
+        ${i === 0 && this.bt.s.expSide === 0 ? `<div class="xpbar"><div style="width:${Math.min(100, (have / need) * 100)}%"></div></div>` : ''}</div>
         <div class="tp-sprite zone" data-side="${i}" data-zone="beast"><div class="shadow"></div><img class="spr${i === 0 ? ' flip' : ''}${b.hp <= 0 ? ' down' : ''}" src="${A.beastUrl(b.sp)}"></div>`;
     },
     monHTML(m) {
@@ -129,9 +158,9 @@
       const st = `<div class="row st">${sd.st.map((t, z) => `<div class="zone sz${t ? '' : ' empty'}" data-side="${i}" data-st="${z}">${this.stHTML(t)}</div>`).join('')}</div>`;
       const look = i === 1 ? this.cfg.foeLook || 'duelist_m' : 'hero';
       const pct = Math.min(100, (sd.lp / sd.maxLp) * 100);
-      return `<div class="dp-info"><img class="ava" src="${A.charUrl(look)}"><div class="dp-name">${sd.name}</div><div class="lp" data-lp="${i}">LP <b>${sd.lp}</b></div>
+      return `<div class="dp-info plate${this.v.cur === i && this.bt.mode !== 'tt' ? ' turn' : ''}"><img class="ava" src="${A.charUrl(look)}"><div class="dp-name">${sd.name}</div><div class="lp" data-lp="${i}"><span>LP</span><b>${sd.lp}</b></div>
         <div class="hpbar"><div class="hpfill lpf" style="width:${pct}%"></div></div>
-        <div class="dp-counts">덱 ${sd.deck.length} · 패 ${sd.hand.length} · 묘지 ${sd.grave.length}</div></div>
+        <div class="piles"><div class="pile deck" title="덱"><i></i><b>${sd.deck.length}</b><span>덱</span></div><div class="pile grave" data-act="grave" data-side="${i}" title="묘지 보기"><i></i><b>${sd.grave.length}</b><span>묘지</span></div><div class="pile handc" title="패"><i></i><b>${sd.hand.length}</b><span>패</span></div></div></div>
         <div class="dp-field">${i === 1 ? st + mons : mons + st}</div>`;
     },
     renderHand() {
@@ -139,8 +168,9 @@
       $('#b-hand').innerHTML = sd.hand.map((id, h) => {
         const c = X.CARDS[id];
         const ok = can && (c.kind === 'mon' ? bt.canSummon(0, h) : c.kind === 'spell' ? bt.spellInfo(0, h) : bt.freeZone(bt.side(0).st) >= 0);
-        return X.cardHTML(id, `data-hand="${h}"`, '', (ok ? 'ok' : '') + (this.sel && this.sel.hand === h ? ' sel' : ''));
+        return X.cardHTML(id, `data-hand="${h}" style="--o:${h - (sd.hand.length - 1) / 2};--n:${sd.hand.length}"`, '', (ok ? 'ok' : '') + (this.sel && this.sel.hand === h ? ' sel' : ''));
       }).join('');
+      $('#b-hand').className = 'fan' + (sd.hand.length > 6 ? ' tight' : '');
     },
     setMsg(t) { $('#b-msg').textContent = t; },
     addLog(t) {
@@ -157,6 +187,8 @@
         const gh = this.snapGhost(e.fx), prevLp = this.v ? this.v.sides.map((sd) => sd.lp) : null;
         this.render(X.Battle.viewFor(e.s, 0));
         this.fx(e.fx, gh, prevLp);
+        const co = /효과가 굉장했다/.test(e.text) ? ['효과 굉장!!', 'co-good'] : /급소/.test(e.text) ? ['급소!!', 'co-crit'] : /^쾌속!/.test(e.text) ? ['쾌속!', 'co-swift'] : /융합 소환/.test(e.text) ? ['융합 소환!', 'co-fuse'] : /함정 발동/.test(e.text) ? ['함정 발동!', 'co-trap'] : /특수 소환/.test(e.text) ? ['특수 소환!', 'co-swift'] : /무효/.test(e.text) ? ['무효!', 'co-trap'] : null;
+        if (co) this.spawn('callout ' + co[1], 330, 150, co[0], 900);
         this.addLog(e.text);
         await this.message(e.text, e.fx && e.fx.k === 'turn' ? 520 : 480 + Math.min(700, e.text.length * 22));
       }
@@ -291,6 +323,7 @@
       const f = this.acts && this.acts[name];
       if (name === 'close' && this.onClose) return this.onClose();
       if (name === 'cancel') return this.cancelPick();
+      if (name === 'grave' && !(this.acts && this.acts.grave)) return this.graveModal(+d.side);
       if (name === 'speed') { G.speed = { 1: 2, 2: 4, 4: 1 }[G.speed || 1]; const e = $('#battle [data-act=speed]'); if (e) e.textContent = '▶ ×' + G.speed; return; }
       if (name === 'auto') {
         this.auto = !this.auto;
@@ -304,8 +337,8 @@
     clearSel() { this.sel = null; this.acts = this.baseActs || {}; const d = $('#b-detail'); if (d) d.classList.add('hidden'); document.querySelectorAll('#battle .sel').forEach((x) => x.classList.remove('sel')); },
     cancelPick() { if (!this.picking) return; this.picking = null; this.paintPick(); this.clearSel(); if (this.cmdBack) this.cmdBack(); },
     // 대상 선택 모드
-    pick(side, zones, prompt, cb, tagFn) {
-      this.picking = { side, zones, tagFn, cb: (z) => { this.picking = null; this.paintPick(); cb(z); } };
+    pick(side, zones, prompt, cb, tagFn, from) {
+      this.picking = { side, zones, tagFn, from, cb: (z) => { this.picking = null; this.paintPick(); cb(z); } };
       this.setMsg(prompt);
       $('#b-detail').classList.add('hidden');
       this.paintPick();
@@ -314,7 +347,7 @@
       document.querySelectorAll('#battle .pick').forEach((x) => { x.classList.remove('pick'); const t = x.querySelector('.ptag'); if (t) t.remove(); });
       const p = this.picking;
       $('#battle').classList.toggle('picking', !!p);
-      if (!p) return;
+      if (!p) { const ap = $('#b-aim path'); if (ap) ap.setAttribute('d', ''); return; }
       for (const z of p.zones) {
         const e = $(`#bs${p.side} .zone[data-zone="${z}"]:not(.sz)`);
         if (!e) continue;
@@ -328,24 +361,30 @@
       const bt = this.bt, cross = bt.mode === 'cross', b = bt.active(0);
       const main = () => {
         this.cmdBack = null;
-        $('#b-hand').innerHTML = `<div class="hint">${cross ? '크로스 룰: 기술은 <b>스트라이크</b>가 되어 몬스터의 ATK/DEF와 겨룬다. 몬스터가 없으면 상대 LP에 직접!' : '비스트 룰: 스피드가 빠른 쪽이 먼저 움직인다. 속성 상성을 노리자.'}</div>`;
-        $('#b-cmd').innerHTML = `<button class="btn big" data-act="fight">싸운다</button><button class="btn" data-act="team">비스트</button><button class="btn" data-act="bag">가방</button>${bt.s.wild && bt.mode === 'tt' ? '<button class="btn" data-act="run">도망</button>' : '<button class="btn" data-act="rules">룰</button>'}`;
+        const sd = bt.side(0);
+        $('#b-hand').className = 'teambar';
+        $('#b-hand').innerHTML = sd.team.map((t, k) => { const pc = (t.hp / t.maxhp) * 100; return `<button class="tb${k === sd.active ? ' on' : ''}" data-act="tswitch" data-i="${k}" ${bt.canSwitch(0, k) ? '' : 'disabled'} title="${k === sd.active ? '전투 중' : '교체'}"><img src="${A.beastUrl(t.sp)}"><b>${t.name}</b><small>Lv.${t.lv}${t.status ? ' · ' + X.STATUS[t.status] : ''}</small><div class="hpbar"><div class="hpfill ${this.hpCls(pc)}" style="width:${pc}%"></div></div></button>`; }).join('') + `<div class="tb-hint">${cross ? '크로스 룰 — 기술은 <b>스트라이크</b>가 되어 몬스터의 ATK/DEF와 겨룬다.' : '비스트 룰 — 스피드가 빠른 쪽이 먼저 움직인다.'}<br>동료를 누르면 바로 교체한다.</div>`;
+        $('#b-cmd').className = 'cmd4';
+        $('#b-cmd').innerHTML = `<button class="cb c-fight" data-act="fight"><i>⚔</i>싸운다</button><button class="cb c-bag" data-act="bag"><i>✚</i>가방</button><button class="cb c-team" data-act="team"><i>◈</i>비스트</button>${bt.s.wild && bt.mode === 'tt' ? '<button class="cb c-run" data-act="run"><i>➤</i>도망</button>' : '<button class="cb c-run" data-act="rules"><i>?</i>룰</button>'}`;
       };
       const fight = () => {
         this.cmdBack = main;
         const usable = b.moves.some((m) => m.pp > 0);
         const foeTypes = bt.side(1).kind === 'tamer' ? X.BEASTS[bt.active(1).sp].types : null;
         const btn = (mv, k, pp) => {
-          const fxs = mv.fx || {}, tag = fxs.multi ? ' ×2~5' : fxs.recoil ? ' · 반동' : fxs.crit ? ' · 급소↑' : fxs.pri ? ' · 선공' : fxs.conf ? ' · 혼란' : fxs.flinch ? ' · 풀죽음' : fxs.weather ? ' · 날씨' : fxs.protect ? ' · 방어' : '';
-          const info = (mv.pow > 0 ? (cross ? `스트라이크 ${Math.round(bt.strikeBase(0, mv, null) / 10) * 10}` : `위력 ${mv.pow}`) : '변화') + tag;
+          const fxs = mv.fx || {}, tag = fxs.multi ? '×2~5' : fxs.recoil ? '반동' : fxs.crit ? '급소↑' : fxs.pri ? '선공' : fxs.conf ? '혼란' : fxs.flinch ? '풀죽음' : fxs.weather ? '날씨' : fxs.protect ? '방어' : fxs.drain ? '흡수' : fxs.st ? X.STATUS[fxs.st[0]] : '';
+          const info = mv.pow > 0 ? (cross ? `스트라이크 ${Math.round(bt.strikeBase(0, mv, null) / 10) * 10}` : `위력 ${mv.pow}`) : '변화';
           const e = foeTypes && mv.pow > 0 ? X.eff(mv.type, foeTypes) : 1;
-          return `<button class="move" data-act="move" data-i="${k}" ${pp === 0 ? 'disabled' : ''} style="--tc:${X.TYPES[mv.type].color}"><b>${mv.name}</b><span>${X.TYPES[mv.type].name} · ${info}${e > 1 ? ' · <em class="up">효과 굉장</em>' : e < 1 ? ' · <em class="dn">효과 별로</em>' : ''}</span><span class="pp">${pp == null ? '' : `PP ${pp}/${mv.pp}`}</span></button>`;
+          return `<button class="move" data-act="move" data-i="${k}" ${pp === 0 ? 'disabled' : ''} style="--tc:${X.TYPES[mv.type].color}"><span class="mv-type">${X.TYPES[mv.type].name}</span><b>${mv.name}</b><span class="mv-info">${info} · 명중 ${mv.acc}${tag ? ` · <u>${tag}</u>` : ''}</span>${e > 1 ? '<em class="eff up">효과 굉장 ▲</em>' : e < 1 ? '<em class="eff dn">효과 별로 ▼</em>' : ''}<span class="pp">${pp == null ? '' : `PP ${pp}/${mv.pp}`}</span></button>`;
         };
-        $('#b-hand').innerHTML = `<div class="moves">${usable ? b.moves.map((m, k) => btn(X.MOVES[m.id], k, m.pp)).join('') : btn({ name: '발버둥', type: 'normal', pow: 35, pp: 1 }, -1, null)}</div>`;
-        $('#b-cmd').innerHTML = `<button class="btn" data-act="back">뒤로</button>`;
+        $('#b-hand').className = '';
+        $('#b-hand').innerHTML = `<div class="moves">${usable ? b.moves.map((m, k) => btn(X.MOVES[m.id], k, m.pp)).join('') : btn({ name: '발버둥', type: 'normal', pow: 35, acc: 100, pp: 1 }, -1, null)}</div>`;
+        $('#b-cmd').className = '';
+        $('#b-cmd').innerHTML = `<button class="btn" data-act="back">◀ 뒤로</button>`;
       };
       this.acts = this.baseActs = {
         fight, back: main, rules: () => this.rulesModal(),
+        tswitch: (d) => { if (bt.canSwitch(0, +d.i)) this.done({ type: 'switch', to: +d.i }); },
         run: () => this.done({ type: 'run' }),
         team: () => this.teamModal((k) => bt.canSwitch(0, k), (k) => this.done({ type: 'switch', to: k })),
         bag: () => this.bagModal(),
@@ -365,7 +404,7 @@
             if (m.hidden) return ['?', ''];
             const S = Math.round(bt.strikeBase(0, mv, X.CARDS[m.id].attr) * 0.96 / 10) * 10, val = m.pos === 'atk' ? m.a : m.d;
             return [`${S} ${S >= val ? '≥' : '<'} ${val}`, S >= val ? 'good' : 'bad'];
-          });
+          }, $('#bs0 .spr'));
         },
       };
       main();
@@ -401,6 +440,13 @@
       m.innerHTML = `<div class="mbox"><div class="mtitle">${what}</div><div class="tlist">${req.options.map((z) => `<button class="trow trap" data-act="trap" data-i="${z}"><img src="${A.cardUrl(sd.st[z].id)}"><div><b>${X.CARDS[sd.st[z].id].name}</b> 발동<br><small>${X.CARDS[sd.st[z].id].text}</small></div></button>`).join('')}</div><button class="btn" data-act="notrap">발동하지 않는다</button></div>`;
       this.acts = { trap: (d) => { m.className = 'hidden'; this.done({ type: 'trap', idx: +d.i }); }, notrap: () => { m.className = 'hidden'; this.done({ type: 'trap', idx: null }); } };
     },
+    graveModal(side) {
+      const sd = this.v.sides[side], m = $('#b-modal');
+      m.className = 'modal';
+      m.innerHTML = `<div class="mbox wide"><div class="mtitle">${sd.name}의 묘지 (${sd.grave.length}장)</div><div class="cgrid gv">${sd.grave.length ? sd.grave.slice().reverse().map((id) => X.cardHTML(id)).join('') : '<div class="hint">묘지가 비어 있다.</div>'}</div><button class="btn" data-act="mclose">닫기</button></div>`;
+      const prev = this.acts;
+      this.acts = Object.assign({}, prev, { mclose: () => { m.className = 'hidden'; this.acts = prev; } });
+    },
     rulesModal() {
       const m = $('#b-modal'), mode = this.bt.mode, K = X.Battle.linkK(this.bt.s.link);
       const text = mode === 'tt' ? '<p><b>비스트 룰</b></p><p>양쪽이 동시에 행동을 고르고, 스피드가 빠른 쪽부터 움직인다. 상대의 비스트를 모두 쓰러뜨리면 승리.</p><p>속성 상성(2배/0.5배), 자속 보정(1.5배), 상태이상(독·화상·마비·수면)을 활용하자.</p>'
@@ -417,8 +463,8 @@
       const bt = this.bt;
       this.cmdBack = () => { $('#b-cmd').innerHTML = cmdHTML; this.setMsg('내 턴 — 카드를 골라 행동하자.'); };
       const cmdHTML = `<button class="btn big" data-act="end">턴 종료</button><button class="btn" data-act="rules">룰</button>${bt.s.wild ? '<button class="btn" data-act="run">도망</button>' : ''}`;
-      $('#b-cmd').innerHTML = cmdHTML;
-      this.acts = this.baseActs = { end: () => this.done({ type: 'end' }), rules: () => this.rulesModal(), run: () => this.done({ type: 'run' }) };
+      $('#b-cmd').className = ''; $('#b-cmd').innerHTML = cmdHTML;
+      this.acts = this.baseActs = { grave: (d) => this.graveModal(+d.side), end: () => this.done({ type: 'end' }), rules: () => this.rulesModal(), run: () => this.done({ type: 'run' }) };
       this.renderHand();
     },
     cancelBtn() { $('#b-cmd').innerHTML = `<button class="btn" data-act="cancel">취소</button>`; },
@@ -489,7 +535,7 @@
             if (!zones.length) return this.done({ type: 'attack', zone: z, target: 'direct' });
             if (zones.length === 1) return this.done({ type: 'attack', zone: z, target: zones[0] });
             this.cancelBtn();
-            this.pick(1, zones, '공격할 대상을 고르자.', (t) => this.done({ type: 'attack', zone: z, target: t }), (t) => { const T = v.sides[1].mons[t]; if (T.hidden) return ['?', '']; const val = T.pos === 'atk' ? T.a : T.d; return [`${m.a} ${m.a > val ? '>' : m.a === val ? '=' : '<'} ${val}`, m.a > val ? 'good' : 'bad']; });
+            this.pick(1, zones, '공격할 대상을 고르자.', (t) => this.done({ type: 'attack', zone: z, target: t }), (t) => { const T = v.sides[1].mons[t]; if (T.hidden) return ['?', '']; const val = T.pos === 'atk' ? T.a : T.d; return [`${m.a} ${m.a > val ? '>' : m.a === val ? '=' : '<'} ${val}`, m.a > val ? 'good' : 'bad']; }, $(`#bs0 .mz[data-zone="${z}"]`));
           };
         } else if (!m.faceDown && m.pos === 'atk' && bt.s.turn <= 1) btns += `<div class="cd-note">첫 턴에는 공격할 수 없다.</div>`;
         if (bt.canAttack(0, z) && X.CARDS[m.id].fx.direct && bt.side(1).kind === 'duelist' && bt.monZones(1).length) { btns += `<button class="btn" data-act="direct">직접 공격</button>`; acts.direct = () => this.done({ type: 'attack', zone: z, target: 'direct' }); }
