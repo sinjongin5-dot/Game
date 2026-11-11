@@ -60,7 +60,6 @@
       await this.result(txt, r.winner === 0 || r.reason === 'capture');
       await G.fade(true);
       $('#battle').classList.add('hidden');
-      if (this.gl) X.FX3D.stop();
       this.auto = false;
       G.popInput(h);
       G.scene = prevScene;
@@ -76,8 +75,7 @@
         <div id="b-right"><div id="b-log"></div><div id="b-detail" class="hidden"></div></div>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);
-      this.gl = X.FX3D.ok;
-      if (this.gl) { X.FX3D.start(b, this.cfg.bg || 'field'); b.classList.add('gl'); }
+
     },
 
     // ── 렌더링 ──
@@ -91,7 +89,6 @@
       requestAnimationFrame(() => document.querySelectorAll('#battle [data-to]').forEach((f) => (f.style.width = f.dataset.to + '%')));
       if (this.meKind === 'duelist') this.renderHand();
       this.paintPick();
-      if (this.gl) X.FX3D.sync(v);
     },
     hpCls: (p) => (p > 50 ? 'g' : p > 20 ? 'y' : 'r'),
     tamerHTML(sd, i) {
@@ -162,13 +159,39 @@
       ms /= G.speed || 1;
       return new Promise((res) => { const t = setTimeout(done, ms); const self = this; function done() { clearTimeout(t); self.skipFn = null; res(); } this.skipFn = done; });
     },
+    // 대상 요소 위에 떠오르는 숫자
+    floatNum(elm, text, cls) {
+      if (!elm) return;
+      const host = $('#battle'), hr = host.getBoundingClientRect(), r = elm.getBoundingClientRect(), k = 960 / hr.width;
+      const d = el('div', 'dmg ' + (cls || ''), text);
+      d.style.left = (r.left - hr.left + r.width / 2) * k + 'px'; d.style.top = (r.top - hr.top + r.height * 0.35) * k + 'px';
+      host.appendChild(d); setTimeout(() => d.remove(), 950);
+    },
+    // 타격 지점에서 튀는 픽셀 파편
+    sparks(elm, color) {
+      if (!elm) return;
+      const host = $('#battle'), hr = host.getBoundingClientRect(), r = elm.getBoundingClientRect(), k = 960 / hr.width;
+      const x = (r.left - hr.left + r.width / 2) * k, y = (r.top - hr.top + r.height * 0.5) * k;
+      for (let i = 0; i < 12; i++) {
+        const p = el('i', 'spark'), a = Math.random() * 6.28, d = 30 + Math.random() * 60;
+        p.style.cssText = `left:${x}px;top:${y}px;background:${color || '#fff'};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px`;
+        host.appendChild(p); setTimeout(() => p.remove(), 520);
+      }
+    },
     fx(f) {
       if (!f) return;
-      if (this.gl) X.FX3D.fx(f);
+      // 공격자 돌진
+      if (f.k === 'move' || f.k === 'attack') {
+        const a = f.k === 'attack' ? $(`#bs${f.side} .mz[data-zone="${f.zone}"] .holo`) : $(`#bs${f.side} .spr`);
+        if (a) { a.classList.remove('lunge'); void a.offsetWidth; a.classList.add('lunge'); }
+      }
       const tgt = f.zone != null && f.zone !== 'beast' ? $(`#bs${f.side} .mz[data-zone="${f.zone}"]`) : $(`#bs${f.side} .tp-sprite`) || $(`#bs${f.side} .dp-info`);
       const cls = { hit: 'fx-hit', destroy: 'fx-destroy', faint: 'fx-faint', summon: 'fx-pop', flip: 'fx-pop', enter: 'fx-pop', heal: 'fx-heal', buff: 'fx-buff', debuff: 'fx-debuff', status: 'fx-debuff', lp: 'fx-hit', levelup: 'fx-buff', capsule: 'fx-capsule', trap: 'fx-trap', spell: 'fx-buff' }[f.k];
       if (f.k === 'hit' || f.k === 'lp' || f.k === 'destroy') G.sfx('hit'); else if (f.k === 'faint') G.sfx('faint'); else if (f.k === 'heal' || f.k === 'levelup') G.sfx('heal'); else if (['summon', 'spell', 'trap', 'set', 'draw'].includes(f.k)) G.sfx('card');
       const target = f.k === 'lp' ? $(`#bs${f.side} .lp`) : f.k === 'trap' || f.k === 'spell' ? $(`#bs${f.side} .dp-info`) : tgt;
+      if (f.k === 'hit') { this.sparks(tgt, f.type ? X.TYPES[f.type].color : '#fff'); if (f.n) this.floatNum(tgt, '-' + f.n, 'bad'); }
+      if (f.k === 'lp' && f.n) this.floatNum(target, '-' + f.n, 'bad big');
+      if (f.k === 'destroy') this.sparks(tgt, '#ffd24a');
       if (target && cls) { target.classList.add(cls); if (f.type) target.style.setProperty('--fx', X.TYPES[f.type].color); }
       if ((f.k === 'spell' || f.k === 'trap') && f.card) this.showDetail(X.cardDetail(f.card, `<div class="cd-note">${f.side === 0 ? '내가' : '상대가'} 발동</div>`), true);
     },

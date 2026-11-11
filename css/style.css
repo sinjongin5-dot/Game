@@ -286,19 +286,15 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 .zst{position:absolute;right:4px;top:4px;z-index:3}
 .bw-roof{background-repeat:repeat}
 
-/* ══ 3D 전투 무대 (WebGL) ══ */
-#b3d{position:absolute;left:0;top:0;width:960px;height:600px;z-index:0!important;pointer-events:none}
-#battle.gl{background:#101018!important}#battle.gl::before{display:none}
-#battle.gl::after{background:radial-gradient(ellipse at 34% 45%,transparent 50%,rgba(6,4,16,.42) 100%)}
-.gl .holo,.gl .zone.mz .fc,.gl .spr,.gl .tp-sprite .shadow{display:none}
-.gl .zone.mz{background:none;box-shadow:none;border:1px solid rgba(255,255,255,.16)}
-.gl .zone.mz.empty{border-style:dashed;border-color:rgba(255,255,255,.28)}
-.gl .zone.mz:not(.empty){border-color:transparent}
-.gl .mz.fx-hit::after,.gl .mz.fx-destroy::after{display:none}.gl .mz.fx-hit,.gl .tp-sprite.fx-hit{animation:none}
-.gl .zone.sel,.gl .zone.pick{border-color:var(--gold)}
+/* ══ 전투 연출 ══ */
 .dmg{position:absolute;z-index:6!important;transform:translate(-50%,-50%);font:900 26px "Jua",sans-serif;color:#fff;text-shadow:0 2px 0 #000,0 0 8px rgba(0,0,0,.8);pointer-events:none;animation:dmgUp .95s ease-out forwards;white-space:nowrap}
 .dmg.bad{color:#ff8a7a}.dmg.good{color:#8ff09a}.dmg.big{font-size:38px;color:#ffd24a}
 @keyframes dmgUp{0%{transform:translate(-50%,-30%) scale(.5);opacity:0}15%{transform:translate(-50%,-70%) scale(1.25);opacity:1}100%{transform:translate(-50%,-190%) scale(1);opacity:0}}
+.spark{position:absolute;z-index:5!important;width:7px;height:7px;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.5);animation:spark .5s ease-out forwards}
+@keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
+.b-opp .spr.lunge,.b-opp .holo.lunge{animation:lungeD .42s}.b-me .spr.lunge{animation:lungeUF .42s}.b-me .holo.lunge{animation:lungeUF .42s}
+@keyframes lungeD{40%{transform:translate(-60px,70px) scale(1.12)}}
+@keyframes lungeUF{0%,100%{transform:scaleX(-1)}40%{transform:translate(70px,-70px) scale(-1.12,1.12)}}
 .bb{margin-left:6px;flex:0 0 auto;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700}
 .bb:first-of-type{margin-left:auto}.bb.on{background:var(--gold);color:#1a1626}
 #b-msg{flex:1;min-width:0}

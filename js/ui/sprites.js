@@ -8,9 +8,9 @@
 
   // ── 생물 스프라이트 (32x32) ──
   function creature(look) {
-    const cv = mk(32, 32), g = cv.getContext('2d');
-    const [c1, c2, c3] = look.c, sz = look.size || 0.8, shape = look.shape;
-    g.translate(16, 30); g.scale(sz, sz);
+    const cv = mk(48, 48), g = cv.getContext('2d');
+    const [c1, c2, c3] = look.c, sz = (look.size || 0.8) * 1.5, shape = look.shape;
+    g.translate(24, 45.5); g.scale(sz, sz);
     const ell = (x, y, rx, ry, col, rot) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 7); g.fill(); };
     const tri = (pts, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); g.fill(); };
     const rect = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
