@@ -3,6 +3,7 @@
   const X = root.XG;
   const $ = (s) => document.querySelector(s);
   const SAVE_KEY = 'crosslink_save_v1';
+  const A0 = X.Art;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   X.wait = wait;
   X.el = function (tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -48,7 +49,7 @@
       this.setFlag('emblem_' + id);
       if (!this.p.emblems.includes(id)) this.p.emblems.push(id);
       sfx('win');
-      await this.say(`★ ${X.josa(name, '을/를')} 손에 넣었다! (엠블럼 ${this.p.emblems.length}/4)`, null);
+      await X.Cine.emblem(name, { wave: '#3c8df0', leaf: '#4fb84a', magma: '#f0672e', shadow: '#7a5aa8' }[id] || '#f2c94c', this.p.emblems.length);
     },
     refresh() { X.OW.refreshNpcs(); },
 
@@ -85,10 +86,12 @@
     async fade(on) { $('#fade').classList.toggle('on', on); await wait(220); },
 
     // 스크립트 실행 (필드 조작 잠금)
-    async run(fn) {
+    async run(fn, cine) {
       this.lock++;
+      if (cine) X.Cine.bars(true);
       try { await fn(); } catch (e) { console.error(e); this.toast('오류: ' + e.message, 4000); }
       this.lock--;
+      X.Cine.bars(false); X.OW.focus = null;
       Dlg.hide();
       if (this.scene === 'world') { this.refresh(); this.save(); }
     },
@@ -113,6 +116,7 @@
       if (kind === 'tamer') { foe = B.tamer(npc.name, this.mkTeam(b.team)); for (const x of foe.team) p.seen[x.sp] = 1; }
       else foe = B.duelist(npc.name, X.DECKS[b.deck], lp, { expLv: b.lvl });
       const label = mode === 'beast' ? (kind === 'tamer' ? '비스트 배틀' : '크로스 배틀') : kind === 'tamer' ? '크로스 배틀' : '듀얼';
+      await X.Cine.vs({ name: p.name, look: 'hero' }, { name: npc.name, look: npc.look }, label);
       const res = await X.BattleUI.run({ sides: [me, foe], link: b.lvl, expSide: mode === 'beast' ? 0 : null, foeLook: npc.look, intro: `${X.josa(npc.name, '이/가')} 승부를 걸어왔다! 【${label}】`, bg: X.OW.map.bg || 'indoor' });
       await this.afterBattle(me);
       if (res.winner === 0) {
@@ -136,6 +140,7 @@
       p.seen[sp] = 1;
       const me = mode === 'beast' ? B.tamer(p.name, p.team, { bag: p.bag }) : B.duelist(p.name, p.deck, X.lpForLevel(lv));
       const foe = B.tamer(wild.name, [wild], { wild: true });
+      if (opts.legend) await X.Cine.vs({ name: p.name, look: 'hero' }, { name: wild.name, beast: sp }, '전설의 비스트');
       const res = await X.BattleUI.run({ sides: [me, foe], link: lv, wild: true, expSide: mode === 'beast' ? 0 : null, intro: `${opts.legend ? '전설의 비스트' : '야생의'} ${X.josa(wild.name, '이/가')} 나타났다!`, bg: X.OW.map.bg || 'field' });
       if (res.reason === 'capture') {
         wild.status = null; wild.slp = 0;
@@ -157,12 +162,11 @@
       for (const L of me.learn) await X.Menu.learnMove(p.team[L.idx], L.move);
       for (const b of p.team) {
         while (b.hp > 0 && X.canEvolve(b)) {
-          const old = b.name;
-          await this.say(`…어라? ${old}의 모습이…!`);
+          const old = b.name, oldSp = b.sp;
           const r = X.evolve(b);
           p.seen[b.sp] = 1; p.caught[b.sp] = 1;
           sfx('win');
-          await X.Menu.showEvolution(old, b);
+          await X.Cine.evolve(oldSp, old, b);
           for (const m of r.news) { if (b.moves.length < 4) { b.moves.push({ id: m, pp: X.MOVES[m].pp }); await this.say(`${X.josa(b.name, '은/는')} ${X.josa(X.MOVES[m].name, '을/를')} 배웠다!`); } else await X.Menu.learnMove(b, m); }
         }
       }
@@ -178,7 +182,9 @@
     },
     async ending() {
       sfx('win');
-      await this.say(['— 그날, 아르카 대륙에 새로운 챔피언이 탄생했다.', '비스트를 기르는 테이머이자, 덱을 다루는 듀얼리스트.', '서로 다른 규칙으로 싸우던 두 문화는, 한 사람의 여행을 통해 조금 더 가까워졌다.', '레온은 몰래 카드 팩을 샀고, 미라는 작은 비스트를 키우기 시작했다고 한다.', '【 크로스링크 — 끝 】  플레이해 주셔서 감사합니다!', '(모험은 계속된다. 잿빛 동굴 깊은 곳에서 무언가가 깨어났다…)'], null);
+      await this.say(['— 그날, 아르카 대륙에 새로운 챔피언이 탄생했다.', '비스트를 기르는 테이머이자, 덱을 다루는 듀얼리스트.', '서로 다른 규칙으로 싸우던 두 문화는, 한 사람의 여행을 통해 조금 더 가까워졌다.', '레온은 몰래 카드 팩을 샀고, 미라는 작은 비스트를 키우기 시작했다고 한다.'], null);
+      await X.Cine.credits();
+      await this.say('(모험은 계속된다. 잿빛 동굴 깊은 곳에서 무언가가 깨어났다…)', null);
     },
     openShop: (stock) => X.Menu.shop(stock),
     openCardShop: (stock) => X.Menu.cardShop(stock),
@@ -231,6 +237,9 @@
         const box = $('#dialog'), tx = $('#dlg-text'), nm = $('#dlg-name');
         box.classList.remove('hidden');
         nm.textContent = name || ''; nm.style.display = name ? '' : 'none';
+        const pt = $('#dlg-port'), lk = X.Cine.lookOf(name);
+        if (lk) { const u = A0.portrait(lk); if (pt.dataset.u !== u) { pt.dataset.u = u; pt.src = u; pt.classList.remove('pop'); void pt.offsetWidth; pt.classList.add('pop'); } }
+        pt.classList.toggle('hidden', !lk); box.classList.toggle('has-port', !!lk);
         $('#dlg-next').style.visibility = 'hidden';
         let i = 0, done = false;
         const fin = () => { done = true; tx.textContent = text; clearInterval(tm); $('#dlg-next').style.visibility = keep ? 'hidden' : 'visible'; if (keep) end(); };

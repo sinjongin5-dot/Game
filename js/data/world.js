@@ -366,6 +366,7 @@
         G.refresh();
       } },
       { id: 'stormwing', x: 17, y: 1, look: null, beast: 'stormwing', name: '뇌운조', dir: 'down', show: (G) => !G.flag('stormwing'), script: async (G) => {
+        await X.Cine.shock();
         await G.say('키이이잉—! (전설의 비스트 뇌운조가 날개를 펼쳤다!)', null);
         const r = await G.wildBattle('stormwing', 30, { legend: true });
         if (r === 'captured' || r === 'win') { G.setFlag('stormwing'); G.refresh(); }
@@ -412,6 +413,7 @@
       } },
       { id: 'arcalon', x: 21, y: 3, look: null, beast: 'arcalon', name: '아르카론', dir: 'down', show: (G) => G.flag('champion') && !G.flag('arcalon'), script: async (G) => {
         await G.say(['……(빛과 어둠이 뒤섞인 비스트가 조용히 이쪽을 바라본다.)', '(대융합의 날 태어났다는 전설의 존재, 아르카론이다!)'], null);
+        await X.Cine.shock();
         const r = await G.wildBattle('arcalon', 50, { legend: true });
         if (r === 'captured' || r === 'win') { G.setFlag('arcalon'); G.refresh(); }
       } },
@@ -515,6 +517,7 @@
             G.setFlag('zero_seen');
             await G.say(['드디어 결승이군. 그대와 겨룰 날을—', '…음? 누구냐!'], n.name);
             G.refresh();
+            await X.Cine.shock();
             await G.say(['결승은 취소다. 이 리그 자체가 오늘로 끝이니까.', '나는 제로. 분리단을 이끄는 자.', '나 또한 너와 같은 크로스 링커였다. 두 힘을 다 가졌기에, 어느 쪽에도 속하지 못했지.', '섞인 세계는 누군가를 반드시 외톨이로 만든다. 그러니 내가 갈라놓겠다!'], '제로');
           } else await G.say('아직 서 있었나. 몇 번이든 상대해 주마.', '제로');
           const zero = MAPS.arena.npcs.find((x) => x.id === 'zero');

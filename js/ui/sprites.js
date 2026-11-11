@@ -245,34 +245,52 @@
     noah: { hair: '#1a1626', top: '#5a3a78', bot: '#1a1626', coat: '#3a2a58' },
     aria: { hair: '#f5e79a', top: '#f8f8ff', bot: '#c8a040', coat: '#e03a3a' },
   };
+  // 캐릭터: 24x32, 4방향 x 4프레임 걷기 (0·2 서기, 1·3 발 내딛기)
   const charCache = {};
   function drawChar(lookName, dir, frame) {
+    frame = frame || 0;
     const key = lookName + dir + frame;
     if (charCache[key]) return charCache[key];
-    const L = LOOKS[lookName] || LOOKS.kid, cv = mk(16, 16), g = cv.getContext('2d');
-    const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
-    const skin = '#f8d0a8', body = L.coat || L.top;
-    // 다리
-    const lf = frame ? 1 : 0;
-    if (dir === 'left' || dir === 'right') { R(6, 12, 2, 3 - lf, L.bot); R(8, 12, 2, 2 + lf, L.bot); }
-    else { R(5, 12, 2, 3 - lf, L.bot); R(9, 12, 2, 2 + lf, L.bot); }
-    // 몸
-    R(4, 8, 8, 5, body);
-    if (L.coat && dir === 'down') R(7, 8, 2, 5, L.top);
-    if (dir === 'down' || dir === 'up') { R(3, 8, 1, 4, body); R(12, 8, 1, 4, body); R(3, 11, 1, 1, skin); R(12, 11, 1, 1, skin); }
-    else R(dir === 'left' ? 6 : 8, 9, 2, 3, shade(body, 0.8));
-    // 머리
-    R(4, 2, 8, 7, skin);
-    if (dir === 'down') { R(4, 1, 8, 3, L.hair); R(3, 2, 1, 4, L.hair); R(12, 2, 1, 4, L.hair); R(6, 5, 1, 2, '#1a1626'); R(9, 5, 1, 2, '#1a1626'); }
-    else if (dir === 'up') { R(3, 1, 10, 7, L.hair); }
-    else { const f = dir === 'left'; R(4, 1, 8, 3, L.hair); R(f ? 8 : 4, 2, 4, 6, L.hair); R(f ? 5 : 10, 5, 1, 2, '#1a1626'); }
-    if (L.hat) { R(3, 0, 10, 3, L.hat); if (dir === 'down') R(4, 3, 8, 1, shade(L.hat, 0.75)); else if (dir === 'left') R(2, 2, 3, 1, shade(L.hat, 0.75)); else if (dir === 'right') R(11, 2, 3, 1, shade(L.hat, 0.75)); }
-    // 외곽선
-    const im = g.getImageData(0, 0, 16, 16), d = im.data, on = [];
-    for (let i = 0; i < 256; i++) on[i] = d[i * 4 + 3] > 0;
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      if (on[y * 16 + x]) continue;
-      if ((x > 0 && on[y * 16 + x - 1]) || (x < 15 && on[y * 16 + x + 1]) || (y > 0 && on[(y - 1) * 16 + x]) || (y < 15 && on[(y + 1) * 16 + x])) { const i = (y * 16 + x) * 4; d[i] = OUT[0]; d[i + 1] = OUT[1]; d[i + 2] = OUT[2]; d[i + 3] = 255; }
+    const L = LOOKS[lookName] || LOOKS.kid, cv = mk(24, 32), g = cv.getContext('2d');
+    const skin = '#f8d0a8', skinD = '#e0a880', body = L.coat || L.top, bodyD = shade(body, 0.78), hairL = shade(L.hair, 1.28), shoe = '#2a2230';
+    const step = frame === 1 ? 1 : frame === 3 ? -1 : 0, bob = step ? -1 : 0;
+    const side = dir === 'left' || dir === 'right';
+    if (dir === 'right') { g.translate(24, 0); g.scale(-1, 1); }
+    const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y + bob, w, h); };
+    const F = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); }; // 발은 들썩이지 않는다
+    if (side) {
+      // 다리 (앞뒤로 교차)
+      F(9 - step * 2, 24, 3, 6 - (step > 0 ? 1 : 0), L.bot); F(9 - step * 2 - 1, 29 - (step > 0 ? 1 : 0), 4, 2, shoe);
+      F(12 + step * 2, 24, 3, 6 - (step < 0 ? 1 : 0), shade(L.bot, 0.85)); F(12 + step * 2 - 1, 29 - (step < 0 ? 1 : 0), 4, 2, shoe);
+      R(8, 15, 8, 9, body); R(8, 22, 8, 2, bodyD); if (L.coat) R(8, 15, 2, 9, L.top);
+      R(11 + step, 16, 3, 6, bodyD); R(11 + step, 22, 3, 2, skin);
+      R(5, 6, 14, 9, skin); R(5, 13, 9, 2, skinD);
+      R(5, 2, 14, 5, L.hair); R(11, 7, 8, 7, L.hair); R(12, 14, 6, 1, shade(L.hair, 0.8)); R(5, 7, 3, 2, L.hair); R(7, 3, 6, 1, hairL);
+      R(7, 10, 2, 3, '#1a1626'); R(7, 10, 1, 1, '#fff'); R(6, 13, 2, 1, '#c07860');
+      if (L.hat) { R(4, 1, 16, 4, L.hat); R(2, 5, 9, 1, shade(L.hat, 0.72)); R(7, 1, 8, 1, shade(L.hat, 1.25)); }
+    } else {
+      F(8, 24, 3, 6 - (step > 0 ? 2 : 0), L.bot); F(8, 29 - (step > 0 ? 2 : 0), 3, 2, shoe);
+      F(13, 24, 3, 6 - (step < 0 ? 2 : 0), L.bot); F(13, 29 - (step < 0 ? 2 : 0), 3, 2, shoe);
+      R(7, 15, 10, 9, body); R(7, 22, 10, 2, bodyD);
+      R(5, 16 + step, 2, 6, body); R(5, 22 + step, 2, 2, skin); R(17, 16 - step, 2, 6, body); R(17, 22 - step, 2, 2, skin);
+      R(5, 6, 14, 9, skin);
+      if (dir === 'down') {
+        if (L.coat) { R(11, 15, 2, 9, L.top); R(9, 15, 6, 1, shade(body, 1.2)); } else R(10, 15, 4, 1, skinD);
+        R(5, 13, 14, 2, skinD); R(6, 13, 12, 1, skin);
+        R(5, 2, 14, 5, L.hair); R(4, 4, 1, 8, L.hair); R(19, 4, 1, 8, L.hair); R(5, 7, 4, 2, L.hair); R(15, 7, 4, 2, L.hair); R(9, 7, 6, 1, L.hair); R(8, 3, 6, 1, hairL);
+        R(8, 10, 2, 3, '#1a1626'); R(14, 10, 2, 3, '#1a1626'); R(8, 10, 1, 1, '#fff'); R(14, 10, 1, 1, '#fff'); R(11, 13, 2, 1, '#c07860'); R(6, 12, 2, 1, '#f0a8a0'); R(16, 12, 2, 1, '#f0a8a0');
+        if (L.hat) { R(4, 1, 16, 4, L.hat); R(4, 5, 16, 1, shade(L.hat, 0.72)); R(7, 1, 8, 1, shade(L.hat, 1.25)); }
+      } else {
+        R(4, 2, 16, 12, L.hair); R(5, 14, 14, 1, shade(L.hair, 0.8)); R(8, 3, 6, 1, hairL); R(6, 9, 12, 1, shade(L.hair, 0.88));
+        if (L.hat) { R(4, 1, 16, 4, L.hat); R(4, 5, 16, 1, shade(L.hat, 0.72)); }
+      }
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    const im = g.getImageData(0, 0, 24, 32), d = im.data, on = [];
+    for (let i = 0; i < 768; i++) on[i] = d[i * 4 + 3] > 0;
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 24; x++) {
+      if (on[y * 24 + x]) continue;
+      if ((x > 0 && on[y * 24 + x - 1]) || (x < 23 && on[y * 24 + x + 1]) || (y > 0 && on[(y - 1) * 24 + x]) || (y < 31 && on[(y + 1) * 24 + x])) { const i = (y * 24 + x) * 4; d[i] = OUT[0]; d[i + 1] = OUT[1]; d[i + 2] = OUT[2]; d[i + 3] = 255; }
     }
     g.putImageData(im, 0, 0);
     return (charCache[key] = cv);
@@ -339,6 +357,8 @@
     card(id) { const c = X.CARDS[id]; return artCache['c' + id] || (artCache['c' + id] = c.kind === 'mon' ? creature(c.look) : icon(c.icon)); },
     beastUrl(id) { return urlCache['b' + id] || (urlCache['b' + id] = this.beast(id).toDataURL()); },
     cardUrl(id) { return urlCache['c' + id] || (urlCache['c' + id] = this.card(id).toDataURL()); },
-    charUrl(look, dir = 'down') { const k = 'h' + look + dir; if (!urlCache[k]) { const s = drawChar(look, dir, 0), c = mk(16, 16); c.getContext('2d').drawImage(s, 0, 0); urlCache[k] = c.toDataURL(); } return urlCache[k]; },
+    // 얼굴 위주로 자른 정사각 아이콘 / 대화용 상반신 초상
+    charUrl(look, dir = 'down') { const k = 'h' + look + dir; if (!urlCache[k]) { const c = mk(24, 24); c.getContext('2d').drawImage(drawChar(look, dir, 0), 0, 0); urlCache[k] = c.toDataURL(); } return urlCache[k]; },
+    portrait(look) { const k = 'p' + look; if (!urlCache[k]) { const c = mk(22, 24); c.getContext('2d').drawImage(drawChar(look, 'down', 0), -1, 0); urlCache[k] = c.toDataURL(); } return urlCache[k]; },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

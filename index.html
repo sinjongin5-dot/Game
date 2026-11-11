@@ -9,14 +9,18 @@
 </head>
 <body>
 <div id="stage">
-  <div id="scene"><div id="cam"><div id="plane"></div></div><div id="haze"></div></div>
+  <div id="scene"><div id="far"></div><div id="cam"><div id="plane"></div></div><div id="haze"></div><div id="rays"></div><canvas id="atmo" width="960" height="600"></canvas></div>
   <div id="hud">
     <div id="toast"></div>
     <button id="btn-menu" class="hud-btn">메뉴</button>
   </div>
   <div id="battle" class="hidden"></div>
   <div id="overlay" class="hidden"></div>
+  <div id="bar-t" class="lbar"></div><div id="bar-b" class="lbar"></div>
+  <div id="cine" class="hidden"></div>
+  <div id="flash"></div>
   <div id="dialog" class="hidden">
+    <img id="dlg-port" class="hidden" alt="">
     <div id="dlg-name"></div>
     <div id="dlg-text"></div>
     <div id="dlg-next">▼</div>
@@ -41,6 +45,7 @@
 <script src="js/ui/main.js"></script>
 <script src="js/ui/overworld.js"></script>
 <script src="js/ui/battleui.js"></script>
+<script src="js/ui/cine.js"></script>
 <script src="js/ui/menus.js"></script>
 <script>XG.G.boot();</script>
 <!--/SCRIPTS-->

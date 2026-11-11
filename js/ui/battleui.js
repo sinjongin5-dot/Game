@@ -71,7 +71,8 @@
       const b = $('#battle'), bt = this.bt;
       const mode = bt.mode === 'tt' ? '비스트 배틀' : bt.mode === 'dd' ? '듀얼' : '크로스 배틀';
       b.className = 'bg-' + (this.cfg.bg || 'field') + ' m-' + bt.mode;
-      b.innerHTML = `<div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
+      const scn = { field: 'T', forest: 'T', cave: '#', indoor: 'xb' }[this.cfg.bg || 'field'];
+      b.innerHTML = `<div class="b-sky"></div><div class="b-scn" ${scn ? `style="background-image:url(${A.prop(scn).url})"` : ''}></div><div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
         <div id="b-right"><div id="b-log"></div><div id="b-detail" class="hidden"></div></div>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);

@@ -359,3 +359,121 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 #dialog{animation:dlgIn .18s ease-out}@keyframes dlgIn{from{transform:translateY(24px);opacity:0}}
 .ov{animation:ovIn .2s cubic-bezier(.2,1.3,.4,1)}@keyframes ovIn{from{transform:scale(.9);opacity:0}}
 @media (prefers-reduced-motion:reduce){.turnban,.cardcast,.pillar,#battle.intro *{animation:none!important}}
+
+/* ══ 2.5D 품질: 캐릭터, 분위기, 조명 ══ */
+.bi{position:absolute;inset:0;image-rendering:pixelated;background-repeat:repeat-x}
+.bi.ent{width:auto;height:auto;background-size:100% 100%;background-repeat:no-repeat;filter:drop-shadow(0 0 1px rgba(0,0,0,.45))}
+.bi.idle{transform-origin:50% 100%;animation:idle 1.8s ease-in-out infinite alternate}@keyframes idle{to{transform:scaleY(1.03)}}
+.bi.beast{animation:bob 1s ease-in-out infinite alternate}
+.bi.p-T{transform-origin:50% 100%;animation:sway 3.6s ease-in-out infinite alternate}@keyframes sway{from{transform:skewX(-1.6deg)}to{transform:skewX(1.6deg)}}
+.bi.p-grass{transform-origin:50% 100%;animation:sway2 1.7s ease-in-out infinite alternate}@keyframes sway2{from{transform:skewX(-9deg)}to{transform:skewX(9deg)}}
+.f3.bang::after{content:"!";position:absolute;left:50%;top:-34px;transform:translateX(-50%);background:#fff;color:#e03a3a;font:900 22px/1.2 sans-serif;border:2px solid #1a1626;border-radius:7px;padding:0 9px;animation:bangIn .3s cubic-bezier(.2,2,.4,1)}
+@keyframes bangIn{from{transform:translateX(-50%) scale(0) translateY(20px)}}
+.bw-chim{background:linear-gradient(90deg,#9a7868,#7a5a4c);border:2px solid #1a1626}
+.clouds{background:radial-gradient(ellipse 220px 110px at 22% 30%,rgba(10,10,50,.2),transparent 70%),radial-gradient(ellipse 300px 140px at 72% 68%,rgba(10,10,50,.17),transparent 70%),radial-gradient(ellipse 160px 80px at 52% 12%,rgba(10,10,50,.14),transparent 70%);background-size:1100px 760px;animation:drift 60s linear infinite;pointer-events:none}
+@keyframes drift{to{background-position:1100px 380px}}
+#cam{transition:none}
+#atmo{position:absolute;inset:0;pointer-events:none;image-rendering:pixelated}
+/* 원경: 겹겹의 산등성이 */
+#far{position:absolute;left:0;right:0;top:0;height:150px;pointer-events:none;background-repeat:repeat-x;background-image:linear-gradient(135deg,transparent 50%,var(--m1) 50%),linear-gradient(135deg,transparent 50%,var(--m2) 50%);background-size:340px 110px,220px 70px;--m1:#7fb0d8;--m2:#5f96c4;opacity:.75;-webkit-mask-image:linear-gradient(#000 60%,transparent);mask-image:linear-gradient(#000 60%,transparent)}
+#scene.bg-forest #far{--m1:#3f7a60;--m2:#2f6248}#scene.bg-city #far{--m1:#a898d8;--m2:#8878c0}#scene.bg-coast #far{--m1:#8fc4ec;--m2:#74b0e0}
+#scene.bg-cave #far,#scene.bg-indoor #far{display:none}
+/* 지역별 색 보정과 빛 */
+/* (필터를 장면 자체에 걸면 원근이 풀리므로, 색 보정은 위에 얹는 혼합 레이어로 한다) */
+#scene::after{content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;background:var(--tint,rgba(255,240,200,.25))}
+#scene.bg-forest{--tint:rgba(40,150,90,.4)}#scene.bg-coast{--tint:rgba(120,210,255,.32)}#scene.bg-cave{--tint:rgba(90,70,160,.4)}#scene.bg-city{--tint:rgba(255,160,90,.42)}#scene.bg-indoor{--tint:rgba(255,210,150,.3)}
+#rays{position:absolute;inset:-20% -10% 0 -10%;pointer-events:none;mix-blend-mode:screen;opacity:0;background:repeating-linear-gradient(112deg,transparent 0 70px,rgba(255,244,200,.2) 70px 110px,transparent 110px 200px);-webkit-mask-image:linear-gradient(#000,transparent 85%);mask-image:linear-gradient(#000,transparent 85%);animation:raysMove 9s ease-in-out infinite alternate}
+@keyframes raysMove{from{transform:translateX(-40px)}to{transform:translateX(40px)}}
+#scene.bg-forest #rays{opacity:1}#scene.bg-field #rays{opacity:.45}#scene.bg-indoor #rays{opacity:.6}#scene.bg-city #rays{opacity:.5}
+#scene.bg-cave #haze{background:radial-gradient(ellipse 46% 52% at 50% 62%,transparent 30%,rgba(4,2,12,.86) 100%)}
+#scene.bg-city #haze{background:linear-gradient(var(--sky) 0,transparent 30%),linear-gradient(transparent 40%,rgba(255,150,80,.14)),radial-gradient(ellipse at 50% 62%,transparent 52%,rgba(8,6,20,.5) 100%)}
+/* ══ 연출: 레터박스, 초상화, 섬광 ══ */
+.lbar{position:absolute;left:0;right:0;height:0;background:#000;z-index:58;transition:height .35s ease-out;pointer-events:none}#bar-t{top:0}#bar-b{bottom:0}
+#stage.letterbox .lbar{height:54px}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:79}#flash.go{animation:flashGo .6s ease-out}@keyframes flashGo{0%{opacity:1}100%{opacity:0}}
+#dlg-port{position:absolute;left:14px;bottom:10px;width:132px;height:144px;image-rendering:pixelated;filter:drop-shadow(0 4px 0 rgba(0,0,0,.45));pointer-events:none}
+#dlg-port.pop{animation:portIn .25s cubic-bezier(.2,1.5,.4,1)}@keyframes portIn{from{transform:translateY(30px) scale(.8);opacity:0}}
+#dialog.has-port{padding-left:164px}#dialog.has-port #dlg-name{left:160px}
+/* ══ 컷씬 레이어 ══ */
+#cine{position:absolute;inset:0;z-index:76;overflow:hidden;background:#0c0a14;font-family:"Jua","Noto Sans KR",sans-serif}
+#cine.out{animation:cineOut .35s forwards}@keyframes cineOut{to{opacity:0}}
+#cine img{image-rendering:pixelated}
+.rays{position:absolute;left:50%;top:50%;width:1600px;height:1600px;margin:-800px;background:repeating-conic-gradient(rgba(255,230,150,.16) 0 9deg,transparent 9deg 18deg);animation:spin 26s linear infinite;-webkit-mask-image:radial-gradient(#000 10%,transparent 62%);mask-image:radial-gradient(#000 10%,transparent 62%)}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* VS */
+#cine.vs{background:#0c0a14}
+.vs-side{position:absolute;top:0;bottom:0;width:62%;overflow:hidden}
+.vs-side.l{left:0;clip-path:polygon(0 0,100% 0,72% 100%,0 100%);animation:vsL .42s cubic-bezier(.2,.9,.3,1)}.vs-side.r{right:0;clip-path:polygon(28% 0,100% 0,100% 100%,0 100%);animation:vsR .42s cubic-bezier(.2,.9,.3,1)}
+@keyframes vsL{from{transform:translateX(-100%)}}@keyframes vsR{from{transform:translateX(100%)}}
+.vs-bg{position:absolute;inset:0;background:repeating-linear-gradient(110deg,rgba(255,255,255,.07) 0 30px,transparent 30px 60px),linear-gradient(135deg,#2a5fd0,#12245a);animation:vsScroll 1s linear infinite}
+.vs-side.r .vs-bg{background:repeating-linear-gradient(110deg,rgba(255,255,255,.07) 0 30px,transparent 30px 60px),linear-gradient(135deg,#7a1c34,#d04a4a)}
+@keyframes vsScroll{to{background-position:60px 0,0 0}}
+.vs-por{position:absolute;bottom:60px;width:264px;height:288px;filter:drop-shadow(0 8px 0 rgba(0,0,0,.4))}
+.vs-side.l .vs-por{left:90px;animation:vsPor .5s .15s cubic-bezier(.2,1.4,.4,1) backwards}.vs-side.r .vs-por{right:90px;transform:scaleX(-1);animation:vsPorR .5s .15s cubic-bezier(.2,1.4,.4,1) backwards}
+.vs-por.beast{width:300px;height:300px}
+@keyframes vsPor{from{transform:translateX(-200px);opacity:0}}@keyframes vsPorR{from{transform:translateX(200px) scaleX(-1);opacity:0}}
+.vs-name{position:absolute;bottom:22px;font-size:30px;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.6);white-space:nowrap}.vs-side.l .vs-name{left:60px}.vs-side.r .vs-name{right:60px}
+.vs-slash{position:absolute;left:50%;top:-10%;width:14px;height:120%;background:#fff;transform:translateX(-50%) rotate(15.5deg);box-shadow:0 0 30px 8px rgba(255,255,255,.8);animation:vsSlash .3s .42s backwards}
+@keyframes vsSlash{from{transform:translateX(-50%) rotate(15.5deg) scaleY(0)}}
+.vs-mark{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font:900 130px "Jua",sans-serif;color:#f2c94c;-webkit-text-stroke:6px #1a1626;text-shadow:0 8px 0 #1a1626;animation:vsMark .45s .5s cubic-bezier(.2,1.8,.4,1) backwards}
+@keyframes vsMark{from{transform:translate(-50%,-50%) scale(5) rotate(-20deg);opacity:0}}
+.vs-label{position:absolute;left:50%;top:9%;transform:translateX(-50%);background:#f2c94c;color:#1a1626;font-size:24px;padding:4px 30px;border-radius:8px;border:3px solid #1a1626;animation:vsMark .4s .7s backwards}
+/* 오프닝 */
+#cine.intro{background:#07060d}
+.in-stage{position:absolute;left:0;right:0;top:54px;bottom:150px;overflow:hidden}
+.in-s{position:absolute;inset:0;animation:inIn .7s ease-out}.in-s.out{animation:cineOut .3s forwards}@keyframes inIn{from{opacity:0;transform:scale(1.08)}}
+.cap{position:absolute;left:90px;right:90px;bottom:34px;height:96px;font-size:22px;line-height:1.55;color:#f2efe6;text-align:center;text-shadow:0 2px 0 #000}
+.in-skip{position:absolute;right:18px;top:12px;background:none;border:1px solid rgba(255,255,255,.35);color:#a8a2c0;border-radius:8px;padding:5px 12px;font-size:13px}
+.s1 .half{position:absolute;top:0;bottom:0;width:50%;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;align-content:center;gap:6px}
+.s1 .half.l{left:0;background:linear-gradient(#8fd0f5,#5cb85a 55%,#2f7a3c);animation:mergeL 2.6s ease-in-out}.s1 .half.r{right:0;background:linear-gradient(#2a1f55,#5a3a98 55%,#22184a);animation:mergeR 2.6s ease-in-out}
+@keyframes mergeL{0%{transform:translateX(-46%)}60%{transform:translateX(-6%)}70%{transform:translateX(0)}}@keyframes mergeR{0%{transform:translateX(46%)}60%{transform:translateX(6%)}70%{transform:translateX(0)}}
+.s1 .half img{width:104px;height:104px;animation:bob 1s infinite alternate}.s1 .half img:nth-child(2n){animation-delay:.3s}
+.s1 .fan{display:flex}.s1 .fan .card{margin-left:-34px;transform:rotate(calc((var(--i) - 2) * 8deg)) translateY(calc((var(--i) - 2) * (var(--i) - 2) * 5px))}
+.s1 .seam{position:absolute;left:50%;top:0;bottom:0;width:10px;margin-left:-5px;background:#fff;box-shadow:0 0 50px 22px rgba(255,255,255,.9);animation:seam 2.6s ease-in-out forwards}
+@keyframes seam{0%,55%{opacity:0;transform:scaleX(1)}70%{opacity:1;transform:scaleX(40)}100%{opacity:.75;transform:scaleX(1)}}
+.s2{background:linear-gradient(90deg,#3f8a50 0,#2f6a40 44%,#1a1626 50%,#3a2a68 56%,#5a3a98 100%)}
+.s2 .duo{position:absolute;bottom:20px;display:flex;align-items:flex-end;gap:10px}.s2 .duo.l{left:120px;animation:vsPor .7s backwards}.s2 .duo.r{right:120px;flex-direction:row-reverse;animation:vsPor .7s reverse backwards}
+.s2 .p{width:176px;height:192px}.s2 .duo.r .p{transform:scaleX(-1)}.s2 .b{width:150px;height:150px;transform:scaleX(-1)}.s2 .c .card{transform:scale(1.25) rotate(-6deg);margin:0 24px 30px}
+.s2 .q{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:150px;color:#f2c94c;text-shadow:0 6px 0 #1a1626;animation:bob 1s infinite alternate}
+.s3{background:radial-gradient(circle at 50% 50%,#3a3470,#0c0a14 70%)}
+.s3 .ring{position:absolute;left:50%;top:50%;width:150px;height:150px;margin:-75px;border-radius:50%;border:16px solid #f2c94c;box-shadow:0 0 40px 10px rgba(242,201,76,.7),inset 0 0 20px rgba(242,201,76,.8);animation:ringPulse 1.4s ease-in-out infinite alternate}
+@keyframes ringPulse{to{box-shadow:0 0 80px 26px rgba(242,201,76,.9),inset 0 0 30px rgba(255,255,255,.9);transform:scale(1.06)}}
+.s3 .ring i{position:absolute;left:50%;top:-22px;width:22px;height:22px;margin-left:-11px;background:#58d0c0;border:3px solid #1a1626;transform:rotate(45deg)}.s3 .ring i:nth-child(2){top:auto;bottom:-22px;background:#f0672e}.s3 .ring i:nth-child(3){left:-22px;top:50%;margin:-11px 0 0;background:#8a58c0}
+.s3 .lb{position:absolute;left:150px;top:50%;width:170px;height:170px;margin-top:-85px;animation:bob 1.2s infinite alternate}
+.s3 .lc{position:absolute;right:180px;top:50%;margin-top:-58px}.s3 .lc .card{transform:scale(1.5)}
+.s3 .beam{position:absolute;top:50%;height:8px;margin-top:-4px;background:linear-gradient(90deg,transparent,#fff,transparent);background-size:200% 100%;animation:beam 1s linear infinite}.s3 .b1{left:300px;width:110px}.s3 .b2{right:300px;width:110px;animation-direction:reverse}
+@keyframes beam{to{background-position:-200% 0}}
+.s4{background:linear-gradient(#ffcf8a,#ffe9c0 45%,#8fd0f5 46%,#bfe6f8)}
+.s4 .sun{position:absolute;left:50%;top:24%;width:150px;height:150px;margin-left:-75px;border-radius:50%;background:#fff6d0;box-shadow:0 0 80px 30px rgba(255,240,180,.9);animation:sunUp 4s ease-out}@keyframes sunUp{from{transform:translateY(120px)}}
+.s4 .hill{position:absolute;left:-10%;right:-10%;bottom:-120px;height:280px;border-radius:50%;background:#4fa85a}.s4 .h2{left:30%;right:-40%;bottom:-150px;background:#3f9a48}
+.s4 .house{position:absolute;right:200px;bottom:98px;width:130px;height:74px;background:#f2e6cc;border:4px solid #1a1626}.s4 .house::before{content:"";position:absolute;left:-18px;right:-18px;top:-58px;height:58px;background:#d8553a;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.s4 .hero{position:absolute;left:230px;bottom:104px;width:132px;height:144px;animation:idle 1.6s infinite alternate;transform-origin:50% 100%}
+/* 엠블럼 */
+#cine.embc,#cine.evo2,#cine.credits{background:radial-gradient(circle,#3a3070,#0c0a14 72%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#fff}
+.emb-gem{width:150px;height:150px;position:relative;animation:gemIn .9s cubic-bezier(.2,1.5,.4,1)}
+.emb-gem i{position:absolute;inset:22px;background:linear-gradient(135deg,#fff 0,var(--c) 40%,var(--c) 60%,rgba(0,0,0,.35));border:6px solid #fff;border-radius:22px;transform:rotate(45deg);box-shadow:0 0 50px 12px var(--c)}
+@keyframes gemIn{0%{transform:scale(0) rotate(-540deg)}100%{transform:scale(1)}}
+.emb-t1{font-size:26px;color:#f2c94c;position:relative;animation:slideU .5s .5s backwards}.emb-t2{font-size:52px;position:relative;text-shadow:0 5px 0 #1a1626;animation:slideU .5s .65s backwards}
+.emb-dots{display:flex;gap:14px;position:relative;animation:slideU .5s .8s backwards}.emb-dots b{width:26px;height:26px;border:3px solid #fff;border-radius:6px;transform:rotate(45deg);opacity:.35}.emb-dots b.on{background:#f2c94c;opacity:1;box-shadow:0 0 12px #f2c94c}
+/* 진화 */
+.evo-box{position:relative;width:260px;height:260px}
+.evo-box img{position:absolute;inset:0;width:100%;height:100%}
+.evo-box .o{animation:evoO 2.3s linear forwards}.evo-box .n{animation:evoN 2.3s linear forwards}
+@keyframes evoO{0%{filter:none;opacity:1}20%{filter:brightness(0) invert(1)}30%,50%,64%,74%,82%,88%,93%{opacity:1;filter:brightness(0) invert(1)}40%,57%,69%,78%,85%,91%,96%,100%{opacity:0;filter:brightness(0) invert(1)}}
+@keyframes evoN{0%,30%,50%,64%,74%,82%,88%,93%{opacity:0;filter:brightness(0) invert(1)}40%,57%,69%,78%,85%,91%,96%,100%{opacity:1;filter:brightness(0) invert(1)}}
+#cine.evo2.done .evo-box .o{display:none}#cine.evo2.done .evo-box .n{animation:evoDone .7s cubic-bezier(.2,1.6,.4,1) forwards}
+@keyframes evoDone{0%{filter:brightness(0) invert(1);transform:scale(1.5)}100%{filter:drop-shadow(0 0 22px #ffe9a0);transform:scale(1.15);opacity:1}}
+#cine.evo2.done::after{content:"";position:absolute;inset:0;background:#fff;animation:flashGo .7s forwards;pointer-events:none}
+.evo-t{position:relative;font-size:26px;text-shadow:0 3px 0 #1a1626}.evo-t b{color:#f2c94c}
+/* 크레딧 */
+.cr-roll{position:absolute;left:0;right:0;top:100%;text-align:center;font-size:24px;line-height:2;animation:crRoll 16s linear forwards}.cr-roll .big{font-size:64px;color:#f2c94c;text-shadow:0 5px 0 #1a1626}
+@keyframes crRoll{to{transform:translateY(calc(-100% - 420px))}}
+.cr-parade{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;flex-wrap:wrap;gap:0 2px;max-height:100px;overflow:hidden}.cr-parade img{width:54px;height:54px;animation:bob .5s infinite alternate}
+/* ══ 전투 배경 풍경 ══ */
+.b-sky{position:absolute;left:0;right:0;top:0;height:36%;z-index:0!important;pointer-events:none;background:radial-gradient(ellipse 120px 34px at 18% 30%,rgba(255,255,255,.75),transparent 70%),radial-gradient(ellipse 170px 40px at 62% 52%,rgba(255,255,255,.6),transparent 70%),radial-gradient(ellipse 110px 30px at 88% 22%,rgba(255,255,255,.65),transparent 70%);background-size:1200px 100%;animation:skyDrift 70s linear infinite}
+@keyframes skyDrift{to{background-position:1200px 0}}
+#battle.bg-cave .b-sky,#battle.bg-indoor .b-sky{display:none}
+.b-scn{position:absolute;left:0;right:0;top:calc(36% - 84px);height:90px;z-index:0!important;pointer-events:none;background-repeat:repeat-x;background-size:48px 90px;image-rendering:pixelated;filter:brightness(.8) saturate(.9);opacity:.95}
+#battle.bg-coast .b-scn{top:calc(36% - 26px);height:26px;background:repeating-linear-gradient(90deg,#3f8ee8 0 40px,#58a4f0 40px 80px);animation:skyDrift 30s linear infinite reverse;filter:none}
+#battle.bg-city .b-scn{background:linear-gradient(90deg,#4a3c78 0 60px,transparent 60px 70px,#5a4a88 70px 150px,transparent 150px 164px,#3f3468 164px 230px,transparent 230px 240px) 0 100%/240px 70px repeat-x;filter:none;opacity:.85}
+#battle.bg-cave .b-scn,#battle.bg-indoor .b-scn{top:calc(36% - 88px)}

@@ -58,9 +58,13 @@
       const name = await modal(() => `<div class="mtitle">이름을 알려 주세요</div><input id="nm" maxlength="6" value="하루" autocomplete="off"><button class="btn big" data-act="ok">결정</button>`, { ok: (d, m) => m.close(($('#nm').value || '하루').trim().slice(0, 6) || '하루') }, { cls: 'small', noCancel: true });
       G.p = G.newPlayer(name);
       await G.fade(true);
+      $('#title').classList.add('hidden');
+      await G.fade(false);
+      await X.Cine.intro(name);
+      await G.fade(true);
       G.startWorld();
       await G.fade(false);
-      G.run(() => G.say(['아르카 대륙 — 백 년 전 \'대융합\'으로 두 세계가 하나가 된 땅.', '비스트와 함께 살아가는 테이머, 카드에 혼을 담는 듀얼리스트.', '싸우는 방식이 전혀 다른 두 문화는 오랫동안 서로를 이해하지 못했다.', `그리고 오늘, 새싹 마을의 ${name}에게 한 통의 연락이 온다…`, '(이동: 방향키/WASD · 대화·조사: Z/Enter · 메뉴: X/Esc — 터치 화면에서는 십자 패드와 A·B 버튼)'], null));
+      G.run(() => G.say(['(이동: 방향키/WASD · 대화·조사: Z/Enter · 메뉴: X/Esc — 터치 화면에서는 십자 패드와 A·B 버튼)'], null));
     },
     help() {
       return modal(() => `<div class="mtitle">조작법</div><div class="rules"><p><b>이동</b> 방향키 / WASD (터치: 화면의 십자 패드)</p><p><b>대화·조사·확인</b> Z / Enter / Space (터치: A)</p><p><b>메뉴·취소</b> X / Esc (터치: B)</p><p><b>전투</b> 버튼과 카드를 클릭(탭)해 진행합니다. 메시지는 Z 또는 A로 넘길 수 있습니다.</p><p>NPC에게 승부를 걸면 <b>비스트</b>로 싸울지 <b>덱</b>으로 싸울지 고를 수 있습니다. 상대가 테이머든 듀얼리스트든 상관없이!</p></div><button class="btn" data-act="x">닫기</button>`, { x: (d, m) => m.close() });
