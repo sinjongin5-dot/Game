@@ -1,0 +1,14 @@
+{
+  "name": "crosslink-multiplayer-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Crosslink browser game multiplayer server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
