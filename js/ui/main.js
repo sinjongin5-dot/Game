@@ -255,6 +255,7 @@
       this.scene = 'world';
       $('#title').classList.add('hidden');
       X.OW.load(this.p.map, this.p.x, this.p.y, this.p.dir);
+      if (X.Net) X.Net.start();
     },
   });
 

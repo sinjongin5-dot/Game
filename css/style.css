@@ -592,3 +592,20 @@ h3{margin:0 0 6px;font-size:15px}h3 small{color:var(--dim);font-weight:400;font-
 .qr{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:13px;white-space:nowrap}
 .tabs{width:104px}.tab{padding:8px}
 #battle:not(.hidden)~.lbar{height:0!important}
+
+/* ══ 온라인: 다른 플레이어, 채팅 ══ */
+.ntag{position:absolute;left:50%;top:-16px;transform:translateX(-50%);white-space:nowrap;font:700 11px "Noto Sans KR",sans-serif;color:#fff;background:rgba(16,12,32,.78);border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:0 6px;pointer-events:none}
+.bubble{position:absolute;left:50%;bottom:calc(100% + 20px);transform:translateX(-50%);max-width:220px;width:max-content;font:500 13px/1.35 "Noto Sans KR",sans-serif;color:#1a1626;background:#fff;border:2px solid #1a1626;border-radius:10px;padding:3px 9px;pointer-events:none;z-index:2;animation:bangIn .2s}
+.bubble::after{content:"";position:absolute;left:50%;top:100%;margin-left:-5px;border:5px solid transparent;border-top-color:#1a1626}
+.hud-btn.net{right:92px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e04a4a;margin-right:6px}.dot.on{background:#5fe07a;box-shadow:0 0 8px #5fe07a}
+#chatw{position:absolute;left:12px;bottom:12px;width:330px;z-index:55;font-size:13px;pointer-events:none}
+#chat-log{max-height:86px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;text-shadow:0 1px 2px #000,0 0 4px #000;line-height:1.45;margin-bottom:4px}
+#chat-log div{overflow-wrap:anywhere}#chat-log b{color:#ffd24a;margin-right:4px}#chat-log b.me{color:#8ad0ff}#chat-log .sys{color:#c8c2e0;font-size:12px}
+#chat-form{display:none;gap:5px;pointer-events:auto}#chat-form input{flex:1;font:inherit;padding:6px 9px;border-radius:7px;border:2px solid var(--gold);background:rgba(12,10,24,.92);color:#fff;user-select:text;-webkit-user-select:text}
+#chat-btn{position:static;pointer-events:auto;font-size:13px;padding:4px 10px}#chat-btn kbd{font:inherit;opacity:.6;margin-left:3px}#chat-btn b{background:#e04a4a;border-radius:8px;padding:0 6px;margin-left:5px;font-size:11px}
+#chatw.open #chat-log{max-height:230px;overflow-y:auto;display:block;background:rgba(12,10,24,.86);border:1px solid var(--line);border-radius:8px;padding:7px 9px;pointer-events:auto;text-shadow:none}
+#chatw.open #chat-form{display:flex;margin-bottom:4px}
+#stage:has(#battle:not(.hidden)) #chatw{left:668px;bottom:auto;top:300px;width:276px}
+#stage:has(#battle:not(.hidden)) #chatw:not(.open) #chat-log{display:none}
+#stage:has(#battle:not(.hidden)) #btn-net,#stage:has(#title:not(.hidden)) #chatw,#stage:has(#title:not(.hidden)) #btn-net{display:none}
+#stage:has(#dialog:not(.hidden)) #chatw:not(.open){display:none}

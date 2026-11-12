@@ -75,12 +75,55 @@
       return r;
     },
 
+    // 네트워크 대전: 엔진은 서버에 있고, 여기서는 서버가 보내 준 (가려진) 상태로 화면만 그린다.
+    // 도우미 계산(소환 가능 여부, 스트라이크 미리보기 등)은 그 상태를 얹은 Battle 껍데기가 맡는다.
+    netWake() { if (this.done && this.cfg && this.cfg.net) { $('#b-modal').className = 'hidden'; this.picking = null; this.done({ type: '__skip' }); } },
+    async runNet(sess) {
+      const bt = (this.bt = Object.create(X.Battle.prototype));
+      Object.assign(bt, { s: sess.state, mode: sess.state.mode, events: [], log: [], aiRng: { seed: (Math.random() * 2 ** 31) | 0 }, view: () => bt.s, derive: () => {} });
+      this.auto = false; this.cfg = { bg: 'city', foeLook: sess.foeLook, net: sess }; this.log = []; this.sel = null; this.picking = null; this.prevHp = {}; this.skipFn = null;
+      this.meKind = bt.side(0).kind;
+      const h = G.pushInput({ a: () => this.skipFn && this.skipFn(), b: () => this.cancelPick() });
+      const prevScene = G.scene;
+      await G.fade(true);
+      X.Cine.bars(false);
+      this.build();
+      G.scene = 'battle';
+      this.render(bt.s);
+      await G.fade(false);
+      await this.message(`${sess.opp}와(과)의 온라인 대전!`, 900);
+      let batch = { events: sess.events, state: sess.state };
+      for (;;) {
+        if (!batch.reject) { bt.events = batch.events.slice(); await this.play(); bt.s = batch.state; this.render(bt.s); }
+        else { G.sfx('bump'); this.setMsg('그 행동은 지금 할 수 없다.'); }
+        if (bt.over) break;
+        if (sess.q.length) { batch = await sess.next(); continue; }
+        const req = bt.request(0);
+        if (req) {
+          let a;
+          if (this.auto) { await X.wait(300); a = sess.q.length ? { type: '__skip' } : X.AI.decide(bt, 0); } else a = await this.ask(req);
+          this.clearSel();
+          if (a.type !== '__skip') sess.send(a);
+        } else this.setMsg(`${sess.opp}의 행동을 기다리는 중…`);
+        batch = await sess.next();
+      }
+      const r = bt.s.result;
+      if (r.winner === 0) G.sfx('win');
+      await this.result(r.winner === 0 ? '승리!' : r.winner === 1 ? '패배…' : '무승부', r.winner === 0);
+      await G.fade(true);
+      $('#battle').classList.add('hidden');
+      this.auto = false;
+      G.popInput(h);
+      G.scene = prevScene;
+      await G.fade(false);
+      return r;
+    },
     build() {
       const b = $('#battle'), bt = this.bt;
       const mode = bt.mode === 'tt' ? '비스트 배틀' : bt.mode === 'dd' ? '듀얼' : '크로스 배틀';
       b.className = 'bg-' + (this.cfg.bg || 'field') + ' m-' + bt.mode;
       const scn = { field: 'T', forest: 'T', cave: '#', indoor: 'xb', snow: 'I', ruins: 'U' }[this.cfg.bg || 'field'];
-      b.innerHTML = `<div class="b-sky"></div><div class="b-scn" ${scn ? `style="background-image:url(${A.prop(scn).url})"` : ''}></div><div class="b-wfx"></div><div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><span id="b-weather" style="display:none"></span><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button></div><div class="b-side b-me" id="bs0"></div>
+      b.innerHTML = `<div class="b-sky"></div><div class="b-scn" ${scn ? `style="background-image:url(${A.prop(scn).url})"` : ''}></div><div class="b-wfx"></div><div class="b-side b-opp" id="bs1"></div><div class="b-banner"><span class="b-mode">${mode}</span><div id="b-msg"></div><span id="b-weather" style="display:none"></span><button class="bb" data-act="speed" title="메시지 속도">▶ ×${G.speed || 1}</button><button class="bb${this.auto ? ' on' : ''}" data-act="auto" title="AI가 대신 진행">자동</button>${this.cfg.net ? '<button class="bb" data-act="forfeit">항복</button>' : ''}</div><div class="b-side b-me" id="bs0"></div>
         <div id="b-right"><div id="b-turn"></div><div id="b-log"></div><div id="b-detail" class="hidden"></div></div><svg id="b-aim" viewBox="0 0 960 600"><defs><marker id="aimh" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#ffd24a"/></marker></defs><path d=""/></svg>
         <div class="b-bottom"><div id="b-hand"></div><div id="b-cmd"></div></div><div id="b-modal" class="hidden"></div>`;
       b.onclick = (e) => this.click(e);
@@ -324,12 +367,13 @@
       const f = this.acts && this.acts[name];
       if (name === 'close' && this.onClose) return this.onClose();
       if (name === 'cancel') return this.cancelPick();
+      if (name === 'forfeit') { if (this.cfg.net) this.cfg.net.send({ type: 'forfeit' }); return; }
       if (name === 'grave' && !(this.acts && this.acts.grave)) return this.graveModal(+d.side);
       if (name === 'speed') { G.speed = { 1: 2, 2: 4, 4: 1 }[G.speed || 1]; const e = $('#battle [data-act=speed]'); if (e) e.textContent = '▶ ×' + G.speed; return; }
       if (name === 'auto') {
         this.auto = !this.auto;
         const e = $('#battle [data-act=auto]'); if (e) e.classList.toggle('on', this.auto);
-        if (this.auto && this.done && this.bt.request(0)) { this.picking = null; this.paintPick(); $('#b-modal').className = 'hidden'; this.done(X.AI.decide(this.bt, 0)); }
+        if (this.auto && this.done && this.bt.request(0) && !(this.cfg.net && this.cfg.net.q.length)) { this.picking = null; this.paintPick(); $('#b-modal').className = 'hidden'; this.done(X.AI.decide(this.bt, 0)); }
         return;
       }
       if (f) f(d);

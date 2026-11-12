@@ -43,6 +43,7 @@
   };
 
   const OW = (X.OW = {
+    TS, CW, CH, FEET, boardM, mkBoard: board,
     map: null, npcs: [], pl: { x: 0, y: 0, dir: 'down', t: 0, moving: false }, time: 0, bang: null, focus: null, zoom: 1, walk: 0,
 
     init() {
@@ -68,6 +69,7 @@
       p.map = id; p.x = x; p.y = y; p.dir = this.pl.dir;
       this.build();
       this.refreshNpcs();
+      if (X.Net) X.Net.pos(x, y, this.pl.dir);
       if (this._name !== m.name) { this._name = m.name; G.toast(m.name, 2200); }
     },
     tile(x, y) { const m = this.map; return x < 0 || y < 0 || x >= m.w || y >= m.h ? null : m.tiles[y][x]; },
@@ -201,7 +203,7 @@
       const nx = pl.x + dx, ny = pl.y + dy;
       const w = this.map.warps.find((v) => v.x === nx && v.y === ny);
       if (w && w.gate) { const msg = w.gate(G); if (msg) { G.held.length = 0; return G.run(() => G.say(msg)); } }
-      if (this.passable(nx, ny)) { pl.moving = true; pl.t = 0; const c = this.tile(nx, ny); { const gr = c === ':' || c === 'j'; this.puff(gr ? nx * TS : pl.x * TS, ((gr ? ny : pl.y) + FEET) * TS, gr); } }
+      if (this.passable(nx, ny)) { pl.moving = true; pl.t = 0; if (X.Net) X.Net.pos(nx, ny, d); const c = this.tile(nx, ny); { const gr = c === ':' || c === 'j'; this.puff(gr ? nx * TS : pl.x * TS, ((gr ? ny : pl.y) + FEET) * TS, gr); } }
     },
 
     onStep() {
@@ -254,6 +256,8 @@
         this.focus = { x: (n.x + pl.x) / 2, y: (n.y + pl.y) / 2, zoom: n.battle ? 1.2 : 1.1 };
         await n.script(G, n);
       }, !!n.battle);
+      const rp = X.Net && X.Net.on && X.Net.at(x, y);
+      if (rp) return G.run(() => X.Net.challenge(rp));
       const sign = this.map.signs && this.map.signs[x + ',' + y];
       if (sign) return G.run(() => G.say(sign));
       const c = this.tile(x, y);
@@ -296,6 +300,7 @@
       // 물결
       const wf = Math.floor(this.time / 500) % 2;
       if (wf !== this._fr) { this._fr = wf; for (const [x, y] of this.anim) this.gctx.drawImage(A.drawTile('~', wf), x * 16, y * 16); }
+      if (X.Net && X.Net.on) X.Net.draw(this, dt || 16);
       this.drawAtmo(dt || 16);
     },
     // 화면 위에 떠다니는 입자 (꽃잎, 반딧불, 먼지, 윤슬)
